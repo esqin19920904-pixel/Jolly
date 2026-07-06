@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>JOLLY — Kodsuz Mallar Pro</title>
+<meta name="theme-color" content="#06070d">
+<meta name="description" content="JOLLY — mağaza məhsullarının ağıllı idarəetmə sistemi">
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JOLLY">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div class="ambient-bg"></div>
+
+  <div id="app">
+    <div class="topbar topbar-pro">
+      <button class="icon-btn" id="globalBackBtn" title="Geri" style="display:none;">‹</button>
+      <div class="brand" id="logoHome" title="Ana menyu">
+        <div class="brand-logo">👑 JOLLY</div>
+        <div class="brand-sub">Kodsuz Mallar Pro</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="icon-btn hidden-btn" id="cmdBtn" title="Sürətli əmr">⌘</button>
+      <button class="icon-btn hidden-btn" id="backupPill" title="Backup" style="position:relative;">💾<span id="backupDot" class="backup-dot"></span></button>
+      <div class="top-actions">
+        <button class="top-act" id="notifBell" title="Bildirişlər">
+          <span class="ta-icon" id="taBellIcon"></span><span class="ta-badge" id="notifBadge" style="display:none;">0</span>
+          <span class="ta-label">Bildiriş</span>
+        </button>
+        <button class="top-act" id="topAiBtn" title="AI Brain">
+          <span class="ta-icon ta-purple" id="taBrainIcon"></span>
+          <span class="ta-label">AI Brain</span>
+        </button>
+        <button class="top-act" id="topStudiosBtn" title="Studio">
+          <span class="ta-icon" id="taGearIcon"></span>
+          <span class="ta-label">Studio</span>
+        </button>
+      </div>
+    </div>
+
+    <main id="main"></main>
+
+    <nav class="bottom-nav" id="bottomNav"></nav>
+  </div>
+
+  <div class="edge-tab" id="edgeTab">›</div>
+  <div class="edge-scrim" id="edgeScrim"></div>
+  <aside class="edge-panel" id="edgePanel"></aside>
+
+  <script src="jolly-blackbox.js"></script>
+  <script src="jolly-diag.js"></script>
+  <script src="db.js"></script>
+  <script src="module-registry.js"></script>
+  <script src="storage.js"></script>
+  <script src="cloud.js"></script>
+  <script src="toast.js"></script>
+  <script src="cleanup.js"></script>
+  <script src="sound.js"></script>
+  <script src="haptic-fx.js"></script>
+  <script src="barcode.js"></script>
+  <script src="barcode-gen.js"></script>
+  <script src="share.js"></script>
+  <script src="gallery.js"></script>
+  <script src="voice.js"></script>
+  <script src="visual-search.js"></script>
+  <script src="jolly-live-lens.js"></script>
+  <script src="jolly-drive.js"></script>
+  <script src="viewer.js"></script>
+  <script src="ocr.js"></script>
+  <script src="ai.js"></script>
+  <script src="ai-shortcuts.js"></script>
+  <script src="jolly-ai-dictionary.js"></script>
+  <script src="jolly-ai-typo.js"></script>
+  <script src="jolly-ai-search.js"></script>
+  <script src="jolly-ai-intent.js"></script>
+  <script src="jolly-ai-health.js"></script>
+  <script src="jolly-ai-actions.js"></script>
+  <script src="jolly-ai-voice.js"></script>
+  <script src="jolly-ai-ui.js"></script>
+  <script src="jolly-ai-core.js"></script>
+  <script src="jolly-gemini.js"></script>
+  <script src="jolly-ai-studio.js"></script>
+  <script src="brain.js"></script>
+  <script src="command.js"></script>
+  <script src="product-pro.js"></script>
+  <script src="ux-pro.js"></script>
+  <script src="insight.js"></script>
+  <script src="bulk.js"></script>
+  <script src="fx-engine.js"></script>
+  <script src="reveal.js"></script>
+  <script src="quick.js"></script>
+  <script src="history.js"></script>
+  <script src="data-doctor.js"></script>
+  <script src="products.js"></script>
+  <script src="chat.js"></script>
+  <script src="admin-studio.js"></script>
+  <script src="workflow.js"></script>
+  <script src="code-studio.js"></script>
+  <script src="jolly-ota.js"></script>
+  <script src="jolly-icons.js"></script>
+  <script src="jolly-ai-daily.js"></script>
+  <script src="jolly-product-dna.js"></script>
+  <script src="jolly-store-map.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="studios.js"></script>
+  <script src="edge-panel.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
