@@ -63,6 +63,12 @@
     if (typeof window.JollyPriceAdvisor !== "undefined") {
       tools.push({ icon: "💰", label: "Qiymət Tövsiyəsi", run: () => window.JollyPriceAdvisor.show() });
     }
+    if (typeof window.JollyBgRemove !== "undefined") {
+      tools.push({ icon: "🧹", label: "Şəkil Təmizləyici", run: () => window.JollyBgRemove.show() });
+    }
+    if (typeof window.JollyImageCleaner !== "undefined") {
+      tools.push({ icon: "🧼", label: "Şəkil Təmizləyici", run: () => window.JollyImageCleaner.show() });
+    }
 
     return tools;
   }
