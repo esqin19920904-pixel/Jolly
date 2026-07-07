@@ -200,7 +200,7 @@
   const JollyBgRemove = {
     id: "bg-remove",
     name: "Şəkil Təmizləyici",
-    version: "1.0.0",
+    version: "1.1.0",
     show
   };
 
@@ -212,4 +212,95 @@
   } else {
     console.log("[JollyBgRemove] ModuleRegistry tapılmadı, qlobal olaraq mövcuddur (window.JollyBgRemove.show()).");
   }
+
+  // ------------------------------------------------------------------------
+  // MƏHSUL FORMASINA QOŞULMA (hook)
+  // ------------------------------------------------------------------------
+  // products.js-ə TOXUNMUR — sadəcə #imgFileInput / #imgCameraInput üzərindəki
+  // "change" hadisəsini document səviyyəsində, "capture" fazasında tutur,
+  // orijinal handleImageUpload işə düşməzdən əvvəl sual verir.
+  function askCleanConfirm() {
+    return new Promise((resolve) => {
+      injectStyles();
+      const overlay = document.createElement("div");
+      overlay.id = "jolly-bg-confirm-overlay";
+      overlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+        z-index: 100000; display: flex; align-items: center; justify-content: center;
+      `;
+      overlay.innerHTML = `
+        <div style="background:#1a1a1a;border:1px solid rgba(212,175,55,0.4);border-radius:16px;padding:20px;width:85%;max-width:340px;font-family:system-ui,sans-serif;color:#f0e6c8;text-align:center;">
+          <div style="font-size:30px;margin-bottom:8px;">🧹</div>
+          <div style="font-size:14px;margin-bottom:16px;">Şəklin fonunu təmizləyim?<br><span style="font-size:11px;color:#999;">(bir neçə saniyə çəkə bilər)</span></div>
+          <div style="display:flex;gap:8px;">
+            <button id="jbg-confirm-no" style="flex:1;padding:10px;border-radius:10px;border:none;background:#333;color:#eee;font-size:13px;">Xeyr, olduğu kimi</button>
+            <button id="jbg-confirm-yes" style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#d4af37,#f4d675);color:#1a1a1a;font-weight:600;font-size:13px;">Bəli, təmizlə</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.querySelector("#jbg-confirm-yes").onclick = () => { overlay.remove(); resolve(true); };
+      overlay.querySelector("#jbg-confirm-no").onclick = () => { overlay.remove(); resolve(false); };
+    });
+  }
+
+  function showMiniLoading(on) {
+    let el = document.getElementById("jolly-bg-mini-loading");
+    if (on) {
+      if (el) return;
+      el = document.createElement("div");
+      el.id = "jolly-bg-mini-loading";
+      el.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        background: #1a1a1a; border: 1px solid rgba(212,175,55,0.4); border-radius: 14px;
+        padding: 18px 24px; z-index: 100001; color: #d4af37; font-family: system-ui, sans-serif;
+        font-size: 13px; text-align: center;
+      `;
+      el.innerHTML = `⏳ Fon silinir...`;
+      document.body.appendChild(el);
+    } else if (el) {
+      el.remove();
+    }
+  }
+
+  function runOriginalUpload(files) {
+    if (typeof window.JollyProducts !== "undefined" && typeof window.JollyProducts.handleImageUpload === "function") {
+      window.JollyProducts.handleImageUpload({ target: { files: files, value: "" } });
+    }
+  }
+
+  async function handleFormFileChange(e) {
+    const target = e.target;
+    if (!target || (target.id !== "imgFileInput" && target.id !== "imgCameraInput")) return;
+    if (!target.files || !target.files.length) return;
+
+    e.stopPropagation();
+    const originalFiles = Array.from(target.files);
+    target.value = "";
+
+    const proceed = await askCleanConfirm();
+    if (!proceed) {
+      runOriginalUpload(originalFiles);
+      return;
+    }
+
+    showMiniLoading(true);
+    try {
+      const lib = await loadLib();
+      const cleanedFiles = [];
+      for (const file of originalFiles) {
+        const resultBlob = await lib.removeBackground(file);
+        cleanedFiles.push(new File([resultBlob], (file.name || "sekil").replace(/\.[^.]+$/, "") + "-temiz.png", { type: "image/png" }));
+      }
+      runOriginalUpload(cleanedFiles);
+    } catch (err) {
+      console.error("[JollyBgRemove] form hook error:", err);
+      if (typeof window.Toast !== "undefined" && Toast.error) Toast.error("Fon silinmədi — orijinal şəkil əlavə olundu");
+      runOriginalUpload(originalFiles);
+    } finally {
+      showMiniLoading(false);
+    }
+  }
+
+  document.addEventListener("change", handleFormFileChange, true);
 })();
