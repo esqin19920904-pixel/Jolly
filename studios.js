@@ -459,26 +459,42 @@ const JollyStudios = (() => {
 
     setTimeout(() => {
       aiHistory.pop(); // typing balonunu çıxar
-      const res = JollyAI.respond(text);
-      let html = res.text;
 
-      let productsToShow = null;
-      if (res.action && res.action.type === 'list' && res.action.products && res.action.products.length) {
-        productsToShow = res.action.products;
-      } else if (Array.isArray(res.products) && res.products.length) {
-        productsToShow = res.products.map(x => x.product || x);
-      }
-      if (productsToShow && productsToShow.length) {
-        html += renderInlineProductList(productsToShow.slice(0, 8));
+      function normalizeProducts(list) {
+        if (!list) return [];
+        return list.map(x => (x && x.product) ? x.product : x).filter(Boolean);
       }
 
-      pushAi('bot', html);
-      if (!res.action) return;
-      const a = res.action;
-      if (a.type === 'navigate') setTimeout(() => JollyRouter.go(a.route), 700);
-      else if (a.type === 'openVisualSearch') setTimeout(() => startVisualSearchFromStudio(), 300);
-      else if (a.type === 'whatsapp') setTimeout(() => { if (typeof JollyProducts !== 'undefined') JollyProducts.whatsappShare(a.productId); }, 200);
-      else if (a.type === 'showBarcode') setTimeout(() => { if (typeof JollyProducts !== 'undefined') JollyProducts.showBarcode(a.barcode); }, 200);
+      function finish(resText, products, action) {
+        let html = resText;
+        if (products && products.length) html += renderInlineProductList(products.slice(0, 8));
+        pushAi('bot', html);
+        if (action) {
+          if (action.type === 'navigate') setTimeout(() => JollyRouter.go(action.route), 700);
+          else if (action.type === 'openVisualSearch') setTimeout(() => startVisualSearchFromStudio(), 300);
+          else if (action.type === 'whatsapp') setTimeout(() => { if (typeof JollyProducts !== 'undefined') JollyProducts.whatsappShare(action.productId); }, 200);
+          else if (action.type === 'showBarcode') setTimeout(() => { if (typeof JollyProducts !== 'undefined') JollyProducts.showBarcode(action.barcode); }, 200);
+        }
+      }
+
+      // Gemini körpüsü varsa hibrid işlə (Tam Chat ilə eyni məntiq): Brain tapmasa Gemini
+      if (typeof JollyGemini !== 'undefined') {
+        JollyGemini.ask(text).then(r => {
+          if (r.source === 'gemini') {
+            finish(r.text + `<div class="muted" style="font-size:10px;margin-top:4px;">✨ Gemini</div>`, null, null);
+          } else {
+            const full = r.full;
+            const products = normalizeProducts(full && full.products);
+            finish(r.text, products, full && full.action);
+          }
+        }).catch(() => {
+          const res = JollyAI.respond(text);
+          finish(res.text, normalizeProducts(res.action && res.action.products), res.action);
+        });
+      } else {
+        const res = JollyAI.respond(text);
+        finish(res.text, normalizeProducts(res.action && res.action.products), res.action);
+      }
     }, 420);
   }
 
