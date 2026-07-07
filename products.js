@@ -705,7 +705,7 @@ const JollyProducts = (() => {
           <label>🚚 Tədarükçü</label>
           <input id="f_supplierSearch" list="supplierDatalist" value="${escapeHtml(formState.supplier || '')}" placeholder="Yaz və ya seç..." oninput="JollyProducts.handleSupplierInput(this.value)">
           <datalist id="supplierDatalist">
-            ${suppliers.map(s => `<option value="${escapeHtml(s.name)}">`).join('')}
+            ${suppliers.map(s => `<option value="${escapeHtml(s.code ? s.code + ' - ' + s.name : s.name)}">`).join('')}
           </datalist>
         </div>
 
@@ -997,12 +997,21 @@ const JollyProducts = (() => {
     formState.supplier = (val || '').trim();
   }
 
-  // Əgər yazılan tədarükçü adı siyahıda yoxdursa, avtomatik siyahıya əlavə et
+  // Əgər yazılan tədarükçü adı siyahıda yoxdursa, avtomatik siyahıya əlavə et.
+  // "504 - Fəzail Kosmetika" formatını da tanıyır (kodu ayırır).
   function ensureSupplierSaved() {
-    const name = (formState.supplier || '').trim();
-    if (!name) return;
-    const exists = JollyDB.Suppliers.all().some(s => s.name.toLowerCase() === name.toLowerCase());
-    if (!exists) JollyDB.Suppliers.add({ name });
+    const raw = (formState.supplier || '').trim();
+    if (!raw) return;
+    const m = raw.match(/^(\d+)\s*-\s*(.+)$/);
+    const code = m ? m[1].trim() : null;
+    const name = m ? m[2].trim() : raw;
+    const list = JollyDB.Suppliers.all();
+    const exists = list.some(s => s.name.toLowerCase() === name.toLowerCase());
+    if (!exists) {
+      JollyDB.Suppliers.add(code ? { name, code } : { name });
+    }
+    // Məhsulda təmiz ad saxlanılır (kod prefiksi olmadan)
+    formState.supplier = name;
   }
 
   function handleInlineAdd(selectEl, kind) {
