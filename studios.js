@@ -437,6 +437,21 @@ const JollyStudios = (() => {
     }
   }
 
+  function renderInlineProductList(products) {
+    return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+      ${products.map(p => `
+        <div class="list-row" style="border-bottom:none;">
+          <span>${JollyProducts.escapeHtml(p.name || 'Adsız')}</span>
+          <span class="actions">
+            <span onclick="JollyRouter.go('#/product/${p.id}')" style="color:var(--accent-1);">👁</span>
+            ${(p.barcodes && p.barcodes.length) ? `<span onclick="JollyProducts.showBarcode('${JollyProducts.escapeHtml(p.barcodes[0])}')" style="color:var(--accent-2);">🧾</span>` : ''}
+            <span onclick="JollyProducts.whatsappShare('${p.id}')" style="color:#25D366;">📤</span>
+          </span>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
   function handleAiResponse(text) {
     aiHistory.push({ role: 'bot', text: `<span class="ai-typing"><span></span><span></span><span></span></span>`, typing: true });
     const el = document.getElementById('aiMessages');
@@ -445,7 +460,19 @@ const JollyStudios = (() => {
     setTimeout(() => {
       aiHistory.pop(); // typing balonunu çıxar
       const res = JollyAI.respond(text);
-      pushAi('bot', res.text);
+      let html = res.text;
+
+      let productsToShow = null;
+      if (res.action && res.action.type === 'list' && res.action.products && res.action.products.length) {
+        productsToShow = res.action.products;
+      } else if (Array.isArray(res.products) && res.products.length) {
+        productsToShow = res.products.map(x => x.product || x);
+      }
+      if (productsToShow && productsToShow.length) {
+        html += renderInlineProductList(productsToShow.slice(0, 8));
+      }
+
+      pushAi('bot', html);
       if (!res.action) return;
       const a = res.action;
       if (a.type === 'navigate') setTimeout(() => JollyRouter.go(a.route), 700);
