@@ -10,6 +10,7 @@ const JollyDB = (() => {
     groups: 'jolly_groups',
     locations: 'jolly_locations',
     statuses: 'jolly_statuses',
+    suppliers: 'jolly_suppliers',
     settings: 'jolly_settings',
     activity: 'jolly_activity',
     edge: 'jolly_edge_config',
@@ -35,7 +36,7 @@ const JollyDB = (() => {
   function write(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-      if (key === 'jolly_products' || key === 'jolly_drafts' || key === 'jolly_brands' || key === 'jolly_groups' || key === 'jolly_locations' || key === 'jolly_statuses') {
+      if (key === 'jolly_products' || key === 'jolly_drafts' || key === 'jolly_brands' || key === 'jolly_groups' || key === 'jolly_locations' || key === 'jolly_statuses' || key === 'jolly_suppliers') {
         try { localStorage.setItem('jolly_last_change', String(Date.now())); } catch (e2) {}
         if (typeof JollyApp !== 'undefined' && JollyApp.renderBackupPill) JollyApp.renderBackupPill();
       }
@@ -87,6 +88,9 @@ const JollyDB = (() => {
         { id: uid('st'), name: 'Yeni gəlib', color: '#a78bfa' },
         { id: uid('st'), name: 'Endirimdə', color: '#fbbf24' },
       ]);
+    }
+    if (read(KEYS.suppliers, null) === null) {
+      write(KEYS.suppliers, []);
     }
     if (read(KEYS.products, null) === null) {
       write(KEYS.products, []);
@@ -149,6 +153,7 @@ const JollyDB = (() => {
   const Groups = makeStore(KEYS.groups, 'qrup');
   const Locations = makeStore(KEYS.locations, 'yer');
   const Statuses = makeStore(KEYS.statuses, 'status');
+  const Suppliers = makeStore(KEYS.suppliers, 'tədarükçü');
   const Products = makeStore(KEYS.products, 'məhsul');
   const Drafts = makeStore(KEYS.drafts, 'qaralama');
 
@@ -160,7 +165,7 @@ const JollyDB = (() => {
     return list.filter(p => {
       const hay = [
         p.name, p.mainCode, p.extraCodeType, p.extraCodeValue, p.last4,
-        ...(p.barcodes || []), p.brand, p.group, p.location, p.note, p.color, p.status,
+        ...(p.barcodes || []), p.brand, p.group, p.location, p.note, p.color, p.status, p.supplier,
       ].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
@@ -177,6 +182,7 @@ const JollyDB = (() => {
     if (criteria.group) list = list.filter(p => p.group === criteria.group);
     if (criteria.location) list = list.filter(p => p.location === criteria.location);
     if (criteria.status) list = list.filter(p => p.status === criteria.status);
+    if (criteria.supplier) list = list.filter(p => p.supplier === criteria.supplier);
     if (criteria.hasImage === true) list = list.filter(p => (p.images || []).length > 0);
     if (criteria.hasImage === false) list = list.filter(p => (p.images || []).length === 0);
     if (criteria.hasBarcode === true) list = list.filter(p => (p.barcodes || []).length > 0);
@@ -276,7 +282,7 @@ const JollyDB = (() => {
   return {
     KEYS, uid, read, write, logActivity, seedIfEmpty, repairIds,
     Trash, toggleFavorite, getFavorites,
-    Brands, Groups, Locations, Statuses, Products, Drafts,
+    Brands, Groups, Locations, Statuses, Suppliers, Products, Drafts,
     exportAll, importAll,
     getActivity: () => read(KEYS.activity, []),
     getSettings: () => read(KEYS.settings, {}),
