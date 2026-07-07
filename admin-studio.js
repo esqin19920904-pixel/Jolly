@@ -53,9 +53,10 @@ const JollyAdminStudio = (() => {
 
   function renderRow(key, it) {
     const colorDot = it.color ? `<span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${it.color};margin-right:8px;"></span>` : '';
+    const codePrefix = it.code ? `<span class="mono muted" style="margin-right:6px;">${JollyProducts.escapeHtml(it.code)} ·</span>` : '';
     return `
       <div class="list-row" draggable="true" data-id="${it.id}">
-        <span>${colorDot}${JollyProducts.escapeHtml(it.name)}</span>
+        <span>${colorDot}${codePrefix}${JollyProducts.escapeHtml(it.name)}</span>
         <span class="actions">
           <span onclick="JollyAdminStudio.editItem('${key}','${it.id}')">✏️</span>
           <span onclick="JollyAdminStudio.deleteItem('${key}','${it.id}')">🗑️</span>
@@ -109,6 +110,10 @@ const JollyAdminStudio = (() => {
       const color = prompt('Rəng (hex, məs. #22d3ee):', '#7c8aff');
       extra.color = color || '#7c8aff';
     }
+    if (key === 'suppliers') {
+      const code = prompt('Tədarükçü kodu (məs. 504) — boş buraxıla bilər:');
+      if (code && code.trim()) extra.code = code.trim();
+    }
     cfg.store.add({ name: name.trim(), ...extra });
     Toast.success(`"${name}" əlavə olundu`);
     JollyRouter.go(`#/studios/admin/${key}`);
@@ -120,7 +125,12 @@ const JollyAdminStudio = (() => {
     if (!item) return;
     const name = prompt(`${cfg.label} adını dəyiş:`, item.name);
     if (!name || !name.trim()) return;
-    cfg.store.update(id, { name: name.trim() });
+    const patch = { name: name.trim() };
+    if (key === 'suppliers') {
+      const code = prompt('Tədarükçü kodu (boş buraxıla bilər):', item.code || '');
+      patch.code = (code || '').trim();
+    }
+    cfg.store.update(id, patch);
     Toast.success('Yeniləndi');
     JollyRouter.go(`#/studios/admin/${key}`);
   }
