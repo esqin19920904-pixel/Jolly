@@ -1,5 +1,7 @@
 name = "jolly-app"
 compatibility_date = "2026-07-06"
+main = "worker.js"
 
 [assets]
 directory = "./"
+binding = "ASSETS"
