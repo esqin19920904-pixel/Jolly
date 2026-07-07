@@ -703,7 +703,7 @@ const JollyProducts = (() => {
 
         <div class="field">
           <label>🚚 Tədarükçü</label>
-          <input id="f_supplierSearch" list="supplierDatalist" value="${escapeHtml(formState.supplier || '')}" placeholder="Yaz və ya seç..." oninput="JollyProducts.handleSupplierInput(this.value)">
+          <input id="f_supplierSearch" list="supplierDatalist" value="${escapeHtml(formState.supplier || '')}" placeholder="Kod (məs. 504) və ya ad yaz..." oninput="JollyProducts.handleSupplierInput(this.value)" onblur="JollyProducts.handleSupplierBlur(this.value)">
           <datalist id="supplierDatalist">
             ${suppliers.map(s => `<option value="${escapeHtml(s.code ? s.code + ' - ' + s.name : s.name)}">`).join('')}
           </datalist>
@@ -997,21 +997,62 @@ const JollyProducts = (() => {
     formState.supplier = (val || '').trim();
   }
 
+  // Sahədən çıxanda (blur): əgər yalnız kod yazılıbsa (məs. "504"), mövcud tədarükçünün adına çevir
+  function handleSupplierBlur(val) {
+    const raw = (val || '').trim();
+    if (!raw) { formState.supplier = ''; return; }
+    // "504 - Ad" formatı yazılıbsa, təmiz adı çıxar
+    const dashMatch = raw.match(/^(\d+)\s*-\s*(.+)$/);
+    if (dashMatch) {
+      formState.supplier = dashMatch[2].trim();
+      const el = document.getElementById('f_supplierSearch');
+      if (el) el.value = formState.supplier;
+      return;
+    }
+    // Yalnız rəqəmdirsə — mövcud kodla uyğunlaşdır
+    if (/^\d+$/.test(raw)) {
+      const bycode = JollyDB.Suppliers.all().find(s => (s.code || '').trim() === raw);
+      if (bycode) {
+        formState.supplier = bycode.name;
+        const el = document.getElementById('f_supplierSearch');
+        if (el) el.value = bycode.name;
+        return;
+      }
+    }
+    formState.supplier = raw;
+  }
+
   // Əgər yazılan tədarükçü adı siyahıda yoxdursa, avtomatik siyahıya əlavə et.
-  // "504 - Fəzail Kosmetika" formatını da tanıyır (kodu ayırır).
+  // "504 - Fəzail Kosmetika" formatını da tanıyır (kodu ayırır), yalnız kod yazılıbsa mövcudla uyğunlaşdırır.
   function ensureSupplierSaved() {
     const raw = (formState.supplier || '').trim();
     if (!raw) return;
-    const m = raw.match(/^(\d+)\s*-\s*(.+)$/);
-    const code = m ? m[1].trim() : null;
-    const name = m ? m[2].trim() : raw;
     const list = JollyDB.Suppliers.all();
-    const exists = list.some(s => s.name.toLowerCase() === name.toLowerCase());
-    if (!exists) {
-      JollyDB.Suppliers.add(code ? { name, code } : { name });
+
+    // 1) "504 - Ad" formatı
+    const dashMatch = raw.match(/^(\d+)\s*-\s*(.+)$/);
+    if (dashMatch) {
+      const code = dashMatch[1].trim();
+      const name = dashMatch[2].trim();
+      const exists = list.some(s => s.name.toLowerCase() === name.toLowerCase());
+      if (!exists) JollyDB.Suppliers.add({ name, code });
+      formState.supplier = name;
+      return;
     }
-    // Məhsulda təmiz ad saxlanılır (kod prefiksi olmadan)
-    formState.supplier = name;
+
+    // 2) Yalnız rəqəm (kod) yazılıbsa — mövcud tədarükçü ilə uyğunlaşdır, yeni yaratma
+    if (/^\d+$/.test(raw)) {
+      const bycode = list.find(s => (s.code || '').trim() === raw);
+      if (bycode) { formState.supplier = bycode.name; return; }
+      // uyğun kod tapılmadı — rəqəmi ad kimi saxlamaq yerinə xəbərdarlıq et
+      Toast.error(`"${raw}" kodlu tədarükçü tapılmadı — Admin Studio-dan yoxla`);
+      return;
+    }
+
+    // 3) Ad kimi işlə (mövcud deyilsə yeni tədarükçü kimi əlavə et)
+    const exists = list.some(s => s.name.toLowerCase() === raw.toLowerCase());
+    if (!exists) JollyDB.Suppliers.add({ name: raw });
+    formState.supplier = raw;
   }
 
   function handleInlineAdd(selectEl, kind) {
@@ -1099,6 +1140,6 @@ const JollyProducts = (() => {
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
     lookupBarcodeOnline, applyOnlineLookup,
-    handleSupplierInput,
+    handleSupplierInput, handleSupplierBlur,
   };
 })();
