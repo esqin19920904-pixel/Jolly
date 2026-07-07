@@ -168,7 +168,12 @@ const JollyChat = (() => {
           if (r.source === 'gemini') {
             appendBubble('bot', fmtText(r.text) + `<div class="muted" style="font-size:10px;margin-top:4px;">✨ Gemini</div>`);
           } else {
-            renderAiResult(r.full ? { text: r.text, action: r.full.action, _full: r.full } : { text: r.text, action: null });
+            const full = r.full;
+            let action = full && full.action;
+            if (!action && full && Array.isArray(full.products) && full.products.length) {
+              action = { type: 'list', products: full.products.map(x => x.product) };
+            }
+            renderAiResult({ text: r.text, action: action || null, _full: full });
           }
         }).catch(() => {
           renderAiResult(JollyAI.respond(text));
