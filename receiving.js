@@ -196,7 +196,11 @@ const JollyReceiving = (() => {
         </div>
         <div id="recvFlash" class="recv-flash" style="text-align:center;font-weight:700;padding:10px;border-radius:12px;margin-bottom:10px;min-height:20px;transition:background .2s;"></div>
         <div id="recvCardZone"></div>
-        <div class="row" style="gap:10px;margin-top:16px;">
+
+        <div id="recvUnknownHint" class="muted mono" style="display:none;text-align:center;font-size:11.5px;margin-top:8px;"></div>
+        <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="JollyReceiving.captureUnknown()">📷 Yeni/kodsuz mal — şəklini çək (<span id="recvNewCount">0</span>)</button>
+
+        <div class="row" style="gap:10px;margin-top:10px;">
           <button class="btn btn-ghost btn-block" onclick="JollyReceiving.finishSession()">🏁 Sessiyanı bitir</button>
         </div>
         <input id="recvCapture" inputmode="numeric" autocomplete="off" style="position:fixed;opacity:0;height:1px;width:1px;top:0;left:0;pointer-events:none;">
@@ -266,16 +270,25 @@ const JollyReceiving = (() => {
     setTimeout(() => { if (el) { el.style.background = ''; el.textContent = ''; } }, 900);
   }
 
+  let lastUnknownBarcode = null;
+
   function processScan(raw) {
     const code = (raw || '').replace(/\D/g, '');
     if (!code) return;
     const basket = getBasket();
     const matches = JollyDB.Products.findByBarcode(code);
-    if (!matches.length) { flash('wrong', '❌ Bu barkod bazada tapılmadı'); return; }
+    if (!matches.length) {
+      lastUnknownBarcode = code;
+      flash('wrong', '❌ Bu barkod bazada tapılmadı — 📷 ilə tez qeyd et');
+      updateUnknownHint();
+      return;
+    }
     const product = matches.find(p => basket.productIds.includes(p.id));
     if (!product) { flash('wrong', '⚠️ Bu barkod səbətdə yoxdur'); return; }
     if (basket.received[product.id]) { flash('dup', `🔴 "${product.name}" artıq qəbul edilib`); return; }
 
+    lastUnknownBarcode = null;
+    updateUnknownHint();
     if (!basket.startedAt) basket.startedAt = Date.now();
     basket.received[product.id] = Date.now();
     setBasket(basket);
@@ -284,6 +297,51 @@ const JollyReceiving = (() => {
 
     // Smart Queue + Turbo: 0.5 saniyə sonra avtomatik növbəti məhsula keç
     setTimeout(() => { renderCardZoneNow(); }, 500);
+  }
+
+  function updateUnknownHint() {
+    const el = document.getElementById('recvUnknownHint');
+    if (!el) return;
+    el.style.display = lastUnknownBarcode ? 'block' : 'none';
+    if (lastUnknownBarcode) el.textContent = `Naməlum barkod: ${lastUnknownBarcode}`;
+  }
+
+  // Sistemdə olmayan yeni malın şəklini çək → "Gələn Mallar"a (qaralama) at
+  function captureUnknown() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        let img = ev.target.result;
+        if (typeof JollyStorage !== 'undefined' && JollyStorage.compressImage) {
+          try { img = await JollyStorage.compressImage(img); } catch (er) {}
+        }
+        const draft = JollyDB.Drafts.add({
+          name: '', images: [img],
+          barcodes: lastUnknownBarcode ? [lastUnknownBarcode] : [],
+          price: '', createdAt: Date.now(),
+        });
+        const basket = getBasket();
+        basket.newDrafts = basket.newDrafts || [];
+        basket.newDrafts.push(draft.id);
+        setBasket(basket);
+        if (typeof JollySound !== 'undefined') JollySound.success();
+        Toast.success('Şəkil çəkildi — "Gələn Mallar"a düşdü, sonra tamamla');
+        lastUnknownBarcode = null;
+        updateUnknownHint();
+        updateNewCounter(basket);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  function updateNewCounter(basket) {
+    const el = document.getElementById('recvNewCount');
+    if (el) el.textContent = (basket.newDrafts || []).length;
   }
 
   function fmtDuration(ms) {
@@ -299,11 +357,13 @@ const JollyReceiving = (() => {
     const doneCount = Object.keys(basket.received).length;
     const speed = hours > 0.001 ? Math.round(doneCount / hours) : 0;
     const missing = basket.productIds.filter(id => !basket.received[id]).map(id => JollyDB.Products.get(id)).filter(Boolean);
+    const newCount = (basket.newDrafts || []).length;
     return `
       <div class="glass" style="padding:22px;text-align:center;">
         <div style="font-size:46px;">${missing.length ? '⚠️' : '🎉'}</div>
         <div style="font-family:var(--font-display);font-size:19px;font-weight:700;margin:10px 0 4px;">${missing.length ? missing.length + ' məhsul çatışmır' : 'Hamısı qəbul edildi!'}</div>
         <div class="muted" style="font-size:12.5px;">⏱️ ${fmtDuration(elapsed)} · ⚡ ${speed} məhsul/saat</div>
+        ${newCount ? `<div class="muted" style="font-size:12px;margin-top:4px;color:var(--accent-2);">📷 ${newCount} yeni mal "Gələn Mallar"da tamamlanmağı gözləyir</div>` : ''}
         ${missing.length ? `
           <div class="section-title" style="text-align:left;">Çatışmayan məhsullar</div>
           <div class="glass" style="padding:4px 14px;text-align:left;">
@@ -331,6 +391,7 @@ const JollyReceiving = (() => {
 
   function attachScanMode() {
     renderCardZoneNow();
+    updateNewCounter(getBasket());
     const input = document.getElementById('recvCapture');
     if (!input) return;
     input.focus();
@@ -387,6 +448,6 @@ const JollyReceiving = (() => {
 
   return {
     setFilter, applyFilter, toggleSelect, selectAllVisible, addSelectedToBasket, clearBasket,
-    finishSession, clearBasketAndExit,
+    finishSession, clearBasketAndExit, captureUnknown,
   };
 })();
