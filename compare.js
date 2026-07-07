@@ -197,7 +197,7 @@
 
   function init() {
     injectStyles();
-    injectButton();
+    // Düymə artıq topbar-a inject olunmur — "🧰 Alətlər" menyusundan çağırılır
   }
 
   if (document.readyState === "loading") {
