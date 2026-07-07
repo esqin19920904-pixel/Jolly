@@ -95,6 +95,7 @@ const JollyDashboard = (() => {
     { icon: 'cloud', label: 'Backup', neon: 'teal', route: '#/studios/integration' },
     { icon: 'map', label: 'Rəf xəritəsi', neon: 'blue', route: '#/store-map' },
     { icon: 'star', label: 'Seçilmişlər', neon: 'gold', route: '#/dashboard/favorites' },
+    { icon: 'inbox', label: 'Qəbul Studio', neon: 'green', route: '#/receiving' },
   ];
 
   // Son 7 günün fəaliyyət datası (dalğa qrafiki + trend üçün)
