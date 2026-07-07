@@ -46,7 +46,6 @@ const JollyProducts = (() => {
     container.innerHTML = `<div class="product-grid">${products.map(renderCard).join('')}</div>`;
   }
 
-  /* ---------- Home / List page ---------- */
   function renderHomePage() {
     const all = JollyDB.Products.all();
     const drafts = JollyDB.Drafts.all();
@@ -186,6 +185,7 @@ const JollyProducts = (() => {
     else if (params.filter === 'sekilsiz') { products = JollyDB.Products.filter({ hasImage: false }); title = 'Şəkilsiz məhsullar'; }
     else if (params.brand) { products = JollyDB.Products.filter({ brand: params.brand }); title = `Firma: ${params.brand}`; }
     else if (params.group) { products = JollyDB.Products.filter({ group: params.group }); title = `Qrup: ${params.group}`; }
+    else if (params.supplier) { products = JollyDB.Products.filter({ supplier: params.supplier }); title = `Tədarükçü: ${params.supplier}`; }
     else { products = JollyDB.Products.all(); }
 
     setTimeout(() => renderList(document.getElementById('filteredList'), products), 0);
