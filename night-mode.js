@@ -29,6 +29,26 @@
     }
   }
 
+  const AMOLED_KEY = "jolly_amoled_mode_v1";
+
+  function isAmoledOn() {
+    try {
+      return localStorage.getItem(AMOLED_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setAmoled(on) {
+    try {
+      localStorage.setItem(AMOLED_KEY, on ? "1" : "0");
+    } catch (e) {
+      console.warn("[JollyNightMode] AMOLED localStorage yazıla bilmədi:", e);
+    }
+    document.documentElement.classList.toggle("jolly-amoled", !!on);
+    updateAmoledButton(on);
+  }
+
   function setNight(on) {
     try {
       localStorage.setItem(STORAGE_KEY, on ? "1" : "0");
@@ -65,6 +85,25 @@
         background-color: #0a0a0a !important;
         border-color: rgba(212,175,55,0.25) !important;
       }
+      html.jolly-amoled body,
+      html.jolly-amoled #app,
+      html.jolly-amoled .topbar-pro,
+      html.jolly-amoled .bottom-nav,
+      html.jolly-amoled .edge-panel {
+        background-color: #000000 !important;
+      }
+      html.jolly-amoled #app,
+      html.jolly-amoled main,
+      html.jolly-amoled .ambient-bg {
+        filter: brightness(0.75) contrast(1.1) saturate(0.85);
+      }
+      #jolly-amoled-toggle {
+        background: none; border: none; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; padding: 4px 6px; color: inherit;
+      }
+      #jolly-amoled-toggle .ta-icon { font-size: 18px; line-height: 1; }
+      #jolly-amoled-toggle .ta-label { font-size: 10px; margin-top: 2px; opacity: 0.85; }
       #jolly-night-toggle {
         background: none; border: none; cursor: pointer;
         display: flex; flex-direction: column; align-items: center;
@@ -91,6 +130,14 @@
     btn.title = on ? "Gündüz rejiminə keç" : "Gecə rejiminə keç";
   }
 
+  function updateAmoledButton(on) {
+    const btn = document.getElementById("jolly-amoled-toggle");
+    if (!btn) return;
+    btn.querySelector(".ta-icon").textContent = on ? "⚫" : "◐";
+    btn.querySelector(".ta-label").textContent = "AMOLED";
+    btn.title = on ? "AMOLED rejimini bağla" : "AMOLED (tam qara) rejim aç";
+  }
+
   function injectButton() {
     if (document.getElementById("jolly-night-toggle")) return;
     const container = document.querySelector(".top-actions");
@@ -106,12 +153,21 @@
     btn.onclick = () => setNight(!isNightOn());
     container.appendChild(btn);
     updateButton(isNightOn());
+
+    const amoledBtn = document.createElement("button");
+    amoledBtn.id = "jolly-amoled-toggle";
+    amoledBtn.className = "top-act";
+    amoledBtn.innerHTML = `<span class="ta-icon"></span><span class="ta-label"></span>`;
+    amoledBtn.onclick = () => setAmoled(!isAmoledOn());
+    container.appendChild(amoledBtn);
+    updateAmoledButton(isAmoledOn());
   }
 
   function init() {
     injectStyles();
     applyNight(isNightOn());
-    injectButton();
+    document.documentElement.classList.toggle("jolly-amoled", isAmoledOn());
+    // Düymələr artıq topbar-a inject olunmur — vahid "🧰 Alətlər" menyusundan (tools-menu.js) çağırılır
   }
 
   if (document.readyState === "loading") {
@@ -126,10 +182,13 @@
   const JollyNightMode = {
     id: "night-mode",
     name: "Gecə Rejimi",
-    version: "1.0.0",
+    version: "1.1.0",
     isOn: isNightOn,
     set: setNight,
-    toggle: () => setNight(!isNightOn())
+    toggle: () => setNight(!isNightOn()),
+    isAmoledOn,
+    setAmoled,
+    toggleAmoled: () => setAmoled(!isAmoledOn())
   };
 
   window.JollyNightMode = JollyNightMode;
