@@ -193,7 +193,7 @@
   function init() {
     recordVisit();
     injectStyles();
-    injectButton();
+    // Düymə artıq topbar-a inject olunmur — "🧰 Alətlər" menyusundan çağırılır
     maybeToastNewBadges();
   }
 
