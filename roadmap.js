@@ -286,29 +286,5 @@
     console.log("[JollyRoadmap] ModuleRegistry tapılmadı, JollyRoadmap qlobal olaraq mövcuddur (window.JollyRoadmap.show()).");
   }
 
-  // ------------------------------------------------------------------------
-  // 7) SÜRƏTLİ ÇIXIŞ DÜYMƏSİ (FAB) - konsolsuz açılış üçün
-  // ------------------------------------------------------------------------
-  function injectFab() {
-    if (document.getElementById("jolly-roadmap-fab")) return;
-    const fab = document.createElement("button");
-    fab.id = "jolly-roadmap-fab";
-    fab.title = "Gələcək Fikirlər";
-    fab.textContent = "🗺️";
-    fab.style.cssText = `
-      position: fixed; right: 14px; bottom: 78px; z-index: 9998;
-      width: 44px; height: 44px; border-radius: 50%; border: none;
-      background: linear-gradient(135deg,#d4af37,#f4d675);
-      color: #1a1a1a; font-size: 18px; box-shadow: 0 3px 10px rgba(0,0,0,0.4);
-      display: flex; align-items: center; justify-content: center; cursor: pointer;
-    `;
-    fab.onclick = show;
-    document.body.appendChild(fab);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", injectFab);
-  } else {
-    injectFab();
-  }
+  // FAB silindi — indi bütün alətlər vahid "🧰 Alətlər" menyusunda (tools-menu.js)
 })();
