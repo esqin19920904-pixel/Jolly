@@ -46,12 +46,10 @@ const JollyStudios = (() => {
     if (key === 'analytics') return renderAnalyticsStudio();
     if (key === 'print') return renderPrintCenter();
     if (key === 'ai-brain') { setTimeout(() => { if (typeof JollyAIStudio !== 'undefined') { const m = document.getElementById('main'); if (m) m.innerHTML = JollyAIStudio.render(); } }, 0); return ''; }
-    // Naməlum studio — boş "tezliklə" göstərmə, Studios ana səhifəsinə qaytar
     setTimeout(() => JollyRouter.go('#/studios'), 0);
     return `<div class="empty-state"><div class="big-icon">🏛️</div><h3>Studios açılır...</h3></div>`;
   }
 
-  /* ---------- Voice & Vision Studio ---------- */
   function renderVoiceVision() {
     const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -100,7 +98,6 @@ const JollyStudios = (() => {
     });
   }
 
-  /* ---------- Analytics Studio ---------- */
   function renderAnalyticsStudio() {
     const all = JollyDB.Products.all();
     const total = all.length;
@@ -179,7 +176,6 @@ const JollyStudios = (() => {
   }
   function escapeAS(s) { return (typeof JollyProducts !== 'undefined' ? JollyProducts.escapeHtml(String(s)) : String(s)); }
 
-  /* ---------- Integration Studio ---------- */
   function renderIntegration() {
     const s = JollyDB.getSettings();
     setTimeout(() => {
@@ -263,7 +259,6 @@ const JollyStudios = (() => {
     JollyDB.setSettings({ [key]: !!on });
   }
 
-  /* ---------- Print / Export Studio — Barkod Print Center ---------- */
   function renderPrintCenter() {
     const products = JollyDB.Products.all().filter(p => p.barcodes && p.barcodes.length);
     return `
@@ -376,7 +371,6 @@ const JollyStudios = (() => {
     reader.readAsText(file, 'UTF-8');
   }
 
-  /* ---------- AI Studio ---------- */
   const aiHistory = [];
 
   function renderAI() {
@@ -458,7 +452,7 @@ const JollyStudios = (() => {
     if (el) { el.innerHTML = aiHistory.map(m => `<div class="ai-msg ${m.role}">${m.typing ? m.text : m.text.replace(/\n/g, '<br>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</div>`).join(''); scrollAiBottom(); }
 
     setTimeout(() => {
-      aiHistory.pop(); // typing balonunu çıxar
+      aiHistory.pop();
 
       function normalizeProducts(list) {
         if (!list) return [];
@@ -477,7 +471,6 @@ const JollyStudios = (() => {
         }
       }
 
-      // Gemini körpüsü varsa hibrid işlə (Tam Chat ilə eyni məntiq): Brain tapmasa Gemini
       if (typeof JollyGemini !== 'undefined') {
         JollyGemini.ask(text).then(r => {
           if (r.source === 'gemini') {
@@ -498,7 +491,6 @@ const JollyStudios = (() => {
     }, 420);
   }
 
-  /* ---------- Module Studio ---------- */
   const NAV_ITEMS_DEFAULT = [
     { id: 'dashboard', label: 'İş masası', icon: '🎛️' },
     { id: 'products', label: 'Məhsullar', icon: '📦' },
@@ -507,7 +499,6 @@ const JollyStudios = (() => {
     { id: 'studios', label: 'Menyu', icon: '☰' },
   ];
 
-  /* ---- Edge-ə salına bilən BÜTÜN elementlər (mərkəzi katalog) ---- */
   const EDGE_CATALOG = [
     { id: 'scan', label: 'Barkod skan', icon: '📷', action: "JollyEdgePanel.close();JollyProducts.scanSearch();" },
     { id: 'galleryScan', label: 'Şəkildən skan', icon: '🖼️', action: "JollyEdgePanel.close();JollyGalleryScan.scanAndFind();" },
@@ -537,7 +528,6 @@ const JollyStudios = (() => {
   function getNavConfig() {
     const settings = JollyDB.getSettings();
     let items = settings.navItems || NAV_ITEMS_DEFAULT.map(n => ({ ...n, visible: true }));
-    // yeni default elementlər (məs. dashboard) köhnə konfiqdə yoxdursa əlavə et
     NAV_ITEMS_DEFAULT.forEach((d, idx) => {
       if (!items.some(n => n.id === d.id)) {
         items.splice(idx, 0, { ...d, visible: true });
@@ -608,7 +598,6 @@ const JollyStudios = (() => {
       if (!container) return;
       const persist = () => { if (containerId === 'navModuleList') persistNavOrder(); else persistEdgeOrder(); };
 
-      // Mouse (desktop) drag
       let dragEl = null;
       container.querySelectorAll('.list-row').forEach(row => {
         row.addEventListener('dragstart', () => { dragEl = row; setTimeout(() => row.style.opacity = '0.3', 0); });
@@ -622,7 +611,6 @@ const JollyStudios = (() => {
         });
       });
 
-      // Touch (telefon) drag — barmaqla sürüşdürmə
       container.querySelectorAll('.list-row').forEach(row => {
         let touchDragging = false;
         row.addEventListener('touchstart', (e) => {
@@ -687,7 +675,6 @@ const JollyStudios = (() => {
     Toast.success('Edge Panel-dən çıxarıldı');
   }
 
-  /* ---------- Theme Studio ---------- */
   const THEMES = {
     'dark-neon': { name: 'Dark Neon (standart)', a1: '#7c8aff', a2: '#29e0c9', a3: '#ff5fa2' },
     'midnight-gold': { name: 'Midnight Gold', a1: '#f5c563', a2: '#e0a72e', a3: '#ff8a5c' },
@@ -785,7 +772,6 @@ const JollyStudios = (() => {
     }
   }
 
-  /* ---------- Data Studio ---------- */
   function renderData() {
     const activity = JollyDB.getActivity().slice(0, 8);
     const settings = JollyDB.getSettings();
@@ -869,7 +855,6 @@ const JollyStudios = (() => {
         const data = JSON.parse(ev.target.result);
         const count = (data.jolly_products || []).length;
         if (confirm(`Bu backup-da ${count} məhsul var. Mövcud məlumatlar bununla əvəz olunacaq. Davam edilsin?`)) {
-          // əvvəlcə hazırkı vəziyyətin snapshot-unu al (geri qaytarma üçün)
           saveSnapshot();
           JollyDB.importAll(data);
           Toast.success('Bərpa tamamlandı');
@@ -882,7 +867,6 @@ const JollyStudios = (() => {
     reader.readAsText(file);
   }
 
-  // Avtomatik lokal snapshot (qəza/səhv geri qaytarma üçün)
   function saveSnapshot() {
     try {
       const data = JollyDB.exportAll();
@@ -904,7 +888,6 @@ const JollyStudios = (() => {
     Toast.success(on ? 'Xatırlatma aktiv' : 'Xatırlatma söndürüldü');
   }
 
-  /* ---------- Security Studio ---------- */
   function renderSecurity() {
     const settings = JollyDB.getSettings();
     return `
@@ -938,15 +921,16 @@ const JollyStudios = (() => {
 
   function viewActivityLog() { JollyRouter.go('#/studios/data'); }
 
-  /* ---------- Report Studio ---------- */
   function renderReport() {
     const products = JollyDB.Products.all();
     const byBrand = {};
     const byGroup = {};
+    const bySupplier = {};
     let totalValue = 0, problemCount = 0, noBarcodeCount = 0;
     products.forEach(p => {
       if (p.brand) byBrand[p.brand] = (byBrand[p.brand] || 0) + 1;
       if (p.group) byGroup[p.group] = (byGroup[p.group] || 0) + 1;
+      if (p.supplier) bySupplier[p.supplier] = (bySupplier[p.supplier] || 0) + 1;
       if (p.price) totalValue += parseFloat(p.price) || 0;
       if ((p.status || '').toLowerCase().includes('problem')) problemCount++;
       if (!p.barcodes || !p.barcodes.length) noBarcodeCount++;
@@ -966,6 +950,10 @@ const JollyStudios = (() => {
       <div class="section-title">Qrup üzrə bölgü</div>
       <div class="glass" style="padding:4px 14px;">
         ${Object.entries(byGroup).length ? Object.entries(byGroup).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<div class="list-row"><span>${JollyProducts.escapeHtml(n)}</span><span class="mono">${c}</span></div>`).join('') : '<div class="muted" style="padding:14px;">Məlumat yoxdur</div>'}
+      </div>
+      <div class="section-title">🚚 Tədarükçü üzrə bölgü</div>
+      <div class="glass" style="padding:4px 14px;">
+        ${Object.entries(bySupplier).length ? Object.entries(bySupplier).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<div class="list-row" onclick="JollyRouter.go('#/products?supplier=${encodeURIComponent(n)}')" style="cursor:pointer;"><span>${JollyProducts.escapeHtml(n)}</span><span class="mono">${c}</span></div>`).join('') : '<div class="muted" style="padding:14px;">Hələ tədarükçü təyin olunmayıb</div>'}
       </div>
     `;
   }
