@@ -324,6 +324,7 @@ const JollyProducts = (() => {
           ${infoRow('Firma', p.brand)}
           ${infoRow('Qrup', p.group)}
           ${infoRow('Yer / Rəf', p.location)}
+          ${infoRow('Tədarükçü', p.supplier)}
         </div>
 
         <div class="section-title">Qeyd</div>
@@ -567,8 +568,9 @@ const JollyProducts = (() => {
     formState = existing ? JSON.parse(JSON.stringify(existing)) : {
       id: null, name: '', mainCode: '', extraCodeType: 'No', extraCodeValue: '',
       barcodes: [], last4: '', price: '', brand: '', group: '', location: '', color: '', note: '',
-      status: 'Aktiv', images: [],
+      supplier: '', status: 'Aktiv', images: [],
     };
+    if (formState.supplier === undefined) formState.supplier = '';
     if (formState.last4 === undefined) formState.last4 = '';
     // "Saxla və yenisi"-dən gələn firma/qrup/rəf
     if (!existing) {
@@ -603,6 +605,7 @@ const JollyProducts = (() => {
     const groups = JollyDB.Groups.all();
     const locations = JollyDB.Locations.all();
     const statuses = JollyDB.Statuses.all();
+    const suppliers = JollyDB.Suppliers.all();
 
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 16px;font-size:19px;">${id ? 'Məhsulu redaktə et' : 'Yeni məhsul'}</h2>
@@ -696,6 +699,14 @@ const JollyProducts = (() => {
             ${locations.map(l => `<option ${formState.location === l.name ? 'selected' : ''}>${escapeHtml(l.name)}</option>`).join('')}
             <option value="__new__">+ Yeni yer əlavə et</option>
           </select>
+        </div>
+
+        <div class="field">
+          <label>🚚 Tədarükçü</label>
+          <input id="f_supplierSearch" list="supplierDatalist" value="${escapeHtml(formState.supplier || '')}" placeholder="Yaz və ya seç..." oninput="JollyProducts.handleSupplierInput(this.value)">
+          <datalist id="supplierDatalist">
+            ${suppliers.map(s => `<option value="${escapeHtml(s.name)}">`).join('')}
+          </datalist>
         </div>
 
         <div class="field">
@@ -981,6 +992,19 @@ const JollyProducts = (() => {
     });
   }
 
+  // Tədarükçü — yazılan mətni saxla, forma göndəriləndə (submitForm) siyahıya yeni isə əlavə olunacaq
+  function handleSupplierInput(val) {
+    formState.supplier = (val || '').trim();
+  }
+
+  // Əgər yazılan tədarükçü adı siyahıda yoxdursa, avtomatik siyahıya əlavə et
+  function ensureSupplierSaved() {
+    const name = (formState.supplier || '').trim();
+    if (!name) return;
+    const exists = JollyDB.Suppliers.all().some(s => s.name.toLowerCase() === name.toLowerCase());
+    if (!exists) JollyDB.Suppliers.add({ name });
+  }
+
   function handleInlineAdd(selectEl, kind) {
     if (selectEl.value !== '__new__') {
       formState[kind] = selectEl.value;
@@ -1005,6 +1029,7 @@ const JollyProducts = (() => {
 
   function submitForm(keepOpen) {
     if (!validate()) return false;
+    ensureSupplierSaved();
     const payload = { ...formState };
     delete payload._draftId;
     if (formState.price !== '' && formState.price != null) payload.price = parseFloat(formState.price);
@@ -1065,5 +1090,6 @@ const JollyProducts = (() => {
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
     lookupBarcodeOnline, applyOnlineLookup,
+    handleSupplierInput,
   };
 })();
