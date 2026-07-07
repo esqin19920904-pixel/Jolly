@@ -77,7 +77,6 @@ const JollyProducts = (() => {
 
   function afterHomeRender() {
     applyHomeView();
-    // aktiv filtr çipini işıqlandır
     if (homeState.filter) {
       const chip = document.querySelector(`#homeFilterChips .chip[data-hf="${homeState.filter}"]`);
       if (chip) chip.classList.add('chip-active');
@@ -86,7 +85,6 @@ const JollyProducts = (() => {
     if (sc) { const s = SORTS.find(x => x.key === homeState.sort); if (s) sc.textContent = s.label; }
   }
 
-  /* --- Ağıllı filtr/sort (ana səhifə) --- */
   let homeState = { filter: null, sort: 'new' };
   const SORTS = [
     { key: 'new', label: '↕️ Sıra: Yeni', fn: (a,b) => (b.createdAt||0)-(a.createdAt||0) },
@@ -96,7 +94,6 @@ const JollyProducts = (() => {
   ];
 
   function brandChips() {
-    // ən çox işlənən 4 firma çipi
     const counts = {};
     JollyDB.Products.all().forEach(p => { if (p.brand) counts[p.brand] = (counts[p.brand]||0)+1; });
     return Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, 4)
@@ -113,14 +110,13 @@ const JollyProducts = (() => {
     else if (f && f.startsWith('brand:')) { const b = f.slice(6); items = items.filter(p => p.brand === b); }
     const sort = SORTS.find(s => s.key === homeState.sort) || SORTS[0];
     items = items.slice().sort(sort.fn);
-    if (!f) items = items.slice(0, 12); // filtr yoxdursa son 12
+    if (!f) items = items.slice(0, 12);
     const titleEl = document.querySelector('.section-title');
     if (titleEl) titleEl.textContent = f ? `Nəticə: ${items.length} məhsul` : 'Son əlavə edilənlər';
     renderList(document.getElementById('homeProductList'), items);
   }
 
   function homeFilter(f, chipEl) {
-    // eyni çipə ikinci toxunuş = filtri götür
     homeState.filter = (homeState.filter === f) ? null : f;
     document.querySelectorAll('#homeFilterChips .chip').forEach(c => c.classList.remove('chip-active'));
     if (homeState.filter && chipEl) chipEl.classList.add('chip-active');
@@ -182,7 +178,6 @@ const JollyProducts = (() => {
     });
   }
 
-  /* ---------- Filtered list page (#/products?filter=) ---------- */
   function renderFilteredPage(params) {
     let products = [];
     let title = 'Bütün məhsullar';
@@ -203,10 +198,8 @@ const JollyProducts = (() => {
     `;
   }
 
-  /* ---------- Drafts page ---------- */
   function deleteDraft(id) {
     if (!confirm('Bu gələn malı silmək istəyirsən?')) return;
-    // Şəkli də IDB-dən sil
     const d = JollyDB.Drafts.get(id);
     if (d && d.images && typeof JollyStorage !== 'undefined') {
       d.images.forEach(ref => { if (ref && ref.startsWith && ref.startsWith('idb:')) JollyStorage.deleteImage(ref); });
@@ -244,7 +237,6 @@ const JollyProducts = (() => {
     `;
   }
 
-  /* ---------- Product detail page ---------- */
   function readiness(p) {
     const missing = [];
     if (!p.images || !p.images.length) missing.push('Şəkil yoxdur');
@@ -359,41 +351,35 @@ const JollyProducts = (() => {
     JollyViewer.open(resolved, index);
   }
 
-  // Barkodu böyük, skan oluna bilən şəkil kimi göstər (kassir skanerlə oxusun)
   function showBarcode(code) {
     if (typeof JollyViewer === 'undefined') return;
     let dataUrl;
     if (typeof JollyBarcodeGen !== 'undefined') {
-      dataUrl = JollyBarcodeGen.toDataURL(code); // real EAN-13/Code128
+      dataUrl = JollyBarcodeGen.toDataURL(code);
     }
-    if (!dataUrl) dataUrl = generateBarcodeImage(code); // fallback
+    if (!dataUrl) dataUrl = generateBarcodeImage(code);
     JollyViewer.open([dataUrl], 0, code);
   }
 
-  // Code128 sadə barkod şəkli yaradır (canvas)
   function generateBarcodeImage(code) {
-    // Sadə, geniş zolaqlı vizual barkod (skaner üçün EAN/Code128 tam deyil, amma rəqəm + oxunaqlı zolaq)
     const canvas = document.createElement('canvas');
     const W = 700, H = 320;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#000';
-    // hər rəqəmi zolaq şəklinə çevir (sadə kodlama)
     const digits = code.replace(/\D/g, '') || '0';
     let x = 40;
     const barAreaW = W - 80;
     const unit = Math.max(2, Math.floor(barAreaW / (digits.length * 7)));
     for (const d of digits) {
       const val = parseInt(d, 10);
-      // hər rəqəm üçün dəyişən enli zolaq nümunəsi
       for (let i = 0; i < 4; i++) {
         const w = unit * ((i + val % 3) % 3 + 1);
         if (i % 2 === 0) { ctx.fillRect(x, 30, w, 200); }
         x += w + unit;
       }
     }
-    // rəqəmi altında yaz
     ctx.fillStyle = '#000';
     ctx.font = 'bold 44px monospace';
     ctx.textAlign = 'center';
@@ -430,13 +416,11 @@ const JollyProducts = (() => {
     JollyRouter.go('#/home');
   }
 
-  /* ---------- WhatsApp-a göndər: premium PNG kart (JollyShare) ---------- */
   function whatsappShare(id) {
     if (typeof JollyShare === 'undefined') { Toast.error('Paylaşım modulu yüklənməyib'); return; }
     JollyShare.shareCurrentProduct(id);
   }
 
-  /* ---------- ⋮ Daha çox menyusu ---------- */
   function copyProductText(id) {
     const p = JollyDB.Products.get(id);
     if (!p) return;
@@ -484,10 +468,8 @@ const JollyProducts = (() => {
     if (typeof JollySound !== 'undefined') JollySound.tap();
   }
 
-  /* ---------- Product Form (Add / Edit) ---------- */
   let formState = null;
 
-  /* ---------- Smart Auto Fill: "Corab 545 / ai-120" → ad+kod+model ---------- */
   function smartProductParse(text) {
     text = String(text || '').trim();
     const result = { name: '', specialCode: '', modelNo: '' };
@@ -497,17 +479,12 @@ const JollyProducts = (() => {
     const leftPart = (parts[0] || '').trim();
     const explicitModel = hasSlash ? parts.slice(1).join('/').trim() : '';
 
-    // "Ad + qısa rəqəmli kod (+ qalan mətn = model)" nümunəsi.
-    // Kod 1-5 rəqəm ola bilər (məs. "18", "545", "19") — sabit uzunluq tələb olunmur.
-    // Koddan sonra gələn HƏR ŞEY (məs. "no.456098") ayrıca model kimi götürülür,
-    // özü rəqəmli olsa belə (əvvəlki versiya bunu səhvən yenidən "kod" sanırdı).
     const match = leftPart.match(/^(.+?)\s+(\d{1,5})(?:[\s\-]+(.+))?$/);
     if (match) {
       result.name = match[1].trim();
       result.specialCode = match[2].trim();
       result.modelNo = explicitModel || (match[3] ? match[3].trim() : '');
     } else {
-      // Rəqəm-kod nümunəsi tapılmadı — mətni bölmədən olduğu kimi ad kimi saxla
       result.name = leftPart;
       result.modelNo = explicitModel;
     }
@@ -527,7 +504,6 @@ const JollyProducts = (() => {
     if (modelEl) modelEl.value = data.modelNo;
   }
 
-  /* ---------- AI Product Camera: Visual Search ilə bənzər məhsulu tap, sahələri təklif et ---------- */
   function aiCameraFill() {
     if (typeof JollyVisualSearch === 'undefined') { Toast.error('Bu modul yüklənməyib'); return; }
     JollyVisualSearch.captureAndSearch((results, capturedDataUrl) => {
@@ -573,7 +549,6 @@ const JollyProducts = (() => {
     };
     if (formState.supplier === undefined) formState.supplier = '';
     if (formState.last4 === undefined) formState.last4 = '';
-    // "Saxla və yenisi"-dən gələn firma/qrup/rəf
     if (!existing) {
       const carryRaw = sessionStorage.getItem('jolly_carry');
       if (carryRaw) {
@@ -614,7 +589,7 @@ const JollyProducts = (() => {
       <div class="glass" style="padding:16px;">
         <div class="field">
           <label>⚡ Sürətli doldur — bir sətrə yaz</label>
-          <input id="f_quickFill" placeholder="Məsələn: Corab 545 / ai-120" oninput="JollyProducts.smartFill(this.value)" style="border:1px solid var(--border-glow);">
+          <input id="f_quickFill" placeholder="Məsələn: Corab 545 / ai-120" oninput="JollyProducts.smartFill(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next" style="border:1px solid var(--border-glow);">
           <div class="muted" style="font-size:11px;margin-top:5px;">Ad + kod / model — "/" işarəsindən əvvəl ad və kod, sonra model gəlir</div>
           <button type="button" class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="JollyProducts.aiCameraFill()">📷 AI ilə şəkildən doldur</button>
         </div>
@@ -630,7 +605,7 @@ const JollyProducts = (() => {
 
         <div class="field">
           <label>Məhsulun adı *</label>
-          <input id="f_name" value="${escapeHtml(formState.name)}" placeholder="məs. Daraq">
+          <input id="f_name" value="${escapeHtml(formState.name)}" placeholder="məs. Daraq" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
         </div>
         ${typeof JollyOCR !== 'undefined' ? `<button class="btn btn-ghost btn-sm" style="margin:-6px 0 12px;" onclick="JollyProducts.ocrFill()">📷 Şəkildən oxu (OCR)</button>` : ''}
         <div id="brainSuggestZone" style="margin:-6px 0 12px;"></div>
@@ -638,11 +613,11 @@ const JollyProducts = (() => {
         <div class="field-row">
           <div class="field">
             <label>Xüsusi kod</label>
-            <input id="f_mainCode" inputmode="numeric" value="${escapeHtml(formState.mainCode)}" placeholder="məs. 545">
+            <input id="f_mainCode" inputmode="numeric" value="${escapeHtml(formState.mainCode)}" placeholder="məs. 545" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
           </div>
           <div class="field">
             <label>Qiymət (₼)</label>
-            <input id="f_price" type="number" inputmode="decimal" step="0.01" value="${formState.price}" placeholder="0.00">
+            <input id="f_price" type="number" inputmode="decimal" step="0.01" value="${formState.price}" placeholder="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
           </div>
         </div>
 
@@ -655,7 +630,7 @@ const JollyProducts = (() => {
           </div>
           <div class="field">
             <label>Model nömrəsi</label>
-            <input id="f_extraCodeValue" inputmode="numeric" value="${escapeHtml(formState.extraCodeValue)}" placeholder="məs. 180">
+            <input id="f_extraCodeValue" inputmode="numeric" value="${escapeHtml(formState.extraCodeValue)}" placeholder="məs. 180" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
           </div>
         </div>
 
@@ -672,7 +647,7 @@ const JollyProducts = (() => {
 
         <div class="field">
           <label>Son 4 rəqəm (barkoddan avtomatik)</label>
-          <input id="f_last4" inputmode="numeric" maxlength="4" value="${escapeHtml(formState.last4 || '')}" placeholder="avtomatik dolur" style="letter-spacing:2px;font-family:var(--font-mono);">
+          <input id="f_last4" inputmode="numeric" maxlength="4" value="${escapeHtml(formState.last4 || '')}" placeholder="avtomatik dolur" style="letter-spacing:2px;font-family:var(--font-mono);" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
         </div>
 
         <div class="field">
@@ -720,7 +695,7 @@ const JollyProducts = (() => {
 
         <div class="field">
           <label>Rəng</label>
-          <input id="f_color" value="${escapeHtml(formState.color || '')}" placeholder="məs. qara">
+          <input id="f_color" value="${escapeHtml(formState.color || '')}" placeholder="məs. qara" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="done">
         </div>
 
         <div class="field">
@@ -739,6 +714,17 @@ const JollyProducts = (() => {
     `;
   }
 
+  const ENTER_FIELD_ORDER = ['f_quickFill', 'f_name', 'f_mainCode', 'f_price', 'f_extraCodeValue', 'f_last4', 'f_color', 'f_note'];
+  function focusNext(el) {
+    const idx = ENTER_FIELD_ORDER.indexOf(el.id);
+    if (idx === -1 || idx === ENTER_FIELD_ORDER.length - 1) { el.blur(); return; }
+    for (let i = idx + 1; i < ENTER_FIELD_ORDER.length; i++) {
+      const nextEl = document.getElementById(ENTER_FIELD_ORDER[i]);
+      if (nextEl) { nextEl.focus(); if (nextEl.select) nextEl.select(); return; }
+    }
+    el.blur();
+  }
+
   function afterFormRender() {
     renderImageStrip();
     renderBarcodeTags();
@@ -749,14 +735,12 @@ const JollyProducts = (() => {
         el.addEventListener('change', () => { formState[f] = el.value; });
       }
     });
-    // AI Brain: ad yazılıb bitəndə firma/qrup/yer/status təklif et
     const nameEl = document.getElementById('f_name');
     if (nameEl && typeof JollyBrain !== 'undefined') {
       nameEl.addEventListener('blur', () => { showBrainSuggestions(); checkSimilarWarning(); });
     }
   }
 
-  // Ad yazılanda oxşar/dublikat xəbərdarlığı
   function checkSimilarWarning() {
     if (typeof JollyBrain === 'undefined' || !formState.name || !formState.name.trim()) return;
     const zone = document.getElementById('brainSuggestZone');
@@ -787,7 +771,6 @@ const JollyProducts = (() => {
     }
   }
 
-  // OCR: şəkildən oxu, sahələri doldur
   function ocrFill() {
     if (typeof JollyOCR === 'undefined') { Toast.error('OCR mövcud deyil'); return; }
     const choice = confirm('Kamera ilə şəkil çək?\n(İmtina = qalereyadan seç)');
@@ -886,7 +869,6 @@ const JollyProducts = (() => {
     const input = document.getElementById('f_barcodeInput');
     let val = input.value.trim();
     if (!val) return;
-    // yalnız rəqəm saxla
     val = val.replace(/\D/g, '');
     if (!val) { Toast.error('Barkod yalnız rəqəm olmalıdır'); return; }
     if (formState.barcodes.includes(val)) {
@@ -902,7 +884,6 @@ const JollyProducts = (() => {
     }
     formState.barcodes.push(val);
     if (typeof JollySound !== 'undefined') JollySound.success();
-    // Son 4 rəqəmi avtomatik yaz (ilk barkoddan, əgər boşdursa)
     if (!formState.last4) {
       formState.last4 = val.slice(-4);
       const l4 = document.getElementById('f_last4');
@@ -911,13 +892,11 @@ const JollyProducts = (() => {
     input.value = '';
     renderBarcodeTags();
 
-    // Yeni: əgər ad hələ boşdursa, barkodu internetdə (açıq baza) axtar
     if (!formState.name || !formState.name.trim()) {
       lookupBarcodeOnline(val);
     }
   }
 
-  /* ---------- Avtomatik etiket təklifi: barkodu internetdə axtar ---------- */
   function lookupBarcodeOnline(code) {
     const zone = document.getElementById('brainSuggestZone');
     if (zone) zone.innerHTML = `<div class="muted" style="font-size:11px;">🌐 İnternetdə axtarılır...</div>`;
@@ -1045,7 +1024,6 @@ const JollyProducts = (() => {
     return true;
   }
 
-  // Saxla və dərhal yeni boş kart aç (firma/qrup/rəf/status saxlanır)
   function submitAndNew() {
     const carry = {
       brand: formState.brand, group: formState.group,
@@ -1053,7 +1031,6 @@ const JollyProducts = (() => {
     };
     if (!submitForm(true)) return;
     sessionStorage.setItem('jolly_carry', JSON.stringify(carry));
-    // routerı yeniləmək üçün əvvəlcə home, sonra yeni məhsul
     window.location.hash = '#/home';
     setTimeout(() => { window.location.hash = '#/product/new'; }, 30);
     Toast.info('Növbəti məhsul — firma/qrup saxlanıldı');
@@ -1082,6 +1059,6 @@ const JollyProducts = (() => {
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
-    lookupBarcodeOnline, applyOnlineLookup,
+    lookupBarcodeOnline, applyOnlineLookup, focusNext,
   };
 })();
