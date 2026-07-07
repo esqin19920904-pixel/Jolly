@@ -1,5 +1,5 @@
 /* ============================================================
-   JOLLY Admin Studio — Firma, Qrup, Yer, Status idarəetməsi
+   JOLLY Admin Studio — Firma, Qrup, Yer, Status, Tədarükçü idarəetməsi
    ============================================================ */
 
 const JollyAdminStudio = (() => {
@@ -8,6 +8,7 @@ const JollyAdminStudio = (() => {
     groups: { store: JollyDB.Groups, label: 'Qrup', icon: '📦' },
     locations: { store: JollyDB.Locations, label: 'Yer', icon: '📍' },
     statuses: { store: JollyDB.Statuses, label: 'Status', icon: '🔖' },
+    suppliers: { store: JollyDB.Suppliers, label: 'Tədarükçü', icon: '🚚' },
   };
 
   function renderHome() {
@@ -129,7 +130,7 @@ const JollyAdminStudio = (() => {
     const item = cfg.store.get(id);
     if (!item) return;
     const usageCount = JollyDB.Products.all().filter(p => {
-      const field = { brands: 'brand', groups: 'group', locations: 'location', statuses: 'status' }[key];
+      const field = { brands: 'brand', groups: 'group', locations: 'location', statuses: 'status', suppliers: 'supplier' }[key];
       return p[field] === item.name;
     }).length;
     const warn = usageCount > 0 ? `\n\nDİQQƏT: bu, ${usageCount} məhsulda istifadə olunur.` : '';
