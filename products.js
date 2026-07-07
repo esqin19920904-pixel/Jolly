@@ -24,6 +24,7 @@ const JollyProducts = (() => {
           <span class="p-price">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'}</span>
           ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
         </div>
+        ${p.group ? `<div class="p-related" onclick="event.stopPropagation();JollyRouter.go('#/products?group=${encodeURIComponent(p.group)}')" style="font-size:10px;color:var(--accent-1);margin-top:5px;opacity:.85;">📦 ${escapeHtml(p.group)} qrupundan daha çox ›</div>` : ''}
       </div>
     `;
   }
@@ -703,10 +704,11 @@ const JollyProducts = (() => {
 
         <div class="field">
           <label>🚚 Tədarükçü</label>
-          <input id="f_supplierSearch" list="supplierDatalist" value="${escapeHtml(formState.supplier || '')}" placeholder="Kod (məs. 504) və ya ad yaz..." oninput="JollyProducts.handleSupplierInput(this.value)" onblur="JollyProducts.handleSupplierBlur(this.value)">
-          <datalist id="supplierDatalist">
-            ${suppliers.map(s => `<option value="${escapeHtml(s.code ? s.code + ' - ' + s.name : s.name)}">`).join('')}
-          </datalist>
+          <select id="f_supplier" onchange="JollyProducts.handleInlineAdd(this,'supplier')">
+            <option value="">— seçin —</option>
+            ${suppliers.map(s => `<option value="${escapeHtml(s.name)}" ${formState.supplier === s.name ? 'selected' : ''}>${escapeHtml(s.code ? s.code + ' - ' + s.name : s.name)}</option>`).join('')}
+            <option value="__new__">+ Yeni tədarükçü əlavə et</option>
+          </select>
         </div>
 
         <div class="field">
@@ -992,82 +994,24 @@ const JollyProducts = (() => {
     });
   }
 
-  // Tədarükçü — yazılan mətni saxla, forma göndəriləndə (submitForm) siyahıya yeni isə əlavə olunacaq
-  function handleSupplierInput(val) {
-    formState.supplier = (val || '').trim();
-  }
-
-  // Sahədən çıxanda (blur): əgər yalnız kod yazılıbsa (məs. "504"), mövcud tədarükçünün adına çevir
-  function handleSupplierBlur(val) {
-    const raw = (val || '').trim();
-    if (!raw) { formState.supplier = ''; return; }
-    // "504 - Ad" formatı yazılıbsa, təmiz adı çıxar
-    const dashMatch = raw.match(/^(\d+)\s*-\s*(.+)$/);
-    if (dashMatch) {
-      formState.supplier = dashMatch[2].trim();
-      const el = document.getElementById('f_supplierSearch');
-      if (el) el.value = formState.supplier;
-      return;
-    }
-    // Yalnız rəqəmdirsə — mövcud kodla uyğunlaşdır
-    if (/^\d+$/.test(raw)) {
-      const bycode = JollyDB.Suppliers.all().find(s => (s.code || '').trim() === raw);
-      if (bycode) {
-        formState.supplier = bycode.name;
-        const el = document.getElementById('f_supplierSearch');
-        if (el) el.value = bycode.name;
-        return;
-      }
-    }
-    formState.supplier = raw;
-  }
-
-  // Əgər yazılan tədarükçü adı siyahıda yoxdursa, avtomatik siyahıya əlavə et.
-  // "504 - Fəzail Kosmetika" formatını da tanıyır (kodu ayırır), yalnız kod yazılıbsa mövcudla uyğunlaşdırır.
-  function ensureSupplierSaved() {
-    const raw = (formState.supplier || '').trim();
-    if (!raw) return;
-    const list = JollyDB.Suppliers.all();
-
-    // 1) "504 - Ad" formatı
-    const dashMatch = raw.match(/^(\d+)\s*-\s*(.+)$/);
-    if (dashMatch) {
-      const code = dashMatch[1].trim();
-      const name = dashMatch[2].trim();
-      const exists = list.some(s => s.name.toLowerCase() === name.toLowerCase());
-      if (!exists) JollyDB.Suppliers.add({ name, code });
-      formState.supplier = name;
-      return;
-    }
-
-    // 2) Yalnız rəqəm (kod) yazılıbsa — mövcud tədarükçü ilə uyğunlaşdır, yeni yaratma
-    if (/^\d+$/.test(raw)) {
-      const bycode = list.find(s => (s.code || '').trim() === raw);
-      if (bycode) { formState.supplier = bycode.name; return; }
-      // uyğun kod tapılmadı — rəqəmi ad kimi saxlamaq yerinə xəbərdarlıq et
-      Toast.error(`"${raw}" kodlu tədarükçü tapılmadı — Admin Studio-dan yoxla`);
-      return;
-    }
-
-    // 3) Ad kimi işlə (mövcud deyilsə yeni tədarükçü kimi əlavə et)
-    const exists = list.some(s => s.name.toLowerCase() === raw.toLowerCase());
-    if (!exists) JollyDB.Suppliers.add({ name: raw });
-    formState.supplier = raw;
-  }
-
   function handleInlineAdd(selectEl, kind) {
     if (selectEl.value !== '__new__') {
       formState[kind] = selectEl.value;
       return;
     }
-    const label = { brand: 'firma', group: 'qrup', location: 'yer' }[kind];
+    const label = { brand: 'firma', group: 'qrup', location: 'yer', supplier: 'tədarükçü' }[kind];
     const name = prompt(`Yeni ${label} adı:`);
     if (!name || !name.trim()) { selectEl.value = formState[kind] || ''; return; }
-    const store = { brand: JollyDB.Brands, group: JollyDB.Groups, location: JollyDB.Locations }[kind];
-    const rec = store.add({ name: name.trim() });
+    const store = { brand: JollyDB.Brands, group: JollyDB.Groups, location: JollyDB.Locations, supplier: JollyDB.Suppliers }[kind];
+    let extra = {};
+    if (kind === 'supplier') {
+      const code = prompt('Tədarükçü kodu (məs. 504) — boş buraxıla bilər:');
+      if (code && code.trim()) extra.code = code.trim();
+    }
+    const rec = store.add({ name: name.trim(), ...extra });
     formState[kind] = rec.name;
     const opt = document.createElement('option');
-    opt.value = rec.name; opt.textContent = rec.name; opt.selected = true;
+    opt.value = rec.name; opt.textContent = extra.code ? `${extra.code} - ${rec.name}` : rec.name; opt.selected = true;
     selectEl.insertBefore(opt, selectEl.lastElementChild);
     Toast.success(`"${rec.name}" əlavə olundu`);
   }
@@ -1079,7 +1023,6 @@ const JollyProducts = (() => {
 
   function submitForm(keepOpen) {
     if (!validate()) return false;
-    ensureSupplierSaved();
     const payload = { ...formState };
     delete payload._draftId;
     if (formState.price !== '' && formState.price != null) payload.price = parseFloat(formState.price);
@@ -1140,6 +1083,5 @@ const JollyProducts = (() => {
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
     lookupBarcodeOnline, applyOnlineLookup,
-    handleSupplierInput, handleSupplierBlur,
   };
 })();
