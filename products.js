@@ -897,6 +897,60 @@ const JollyProducts = (() => {
     }
     input.value = '';
     renderBarcodeTags();
+
+    // Yeni: əgər ad hələ boşdursa, barkodu internetdə (açıq baza) axtar
+    if (!formState.name || !formState.name.trim()) {
+      lookupBarcodeOnline(val);
+    }
+  }
+
+  /* ---------- Avtomatik etiket təklifi: barkodu internetdə axtar ---------- */
+  function lookupBarcodeOnline(code) {
+    const zone = document.getElementById('brainSuggestZone');
+    if (zone) zone.innerHTML = `<div class="muted" style="font-size:11px;">🌐 İnternetdə axtarılır...</div>`;
+    fetch(`/api/barcode-lookup?upc=${encodeURIComponent(code)}`)
+      .then(r => r.json())
+      .then(data => {
+        const z = document.getElementById('brainSuggestZone');
+        if (!z) return;
+        if (data && data.found && data.title) {
+          const safeTitle = escapeHtml(data.title).replace(/'/g, "\\'");
+          const safeBrand = escapeHtml(data.brand || '').replace(/'/g, "\\'");
+          z.innerHTML = `
+            <div style="font-size:11px;color:var(--accent-1);margin-bottom:6px;">🌐 İnternetdə tapıldı (toxun, tətbiq et):</div>
+            <div class="chip" onclick="JollyProducts.applyOnlineLookup('${safeTitle}','${safeBrand}')">${escapeHtml(data.title)}${data.brand ? ' · ' + escapeHtml(data.brand) : ''}</div>
+          `;
+        } else {
+          z.innerHTML = '';
+        }
+      })
+      .catch(() => {
+        const z = document.getElementById('brainSuggestZone');
+        if (z) z.innerHTML = '';
+      });
+  }
+
+  function applyOnlineLookup(title, brand) {
+    formState.name = title;
+    const nameEl = document.getElementById('f_name');
+    if (nameEl) nameEl.value = title;
+    if (brand) {
+      formState.brand = brand;
+      const brandEl = document.getElementById('f_brand');
+      if (brandEl) {
+        if (![...brandEl.options].some(o => o.value === brand)) {
+          const opt = document.createElement('option');
+          opt.value = brand; opt.textContent = brand;
+          brandEl.insertBefore(opt, brandEl.lastElementChild);
+        }
+        brandEl.value = brand;
+      }
+    }
+    const zone = document.getElementById('brainSuggestZone');
+    if (zone) zone.innerHTML = '';
+    if (typeof JollySound !== 'undefined') JollySound.success();
+    Toast.success('Tətbiq olundu — yoxla və düzəlt');
+    showBrainSuggestions();
   }
 
   function removeBarcode(i) {
@@ -1010,5 +1064,6 @@ const JollyProducts = (() => {
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
+    lookupBarcodeOnline, applyOnlineLookup,
   };
 })();
