@@ -2,8 +2,13 @@
    JOLLY STUDIOS PREMIUM CARDS (jolly-studios-carousel.js)
    ==========================================================================
    Fintech-tərzi tünd dizayn: HAMISI EYNİ SAKİT TÜND FONDA, tək bir aksent
-   rəngi (gold) — dairə fonda böyük ikon, yumşaq kölgə/dərinlik (elevation),
-   daha geniş boşluq. Rəngbərəng kartlar YOXDUR, hamısı sakit və premium.
+   rəngi (gold) — dairə fonda böyük ikon, yumşaq kölgə/dərinlik (elevation).
+
+   DÜZƏLİŞ: Artıq location.hash === '#/studios' YOXLAMIR (bu heç vaxt doğru
+   olmurdu, çünki "Studio" düyməsi URL-i dəyişmədən səhifəni render edir).
+   Bunun əvəzinə .studio-grid-in İÇİNDƏ "AI Brain" adlı kart olub-olmadığını
+   yoxlayır — bu, yalnız əsl Studios ana səhifəsində olur (Analytics, Theme
+   və digər səhifələrdə belə kart yoxdur).
    ========================================================================== */
 
 (function () {
@@ -68,12 +73,21 @@
     document.head.appendChild(style);
   }
 
+  // Bu, əsl Studios ana səhifəsidirmi? (hash-ə güvənmədən, məzmuna görə yoxla)
+  function isStudiosHubGrid(grid) {
+    const titles = grid.querySelectorAll(".studio-card .title");
+    for (let i = 0; i < titles.length; i++) {
+      if (titles[i].textContent.trim() === "AI Brain") return true;
+    }
+    return false;
+  }
+
   function applyPremiumStyle() {
-    if (location.hash !== "#/studios") return;
     const main = document.getElementById("main");
     if (!main) return;
     const grid = main.querySelector(".studio-grid");
     if (!grid) return;
+    if (!isStudiosHubGrid(grid)) return;
 
     grid.classList.remove("jolly-carousel");
     const oldHint = main.querySelector(".jolly-sc-hint");
@@ -81,6 +95,7 @@
 
     const cards = grid.querySelectorAll(".studio-card");
     cards.forEach((card) => {
+      if (card.classList.contains("jolly-premium-card")) return;
       card.classList.remove("jolly-color-card");
       card.style.removeProperty("--card-accent");
       card.style.removeProperty("--card-accent-glow");
@@ -95,9 +110,14 @@
       return;
     }
     const observer = new MutationObserver(() => applyPremiumStyle());
-    observer.observe(main, { childList: true, subtree: false });
+    observer.observe(main, { childList: true, subtree: true });
     window.addEventListener("hashchange", () => setTimeout(applyPremiumStyle, 0));
     applyPremiumStyle();
+    // Topbar-dakı "Studio" düyməsi URL dəyişmədən render edə bilər —
+    // ona görə bir neçə dəfə təkrar yoxlayaq (kiçik gecikmələrlə)
+    setTimeout(applyPremiumStyle, 300);
+    setTimeout(applyPremiumStyle, 800);
+    setTimeout(applyPremiumStyle, 1500);
   }
 
   function init() {
