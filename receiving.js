@@ -300,7 +300,64 @@ const JollyReceiving = (() => {
     setBasket(basket);
     Toast.success(`${selectedSet.size} məhsul səbətə əlavə olundu`);
     if (typeof JollySound !== 'undefined') JollySound.success();
-    forceReceivingRerender();
+    // Təsdiqdən sonra TAM BOŞ, böyük ölçülü vərəqə keçir
+    window.location.hash = '#/receiving/sheet';
+  }
+
+  /* ============================================================
+     TƏSDİQ VƏRƏQİ (Confirmation Sheet) — tam boş səhifə, bütün
+     səbətdəki məhsullar sıra ilə, HAMISI BÖYÜK: şəkil, ad, barkod
+     nömrəsi+son4, barkodun şəkli. Həm oxumaq, həm skanerlə birbaşa
+     vurmaq üçün nəzərdə tutulub.
+     ============================================================ */
+  function renderConfirmSheet() {
+    const basket = getBasket();
+    if (!basket.productIds.length) {
+      return `<div class="empty-state"><div class="big-icon">📭</div><h3>Səbət boşdur</h3><button class="btn btn-primary" onclick="JollyRouter.go('#/receiving')">‹ Qəbul Studio-ya qayıt</button></div>`;
+    }
+    const rows = basket.productIds.map((id, i) => {
+      const p = JollyDB.Products.get(id);
+      if (!p) return '';
+      const barcode = (p.barcodes && p.barcodes[0]) || '';
+      const last4 = p.last4 || (barcode ? barcode.slice(-4) : '');
+      let barcodeImg = null;
+      if (barcode) {
+        barcodeImg = (typeof JollyBarcodeGen !== 'undefined' && JollyBarcodeGen.toDataURL(barcode)) || (typeof JollyProducts !== 'undefined' && JollyProducts.generateBarcodeImage(barcode));
+      }
+      const img = (p.images && p.images[0])
+        ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:100%;max-height:22vh;object-fit:contain;border-radius:14px;">`
+        : '<div style="font-size:60px;text-align:center;padding:16px;">🧴</div>';
+
+      return `
+        <div class="glass" style="padding:20px;margin-bottom:16px;text-align:center;">
+          <div class="mono muted" style="font-size:12px;margin-bottom:8px;">#${i + 1}</div>
+          ${img}
+          <div style="font-family:var(--font-display);font-size:22px;font-weight:700;margin-top:14px;">${esc(p.name || 'Adsız')}</div>
+          ${p.location ? `<div class="muted" style="font-size:13px;margin-top:2px;">📍 ${esc(p.location)}</div>` : ''}
+
+          ${barcode ? `
+            <div style="margin-top:16px;">
+              <div class="mono" style="font-size:20px;font-weight:700;">${esc(barcode)}</div>
+              <div class="mono" style="font-size:15px;color:var(--accent-2);margin-top:2px;">son 4: ${esc(last4)}</div>
+            </div>
+            ${barcodeImg ? `
+              <div style="background:#fff;border-radius:12px;padding:16px;margin-top:14px;">
+                <img src="${barcodeImg}" style="width:100%;max-width:400px;">
+              </div>
+            ` : ''}
+          ` : '<div class="muted" style="margin-top:14px;">Barkod yoxdur</div>'}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="back-btn anim-slide" onclick="JollyRouter.go('#/receiving')">‹ Geri</div>
+      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">📋 Təsdiq Vərəqi</h2>
+      <p class="muted" style="font-size:12px;margin:0 0 16px;">${basket.productIds.length} məhsul, seçdiyin sıra ilə. Barkodları birbaşa skanerlə vur.</p>
+      ${rows}
+      <button class="btn btn-primary btn-block" style="margin-top:6px;" onclick="JollyRouter.go('#/receiving/scan')">🚀 Qəbul Rejiminə keç</button>
+      <div style="height:30px;"></div>
+    `;
   }
 
   function clearBasket() {
@@ -590,7 +647,11 @@ const JollyReceiving = (() => {
       route: '#/receiving',
       group: 'Anbar',
       enabled: true,
-      render(rest) { return rest === 'scan' ? renderScanMode() : renderPicker(); },
+      render(rest) {
+        if (rest === 'scan') return renderScanMode();
+        if (rest === 'sheet') return renderConfirmSheet();
+        return renderPicker();
+      },
       afterRender: afterRenderDispatch,
       init,
     });
