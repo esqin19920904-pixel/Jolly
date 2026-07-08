@@ -123,7 +123,7 @@ const JollyReceiving = (() => {
     delete basket.received[id];
     setBasket(basket);
     if (typeof JollySound !== 'undefined') JollySound.tap();
-    JollyRouter.go('#/receiving');
+    forceReceivingRerender();
   }
 
   // ── Səbət sırasını sürüşdürərək dəyişmək (drag & drop, mouse + touch) ──
@@ -277,6 +277,14 @@ const JollyReceiving = (() => {
     if (bar) bar.style.display = selectedSet.size ? 'block' : 'none';
   }
 
+  function forceReceivingRerender() {
+    // JollyRouter eyni hash-ə göndəriləndə səhifəni yeniləmir (hashchange
+    // tetiklənmir) — ona görə products.js-də olduğu kimi, bir anlıq başqa
+    // hash-ə keçib dərhal geri qayıdırıq ki, məcburi yenidən render olsun.
+    window.location.hash = '#/home';
+    setTimeout(() => { window.location.hash = '#/receiving'; }, 30);
+  }
+
   function addSelectedToBasket() {
     if (!selectedSet.size) return;
     const basket = getBasket();
@@ -287,14 +295,14 @@ const JollyReceiving = (() => {
     setBasket(basket);
     Toast.success(`${selectedSet.size} məhsul səbətə əlavə olundu`);
     if (typeof JollySound !== 'undefined') JollySound.success();
-    JollyRouter.go('#/receiving');
+    forceReceivingRerender();
   }
 
   function clearBasket() {
     if (!confirm('Bütün qəbul səbəti təmizlənsin? (Qəbul edilməmiş məhsullar da silinəcək siyahıdan)')) return;
     setBasket({ productIds: [], received: {}, startedAt: null });
     Toast.info('Səbət təmizləndi');
-    JollyRouter.go('#/receiving');
+    forceReceivingRerender();
   }
 
   function attachPickerHandlers() {
