@@ -147,6 +147,79 @@
   }
 
   // ------------------------------------------------------------------------
+  // ÇIXIŞ TƏSDİQİ — tətbiq bağlanmazdan əvvəl "Bəli/Xeyr" soruşur
+  // ------------------------------------------------------------------------
+  function injectExitStyles() {
+    if (document.getElementById("jolly-exit-styles")) return;
+    const style = document.createElement("style");
+    style.id = "jolly-exit-styles";
+    style.textContent = `
+      #jolly-exit-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+        z-index: 999999; display: flex; align-items: center; justify-content: center;
+      }
+      #jolly-exit-box {
+        background: #1a1a1a; border: 1px solid rgba(212,175,55,0.4); border-radius: 16px;
+        padding: 22px; width: 82%; max-width: 320px; text-align: center;
+        font-family: system-ui, sans-serif; color: #f0e6c8;
+      }
+      #jolly-exit-box .jx-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+      #jolly-exit-box .jx-row { display: flex; gap: 10px; }
+      #jolly-exit-box button {
+        flex: 1; padding: 11px; border-radius: 10px; border: none; font-size: 13px; cursor: pointer;
+      }
+      #jolly-exit-no { background: linear-gradient(135deg,#d4af37,#f4d675); color: #1a1a1a; font-weight: 600; }
+      #jolly-exit-yes { background: #333; color: #eee; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function showExitConfirm() {
+    injectExitStyles();
+    let overlay = document.getElementById("jolly-exit-overlay");
+    if (overlay) return; // artıq açıqdır
+    overlay = document.createElement("div");
+    overlay.id = "jolly-exit-overlay";
+    overlay.innerHTML = `
+      <div id="jolly-exit-box">
+        <div class="jx-title">Proqramı bağlayım?</div>
+        <div class="jx-row">
+          <button id="jolly-exit-no">Xeyr, qalım</button>
+          <button id="jolly-exit-yes">Bəli, bağla</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#jolly-exit-no").onclick = () => {
+      overlay.remove();
+      ensureSentinel(); // qalmaq istəyir — tarixçəni yenidən "doldur"
+    };
+    overlay.querySelector("#jolly-exit-yes").onclick = () => {
+      overlay.remove();
+      // Heç nə etmirik — bu addım artıq "istifadə olunub", növbəti geri
+      // basış tətbiqi bağlayacaq (Android-in öz davranışı).
+    };
+  }
+
+  // ------------------------------------------------------------------------
+  // "‹ GERİ" DÜYMƏLƏRİNİN DÜZGÜN DAVRANIŞI (ana menyuya yox, əvvəlki səhifəyə)
+  // ------------------------------------------------------------------------
+  function patchGoBack() {
+    if (typeof window.JollyApp === "undefined") {
+      setTimeout(patchGoBack, 300);
+      return;
+    }
+    if (window.JollyApp._backGuardPatched) return;
+    window.JollyApp._backGuardPatched = true;
+    // Köhnə goBack() nə edirdisə (çox güman "#/home"-a aparırdı), bunu
+    // əsl brauzer tarixçəsi ilə əvəz edirik ki, DƏQİQ əvvəlki səhifəyə qayıtsın.
+    window.JollyApp.goBack = function () {
+      history.back();
+    };
+    console.log("[JollyBackGuard] JollyApp.goBack() → əsl 'əvvəlki səhifə' davranışına keçirildi ✅");
+  }
+
+  // ------------------------------------------------------------------------
   // POPSTATE: "geri" düyməsi basılanda
   // ------------------------------------------------------------------------
   function onPopState(e) {
@@ -158,9 +231,9 @@
       popOverlayState(true);
       return;
     }
-    // Heç bir pəncərə açıq deyil — sentinel-ə qayıtmış ola bilərik,
-    // bunu yenidən quraşdırırıq ki, gələcək overlay-lər üçün hazır olsun
-    ensureSentinel();
+    // Heç bir pəncərə açıq deyil VƏ tarixçədə geriyə gedəcək yer qalmayıb —
+    // bu, tətbiqin bağlanacağı andır. Bağlanmazdan əvvəl soruş.
+    showExitConfirm();
   }
 
   function init() {
@@ -171,6 +244,7 @@
     } else {
       document.addEventListener("DOMContentLoaded", watchOverlays);
     }
+    patchGoBack();
     console.log("[JollyBackGuard] Aktivləşdi ✅ — pəncərələr geri düyməsi ilə bağlanacaq, tətbiq bağlanmayacaq");
   }
 
