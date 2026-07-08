@@ -88,6 +88,7 @@ const JollyReceiving = (() => {
 
   // Səbətdəki məhsulları, əlavə olunma SIRASI ilə (basket.productIds sırası
   // artıq əlavə olunma sırasını əks etdirir) nömrələnmiş siyahı kimi qurur.
+  // Hər sətir sürüşdürülə bilər (☰ tutacağından tutub sıra dəyişdirmək olar).
   function renderBasketListRows(basket) {
     if (!basket.productIds.length) {
       return '<div class="muted" style="padding:12px;">Səbət boşdur</div>';
@@ -100,9 +101,10 @@ const JollyReceiving = (() => {
         ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:34px;height:34px;object-fit:cover;border-radius:8px;">`
         : `<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;">🧴</div>`;
       return `
-        <div class="list-row" data-basket-id="${id}" style="align-items:center;">
-          <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-            <span class="mono muted" style="font-size:11px;width:20px;flex-shrink:0;">${i + 1}.</span>
+        <div class="list-row" draggable="true" data-basket-id="${id}" style="align-items:center;">
+          <span style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+            <span class="recv-drag-handle" style="cursor:grab;padding:4px 2px;color:var(--muted,#888);flex-shrink:0;">☰</span>
+            <span class="mono muted" style="font-size:11px;width:18px;flex-shrink:0;">${i + 1}.</span>
             ${thumb}
             <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name || 'Adsız məhsul')}</span>
             ${isDone ? '<span style="font-size:11px;color:var(--accent-2);flex-shrink:0;">✓ qəbul edildi</span>' : ''}
@@ -122,6 +124,75 @@ const JollyReceiving = (() => {
     setBasket(basket);
     if (typeof JollySound !== 'undefined') JollySound.tap();
     JollyRouter.go('#/receiving');
+  }
+
+  // ── Səbət sırasını sürüşdürərək dəyişmək (drag & drop, mouse + touch) ──
+  function getBasketDragAfterEl(container, y) {
+    const rows = [...container.querySelectorAll('.list-row[data-basket-id]')].filter(
+      r => r.style.opacity !== '0.3' && r.style.opacity !== '0.4'
+    );
+    return rows.reduce((closest, row) => {
+      const box = row.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) return { offset, element: row };
+      return closest;
+    }, { offset: -Infinity }).element;
+  }
+
+  function persistBasketOrder() {
+    const container = document.getElementById('recvBasketList');
+    if (!container) return;
+    const ids = [...container.querySelectorAll('.list-row[data-basket-id]')].map(r => r.dataset.basketId);
+    const basket = getBasket();
+    basket.productIds = ids;
+    setBasket(basket);
+    // Nömrələri yenilə (1,2,3...) — tam yenidən render etmədən sadəcə say sütununu düzəlt
+    container.querySelectorAll('.list-row[data-basket-id]').forEach((row, i) => {
+      const numEl = row.querySelector('.mono.muted');
+      if (numEl) numEl.textContent = (i + 1) + '.';
+    });
+  }
+
+  function attachBasketDrag() {
+    const container = document.getElementById('recvBasketList');
+    if (!container) return;
+    let dragEl = null;
+
+    container.querySelectorAll('.list-row[data-basket-id]').forEach(row => {
+      row.addEventListener('dragstart', () => { dragEl = row; setTimeout(() => { row.style.opacity = '0.3'; }, 0); });
+      row.addEventListener('dragend', () => { row.style.opacity = '1'; persistBasketOrder(); });
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const after = getBasketDragAfterEl(container, e.clientY);
+        if (!dragEl) return;
+        if (after == null) container.appendChild(dragEl);
+        else container.insertBefore(dragEl, after);
+      });
+
+      let touchDragging = false;
+      const handle = row.querySelector('.recv-drag-handle');
+      const startTouch = () => {
+        touchDragging = true;
+        row.style.opacity = '0.4';
+        row.style.background = 'rgba(124,138,255,0.12)';
+      };
+      if (handle) handle.addEventListener('touchstart', startTouch, { passive: true });
+      row.addEventListener('touchmove', (e) => {
+        if (!touchDragging) return;
+        e.preventDefault();
+        const y = e.touches[0].clientY;
+        const after = getBasketDragAfterEl(container, y);
+        if (after == null) container.appendChild(row);
+        else if (after !== row) container.insertBefore(row, after);
+      }, { passive: false });
+      row.addEventListener('touchend', () => {
+        if (!touchDragging) return;
+        touchDragging = false;
+        row.style.opacity = '1';
+        row.style.background = '';
+        persistBasketOrder();
+      });
+    });
   }
 
   function pickerCard(p, basket) {
@@ -228,6 +299,7 @@ const JollyReceiving = (() => {
 
   function attachPickerHandlers() {
     applyFilter();
+    attachBasketDrag();
   }
 
   /* ============================================================
