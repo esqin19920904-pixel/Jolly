@@ -1,75 +1,79 @@
 /* ==========================================================================
-   JOLLY STUDIOS CAROUSEL (jolly-studios-carousel.js)
+   JOLLY STUDIOS COLOR CARDS (jolly-studios-carousel.js)
    ==========================================================================
-   Studios ana səhifəsindəki (yalnız #/studios route-u) 2-sütunlu grid-i
-   üfüqi sürüşdürülən "carousel" formatına salır. studios.js-ə TOXUNMUR.
-
-   Diqqət: .studio-grid class-ı digər səhifələrdə də istifadə olunur
-   (Analytics, Theme, Voice&Vision) — ona görə bu fayl YALNIZ #/studios
-   route-unda (dəqiq, alt-səhifə yox) işə düşür, digərlərinə təsir etmir.
-
-   Necə işləyir:
-   - #main-ı izləyir (MutationObserver), hər dəyişiklikdə hash yoxlanılır
-   - Hash === '#/studios' (dəqiq) olanda, tapılan .studio-grid-ə
-     "jolly-carousel" class-ı əlavə olunur
-   - CSS həmin class üzərindən üfüqi scroll + snap effekti yaradır
-
-   Quraşdırma:
-   1. Bu faylı JOLLY-nin flat qovluğuna at.
-   2. index.html-də əlavə et: <script src="jolly-studios-carousel.js"></script>
+   Fayl adı "carousel" olaraq qalıb, AMMA carousel effekti YOXDUR artıq.
+   Grid strukturu TAM KÖHNƏ KİMİ qalır (2 sütun), yalnız hər kartın
+   yuxarı zolağı və ikonu fərqli rəngdə parıldayır.
    ========================================================================== */
 
 (function () {
   "use strict";
 
+  const PALETTE = [
+    "#d4af37", "#00c2ff", "#b829f7", "#ff4fa3", "#29e0c9",
+    "#ff8a3d", "#4caf50", "#ff5c6c", "#7c8aff", "#f5d76e",
+    "#26d0ce", "#e06cff", "#ffb74d", "#66d9c4"
+  ];
+
   function injectStyles() {
-    if (document.getElementById("jolly-sc-styles")) return;
+    const old = document.getElementById("jolly-sc-styles");
+    if (old) old.remove();
     const style = document.createElement("style");
     style.id = "jolly-sc-styles";
     style.textContent = `
-      .studio-grid.jolly-carousel {
-        display: flex !important;
-        grid-template-columns: none !important;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x mandatory;
-        gap: 14px;
-        padding: 6px 6px 14px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+      #main .studio-grid.jolly-carousel {
+        display: grid !important;
       }
-      .studio-grid.jolly-carousel::-webkit-scrollbar { display: none; }
-      .studio-grid.jolly-carousel .studio-card {
-        flex: 0 0 72%;
-        scroll-snap-align: center;
-        min-height: 150px;
+      #main .studio-grid .studio-card.jolly-color-card {
+        position: relative;
+        overflow: hidden;
+        border-top: 3px solid var(--card-accent, #d4af37) !important;
+        transition: transform 0.15s ease, box-shadow 0.25s ease;
       }
-      .jolly-sc-hint {
-        text-align: center;
-        font-size: 11px;
-        color: rgba(212,175,55,0.7);
-        margin: -8px 0 12px;
-        letter-spacing: 0.5px;
+      #main .studio-grid .studio-card.jolly-color-card:active {
+        transform: scale(0.97);
+        box-shadow: 0 0 18px var(--card-accent-glow, rgba(212,175,55,0.4));
+      }
+      #main .studio-grid .studio-card.jolly-color-card .ic {
+        filter: drop-shadow(0 0 6px var(--card-accent-glow, rgba(212,175,55,0.5)));
+      }
+      #main .studio-grid .studio-card.jolly-color-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: radial-gradient(ellipse at top left, var(--card-accent-glow, rgba(212,175,55,0.08)) 0%, transparent 60%);
+        pointer-events: none;
       }
     `;
     document.head.appendChild(style);
   }
 
-  function applyCarousel() {
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function applyColors() {
     if (location.hash !== "#/studios") return;
     const main = document.getElementById("main");
     if (!main) return;
     const grid = main.querySelector(".studio-grid");
-    if (!grid || grid.classList.contains("jolly-carousel")) return;
+    if (!grid) return;
 
-    grid.classList.add("jolly-carousel");
+    grid.classList.remove("jolly-carousel");
+    const oldHint = main.querySelector(".jolly-sc-hint");
+    if (oldHint) oldHint.remove();
 
-    if (!main.querySelector(".jolly-sc-hint")) {
-      const hint = document.createElement("div");
-      hint.className = "jolly-sc-hint";
-      hint.textContent = "← Sürüşdür →";
-      grid.insertAdjacentElement("beforebegin", hint);
-    }
+    const cards = grid.querySelectorAll(".studio-card");
+    cards.forEach((card, i) => {
+      const color = PALETTE[i % PALETTE.length];
+      card.classList.add("jolly-color-card");
+      card.style.setProperty("--card-accent", color);
+      card.style.setProperty("--card-accent-glow", hexToRgba(color, 0.35));
+    });
   }
 
   function watchMain() {
@@ -78,10 +82,10 @@
       setTimeout(watchMain, 300);
       return;
     }
-    const observer = new MutationObserver(() => applyCarousel());
+    const observer = new MutationObserver(() => applyColors());
     observer.observe(main, { childList: true, subtree: false });
-    window.addEventListener("hashchange", () => setTimeout(applyCarousel, 0));
-    applyCarousel();
+    window.addEventListener("hashchange", () => setTimeout(applyColors, 0));
+    applyColors();
   }
 
   function init() {
