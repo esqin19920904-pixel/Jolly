@@ -86,9 +86,10 @@ const JollyReceiving = (() => {
     `;
   }
 
-  // Səbətdəki məhsulları, əlavə olunma SIRASI ilə, 4-sütunlu cədvəl kimi
-  // qurur: 1) şəkil, 2) tam ad, 3) barkod nömrəsi + son 4 rəqəm, 4) barkodun
-  // kiçik şəkli (skaner üçün). Hər sətir sürüşdürülə bilər (☰ tutacağı).
+  // Səbətdəki məhsulları, əlavə olunma SIRASI ilə, SADƏ tək-sətirli siyahı
+  // kimi göstərir. Barkodun ŞƏKLİ burda YOXDUR — o, tam başqa yerdə,
+  // "Qəbul Rejimi" (skan) kartında göstərilir. Burda yalnız: sıra nömrəsi,
+  // kiçik şəkil, ad, son 4 rəqəm. Hər sətir sürüşdürülə bilər (☰ tutacağı).
   function renderBasketListRows(basket) {
     if (!basket.productIds.length) {
       return '<div class="muted" style="padding:12px;">Səbət boşdur</div>';
@@ -99,43 +100,22 @@ const JollyReceiving = (() => {
       const isDone = !!basket.received[id];
       const barcode = (p.barcodes && p.barcodes[0]) || '';
       const last4 = p.last4 || (barcode ? barcode.slice(-4) : '');
-      let barcodeImg = null;
-      if (barcode) {
-        barcodeImg = (typeof JollyBarcodeGen !== 'undefined' && JollyBarcodeGen.toDataURL(barcode)) || (typeof JollyProducts !== 'undefined' && JollyProducts.generateBarcodeImage(barcode));
-      }
       const thumb = (p.images && p.images[0])
-        ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:40px;height:40px;object-fit:cover;border-radius:8px;">`
-        : `<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;">🧴</div>`;
+        ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:34px;height:34px;object-fit:cover;border-radius:8px;">`
+        : `<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;">🧴</div>`;
 
       return `
-        <div class="list-row recv-basket-row" draggable="true" data-basket-id="${id}" style="align-items:center;flex-wrap:wrap;gap:8px;padding:10px 0;">
-          <span class="recv-drag-handle" style="cursor:grab;padding:4px 2px;color:var(--muted,#888);flex-shrink:0;">☰</span>
-          <span class="mono muted" style="font-size:11px;width:16px;flex-shrink:0;">${i + 1}.</span>
-
-          <!-- 1: şəkil -->
-          <span style="flex-shrink:0;">${thumb}</span>
-
-          <!-- 2: tam ad -->
-          <span style="flex:1 1 100px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">
-            ${esc(p.name || 'Adsız məhsul')}
-            ${isDone ? '<div style="font-size:10px;color:var(--accent-2);">✓ qəbul edildi</div>' : ''}
+        <div class="list-row recv-basket-row" draggable="true" data-basket-id="${id}" style="align-items:center;flex-wrap:nowrap;">
+          <span style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+            <span class="recv-drag-handle" style="cursor:grab;padding:4px 2px;color:var(--muted,#888);flex-shrink:0;">☰</span>
+            <span class="mono muted" style="font-size:11px;width:16px;flex-shrink:0;">${i + 1}.</span>
+            <span style="flex-shrink:0;">${thumb}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">${esc(p.name || 'Adsız məhsul')}</span>
+            ${isDone ? '<span style="font-size:10px;color:var(--accent-2);flex-shrink:0;">✓</span>' : ''}
           </span>
-
-          <!-- 3: barkod nömrəsi + son 4 -->
-          <span style="flex-shrink:0;text-align:center;">
-            ${barcode ? `
-              <div class="mono" style="font-size:10.5px;">${esc(barcode)}</div>
-              <div class="mono" style="font-size:9.5px;color:var(--accent-2);">son4: ${esc(last4)}</div>
-            ` : '<span class="muted" style="font-size:10px;">barkod yox</span>'}
-          </span>
-
-          <!-- 4: barkodun kiçik şəkli -->
-          <span style="flex-shrink:0;">
-            ${barcodeImg ? `<img src="${barcodeImg}" style="width:52px;height:24px;object-fit:contain;background:#fff;border-radius:4px;">` : ''}
-          </span>
-
-          <span class="actions" style="flex-shrink:0;margin-left:auto;">
-            <span onclick="JollyReceiving.removeFromBasket('${id}')" style="color:var(--accent-danger);cursor:pointer;padding-left:6px;">✕</span>
+          ${barcode ? `<span class="mono muted" style="font-size:10.5px;flex-shrink:0;margin-left:6px;">son4: ${esc(last4)}</span>` : ''}
+          <span class="actions" style="flex-shrink:0;">
+            <span onclick="JollyReceiving.removeFromBasket('${id}')" style="color:var(--accent-danger);cursor:pointer;padding-left:8px;">✕</span>
           </span>
         </div>
       `;
