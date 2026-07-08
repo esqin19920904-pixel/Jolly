@@ -76,7 +76,7 @@
   setInterval(pollAndApply, 600);
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", pollAndApply);
-  } else {
+  } els {
     pollAndApply();
   }
 })();
