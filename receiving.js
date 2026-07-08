@@ -2,6 +2,10 @@
    JOLLY Receiving Studio — Qəbul Studio
    Yeni gələn malları seç → səbətə at → skanerlə Turbo Qəbul Rejimi
    Özü-özünü ModuleRegistry-ə qeydiyyatdan keçirir (#/receiving).
+
+   DÜZƏLİŞ: Səbətdəki məhsullar indi SEÇİLMƏ SIRASI ilə, nömrələnmiş
+   siyahı kimi göstərilir (renderBasketList) — hər birinin yanında
+   "çıxar" düyməsi var (removeFromBasket).
    ============================================================ */
 
 const JollyReceiving = (() => {
@@ -48,7 +52,12 @@ const JollyReceiving = (() => {
             <button class="btn btn-ghost btn-sm" onclick="JollyReceiving.clearBasket()">🗑️</button>
           </div>
         </div>
-      </div>` : ''}
+      </div>
+      <div class="section-title" style="margin-top:0;">📋 Səbətdəkilər (seçdiyin sıra ilə)</div>
+      <div class="glass" id="recvBasketList" style="padding:4px 14px;margin-bottom:14px;max-height:260px;overflow-y:auto;">
+        ${renderBasketListRows(basket)}
+      </div>
+      ` : ''}
 
       <div class="section-title" style="margin-top:0;">Filtrlə</div>
       <div class="chip-row" id="recvFilterChips" style="margin-bottom:8px;">
@@ -75,6 +84,44 @@ const JollyReceiving = (() => {
         <button class="btn btn-primary btn-block" style="box-shadow:0 6px 20px rgba(0,0,0,0.4);" onclick="JollyReceiving.addSelectedToBasket()">➕ Səbətə əlavə et (<span id="recvSelCount">0</span>)</button>
       </div>
     `;
+  }
+
+  // Səbətdəki məhsulları, əlavə olunma SIRASI ilə (basket.productIds sırası
+  // artıq əlavə olunma sırasını əks etdirir) nömrələnmiş siyahı kimi qurur.
+  function renderBasketListRows(basket) {
+    if (!basket.productIds.length) {
+      return '<div class="muted" style="padding:12px;">Səbət boşdur</div>';
+    }
+    return basket.productIds.map((id, i) => {
+      const p = JollyDB.Products.get(id);
+      if (!p) return '';
+      const isDone = !!basket.received[id];
+      const thumb = (p.images && p.images[0])
+        ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:34px;height:34px;object-fit:cover;border-radius:8px;">`
+        : `<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;">🧴</div>`;
+      return `
+        <div class="list-row" data-basket-id="${id}" style="align-items:center;">
+          <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+            <span class="mono muted" style="font-size:11px;width:20px;flex-shrink:0;">${i + 1}.</span>
+            ${thumb}
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name || 'Adsız məhsul')}</span>
+            ${isDone ? '<span style="font-size:11px;color:var(--accent-2);flex-shrink:0;">✓ qəbul edildi</span>' : ''}
+          </span>
+          <span class="actions" style="flex-shrink:0;">
+            <span onclick="JollyReceiving.removeFromBasket('${id}')" style="color:var(--accent-danger);cursor:pointer;padding-left:8px;">✕</span>
+          </span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function removeFromBasket(id) {
+    const basket = getBasket();
+    basket.productIds = basket.productIds.filter(x => x !== id);
+    delete basket.received[id];
+    setBasket(basket);
+    if (typeof JollySound !== 'undefined') JollySound.tap();
+    JollyRouter.go('#/receiving');
   }
 
   function pickerCard(p, basket) {
@@ -162,7 +209,10 @@ const JollyReceiving = (() => {
   function addSelectedToBasket() {
     if (!selectedSet.size) return;
     const basket = getBasket();
-    basket.productIds = [...new Set([...basket.productIds, ...selectedSet])];
+    // Seçilmə sırasını qorumaq üçün: köhnə ID-lər + yeni seçilənlər (Set-in
+    // öz daxili sırası ilə, seçim ardıcıllığına uyğun) əlavə olunur.
+    const newIds = [...selectedSet].filter(id => !basket.productIds.includes(id));
+    basket.productIds = [...basket.productIds, ...newIds];
     setBasket(basket);
     Toast.success(`${selectedSet.size} məhsul səbətə əlavə olundu`);
     if (typeof JollySound !== 'undefined') JollySound.success();
@@ -448,6 +498,7 @@ const JollyReceiving = (() => {
 
   return {
     setFilter, applyFilter, toggleSelect, selectAllVisible, addSelectedToBasket, clearBasket,
+    removeFromBasket,
     finishSession, clearBasketAndExit, captureUnknown,
   };
 })();
