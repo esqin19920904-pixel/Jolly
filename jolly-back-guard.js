@@ -231,9 +231,16 @@
       popOverlayState(true);
       return;
     }
-    // Heç bir pəncərə açıq deyil VƏ tarixçədə geriyə gedəcək yer qalmayıb —
-    // bu, tətbiqin bağlanacağı andır. Bağlanmazdan əvvəl soruş.
-    showExitConfirm();
+    // VACİB FƏRQ: e.state — İNDİ HARADA olduğumuzu göstərir (haradan
+    // gəldiyimizi yox). Yalnız bizim əvvəlcədən qoyduğumuz "sentinel"
+    // vəziyyətinə qayıtmışıqsa, deməli geriyə HEÇ bir səhifə qalmayıb —
+    // bu, əsl çıxış nöqtəsidir. Əks halda (adi səhifəyə qayıtmışıqsa,
+    // e.state adətən null olur) heç nə etmirik, adi keçid davam edir.
+    const state = e.state;
+    if (state && state[GUARD_KEY] === "sentinel") {
+      showExitConfirm();
+    }
+    // else: adi səhifələr arası geri keçid — bunu ENGƏLLƏMİRİK, sual vermirik
   }
 
   function init() {
