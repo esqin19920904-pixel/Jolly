@@ -35,9 +35,10 @@
   let overlayStack = []; // { id: string } sırası ilə açıq pəncərələr
   let suppressNextPop = false; // öz-özümüzə history.back() çağıranda popstate-i görməzdən gəlmək üçün
 
-  // Bizim modullarımızın overlay ID-ləri (id sonu "-overlay" ilə bitir)
+  // Bizim modullarımızın overlay ID-ləri VƏ sənin köhnə fayllarındakı overlay-lər
+  // (böyük/kiçik hərfə həssas deyil, tire olsun-olmasın "overlay" ilə bitən hər id)
   function isKnownOverlayId(id) {
-    return /-overlay$/.test(id || "");
+    return /overlay$/i.test(id || "");
   }
 
   function ensureSentinel() {
@@ -75,12 +76,23 @@
       if (el) el.classList.remove("on");
       return;
     }
+    if (id === "scanOverlay") {
+      // Barkod skaneri — sadəcə DOM-dan silmək kifayət deyil, kamera stream-i
+      // düzgün dayandırmaq üçün JollyBarcode.close()-u çağırmaq lazımdır
+      if (typeof window.JollyBarcode !== "undefined" && typeof window.JollyBarcode.close === "function") {
+        window.JollyBarcode.close();
+      } else {
+        const el = document.getElementById("scanOverlay");
+        if (el) el.remove();
+      }
+      return;
+    }
     const el = document.getElementById(id);
     if (el && typeof el.remove === "function") {
       el.remove();
       return;
     }
-    // Naməlum overlay (məs. barkod skaner) — Escape simulyasiyası, bəlkə dinləyir
+    // Naməlum overlay — Escape simulyasiyası, bəlkə dinləyir
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
   }
 
