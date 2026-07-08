@@ -1,19 +1,15 @@
 /* ==========================================================================
-   JOLLY STUDIOS COLOR CARDS (jolly-studios-carousel.js)
+   JOLLY STUDIOS PREMIUM CARDS (jolly-studios-carousel.js)
    ==========================================================================
-   Fayl adı "carousel" olaraq qalıb, AMMA carousel effekti YOXDUR artıq.
-   Grid strukturu TAM KÖHNƏ KİMİ qalır (2 sütun), yalnız hər kartın
-   yuxarı zolağı və ikonu fərqli rəngdə parıldayır.
+   Fintech-tərzi tünd dizayn: HAMISI EYNİ SAKİT TÜND FONDA, tək bir aksent
+   rəngi (gold) — dairə fonda böyük ikon, yumşaq kölgə/dərinlik (elevation),
+   daha geniş boşluq. Rəngbərəng kartlar YOXDUR, hamısı sakit və premium.
    ========================================================================== */
 
 (function () {
   "use strict";
 
-  const PALETTE = [
-    "#d4af37", "#00c2ff", "#b829f7", "#ff4fa3", "#29e0c9",
-    "#ff8a3d", "#4caf50", "#ff5c6c", "#7c8aff", "#f5d76e",
-    "#26d0ce", "#e06cff", "#ffb74d", "#66d9c4"
-  ];
+  const ACCENT_GLOW = "rgba(212,175,55,0.28)";
 
   function injectStyles() {
     const old = document.getElementById("jolly-sc-styles");
@@ -21,42 +17,58 @@
     const style = document.createElement("style");
     style.id = "jolly-sc-styles";
     style.textContent = `
-      #main .studio-grid.jolly-carousel {
-        display: grid !important;
-      }
-      #main .studio-grid .studio-card.jolly-color-card {
+      #main .studio-grid .studio-card.jolly-premium-card {
         position: relative;
+        background: linear-gradient(160deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.015) 100%) !important;
+        border: 1px solid rgba(255,255,255,0.06) !important;
+        border-radius: 18px !important;
+        padding: 20px 16px !important;
+        box-shadow:
+          0 10px 24px rgba(0,0,0,0.35),
+          0 1px 0 rgba(255,255,255,0.04) inset;
+        transition: transform 0.18s ease, box-shadow 0.25s ease, border-color 0.25s ease;
         overflow: hidden;
-        border-top: 3px solid var(--card-accent, #d4af37) !important;
-        transition: transform 0.15s ease, box-shadow 0.25s ease;
       }
-      #main .studio-grid .studio-card.jolly-color-card:active {
-        transform: scale(0.97);
-        box-shadow: 0 0 18px var(--card-accent-glow, rgba(212,175,55,0.4));
+      #main .studio-grid .studio-card.jolly-premium-card:active {
+        transform: scale(0.965);
+        border-color: rgba(212,175,55,0.35) !important;
+        box-shadow:
+          0 4px 14px rgba(0,0,0,0.4),
+          0 0 22px ${ACCENT_GLOW};
       }
-      #main .studio-grid .studio-card.jolly-color-card .ic {
-        filter: drop-shadow(0 0 6px var(--card-accent-glow, rgba(212,175,55,0.5)));
+      #main .studio-grid .studio-card.jolly-premium-card .ic {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: radial-gradient(circle, ${ACCENT_GLOW} 0%, rgba(212,175,55,0.06) 70%, transparent 100%);
+        font-size: 22px;
+        margin-bottom: 12px;
       }
-      #main .studio-grid .studio-card.jolly-color-card::after {
+      #main .studio-grid .studio-card.jolly-premium-card .title {
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+      #main .studio-grid .studio-card.jolly-premium-card .sub {
+        color: rgba(255,255,255,0.45);
+        font-size: 12px;
+      }
+      #main .studio-grid .studio-card.jolly-premium-card::after {
         content: '';
         position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: radial-gradient(ellipse at top left, var(--card-accent-glow, rgba(212,175,55,0.08)) 0%, transparent 60%);
+        top: -30%; right: -20%;
+        width: 60%; height: 60%;
+        background: radial-gradient(circle, ${ACCENT_GLOW} 0%, transparent 70%);
+        opacity: 0.5;
         pointer-events: none;
       }
     `;
     document.head.appendChild(style);
   }
 
-  function hexToRgba(hex, alpha) {
-    const h = hex.replace("#", "");
-    const r = parseInt(h.substring(0, 2), 16);
-    const g = parseInt(h.substring(2, 4), 16);
-    const b = parseInt(h.substring(4, 6), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-
-  function applyColors() {
+  function applyPremiumStyle() {
     if (location.hash !== "#/studios") return;
     const main = document.getElementById("main");
     if (!main) return;
@@ -68,11 +80,11 @@
     if (oldHint) oldHint.remove();
 
     const cards = grid.querySelectorAll(".studio-card");
-    cards.forEach((card, i) => {
-      const color = PALETTE[i % PALETTE.length];
-      card.classList.add("jolly-color-card");
-      card.style.setProperty("--card-accent", color);
-      card.style.setProperty("--card-accent-glow", hexToRgba(color, 0.35));
+    cards.forEach((card) => {
+      card.classList.remove("jolly-color-card");
+      card.style.removeProperty("--card-accent");
+      card.style.removeProperty("--card-accent-glow");
+      card.classList.add("jolly-premium-card");
     });
   }
 
@@ -82,10 +94,10 @@
       setTimeout(watchMain, 300);
       return;
     }
-    const observer = new MutationObserver(() => applyColors());
+    const observer = new MutationObserver(() => applyPremiumStyle());
     observer.observe(main, { childList: true, subtree: false });
-    window.addEventListener("hashchange", () => setTimeout(applyColors, 0));
-    applyColors();
+    window.addEventListener("hashchange", () => setTimeout(applyPremiumStyle, 0));
+    applyPremiumStyle();
   }
 
   function init() {
