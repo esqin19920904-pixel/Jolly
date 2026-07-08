@@ -1,0 +1,270 @@
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║  JOLLY EDGE NEON — Mövcud Edge Panel-ə Neon Effektlər           ║
+   ║  .edge-cell və .ec-icon elementlərinə glow, pulse, ripple       ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+
+/* ─── Edge Panel Arxa Planı ─── */
+.edge-panel,
+[class*="edge-panel"],
+#edge-panel {
+  background: linear-gradient(180deg, #0a0a0a 0%, #111 50%, #0a0a0a 100%) !important;
+  border-left: 2px solid rgba(245, 197, 99, 0.4) !important;
+  box-shadow: -8px 0 40px rgba(245, 197, 99, 0.15),
+              -4px 0 20px rgba(0, 245, 255, 0.05) !important;
+}
+
+/* Ambient glow animasiyası */
+.edge-panel::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: 0;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse at 80% 20%, rgba(245,197,99,0.06) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 80%, rgba(0,245,255,0.03) 0%, transparent 50%);
+  animation: edgeAmbient 10s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes edgeAmbient {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.5; }
+  33% { transform: translate(-3%, 3%) rotate(1deg); opacity: 1; }
+  66% { transform: translate(2%, -2%) rotate(-0.5deg); opacity: 0.7; }
+}
+
+/* ─── Edge Cell Xanaları (Neon Glow) ─── */
+.edge-cell,
+.ec-cell,
+[class*="edge-cell"],
+[class*="ec-cell"] {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  transition: all 0.3s ease !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Neon border gradient (hover/active) */
+.edge-cell::before,
+.ec-cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  padding: 1.5px;
+  background: linear-gradient(135deg, 
+    var(--cell-color, #f5c563), 
+    transparent 40%, 
+    transparent 60%, 
+    var(--cell-color, #f5c563));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.edge-cell:hover::before,
+.ec-cell:hover::before,
+.edge-cell:active::before,
+.ec-cell:active::before {
+  opacity: 0.7;
+}
+
+/* Glow effekti */
+.edge-cell::after,
+.ec-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: radial-gradient(ellipse at center, var(--cell-glow, rgba(245,197,99,0.15)) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.edge-cell:hover::after,
+.ec-cell:hover::after,
+.edge-cell:active::after,
+.ec-cell:active::after {
+  opacity: 1;
+}
+
+/* Active scale */
+.edge-cell:active,
+.ec-cell:active {
+  transform: scale(0.96) !important;
+}
+
+/* ─── Hər xanaya öz rəngi (data-id ilə) ─── */
+/* Skan */
+.edge-cell[data-id="scan"],
+.ec-cell[data-id="scan"] {
+  --cell-color: #00ff88;
+  --cell-glow: rgba(0, 255, 136, 0.2);
+}
+
+/* Son əlavələr */
+.edge-cell[data-id="lastAdded"],
+.ec-cell[data-id="lastAdded"] {
+  --cell-color: #00f5ff;
+  --cell-glow: rgba(0, 245, 255, 0.2);
+}
+
+/* Gələn Mallar */
+.edge-cell[data-id="drafts"],
+.ec-cell[data-id="drafts"] {
+  --cell-color: #ff00aa;
+  --cell-glow: rgba(255, 0, 170, 0.2);
+}
+
+/* AI Sürətli */
+.edge-cell[data-id="aiQuick"],
+.ec-cell[data-id="aiQuick"] {
+  --cell-color: #b829f7;
+  --cell-glow: rgba(184, 41, 247, 0.2);
+}
+
+/* Seçilmişlər */
+.edge-cell[data-id="favorites"],
+.ec-cell[data-id="favorites"] {
+  --cell-color: #f5c563;
+  --cell-glow: rgba(245, 197, 99, 0.2);
+}
+
+/* Digər xanalar (fallback) */
+.edge-cell:not([data-id]),
+.ec-cell:not([data-id]) {
+  --cell-color: #ff6b35;
+  --cell-glow: rgba(255, 107, 53, 0.2);
+}
+
+/* ─── Icon Glow ─── */
+.ec-icon,
+[class*="ec-icon"],
+.edge-cell svg,
+.ec-cell svg,
+.edge-cell img,
+.ec-cell img {
+  filter: drop-shadow(0 0 6px var(--cell-glow, rgba(245,197,99,0.3)));
+  transition: all 0.3s ease;
+}
+
+.edge-cell:hover .ec-icon,
+.ec-cell:hover .ec-icon,
+.edge-cell:active .ec-icon,
+.ec-cell:active .ec-icon {
+  filter: drop-shadow(0 0 12px var(--cell-color, #f5c563));
+  transform: scale(1.1);
+}
+
+/* ─── Ripple Effekti (JS ilə aktivləşəcək) ─── */
+.edge-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--cell-color, #f5c563) 0%, transparent 70%);
+  transform: scale(0);
+  animation: edgeRipple 0.5s ease-out forwards;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes edgeRipple {
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+/* ─── Edge Header Neon ─── */
+.edge-header,
+.ec-header,
+[class*="edge-header"] {
+  position: relative;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.edge-header::before,
+.ec-header::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid rgba(245, 197, 99, 0.2);
+  animation: headerPulse 2.5s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes headerPulse {
+  0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+
+/* ─── Edge Label Neon ─── */
+.ec-label,
+.edge-label,
+[class*="ec-label"] {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Bottom Glow Bar ─── */
+.edge-footer,
+.ec-footer,
+[class*="edge-footer"] {
+  position: relative;
+  padding-top: 12px;
+}
+
+.edge-footer::before,
+.ec-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    #f5c563, 
+    #00f5ff, 
+    #f5c563, 
+    transparent);
+  border-radius: 2px;
+  animation: footerGlow 4s ease-in-out infinite;
+}
+
+@keyframes footerGlow {
+  0%, 100% { opacity: 0.4; filter: blur(0px); }
+  50% { opacity: 0.9; filter: blur(1px); }
+}
+
+/* ─── Scrollbar Neon ─── */
+.edge-panel::-webkit-scrollbar,
+[class*="edge-panel"]::-webkit-scrollbar {
+  width: 3px;
+}
+
+.edge-panel::-webkit-scrollbar-track,
+[class*="edge-panel"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.edge-panel::-webkit-scrollbar-thumb,
+[class*="edge-panel"]::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #f5c563, #00f5ff);
+  border-radius: 3px;
+}
