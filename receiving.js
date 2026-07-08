@@ -573,4 +573,4 @@ const JollyReceiving = (() => {
     removeFromBasket,
     finishSession, clearBasketAndExit, captureUnknown,
   };
-})();
+})(); 
