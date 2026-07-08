@@ -28,33 +28,23 @@
     { id: 1,  title: "Gecə rejimi",                         desc: "Gold temaya uyğun tünd fon variantı, axşam işləmək üçün göz rahatlığı",             category: "Vizual/UI",        status: "pending" },
     { id: 2,  title: "AMOLED tam qara rejim",                desc: "Gecə rejimindən əlavə, tam qara fon ilə ekstra batareya qənaəti",                    category: "Vizual/UI",        status: "pending" },
     { id: 3,  title: "Şəkil fonu avtomatik təmizləmə",        desc: "Məhsul şəklinin arxa fonunu AI ilə silib ağ/şəffaf fona keçirmək",                   category: "Vizual/UI",        status: "pending" },
-    { id: 4,  title: "AI foto keyfiyyət yoxlaması",           desc: "Şəkil qaranlıq/bulanıqdırsa xəbərdarlıq, 'yenidən çək' təklifi",                      category: "Vizual/UI",        status: "pending" },
     { id: 5,  title: "Rəngə görə axtarış",                    desc: "'Qırmızı olanları göstər' - AI dominant rəngə görə məhsul tapır",                    category: "Vizual/UI",        status: "pending" },
 
-    { id: 6,  title: "Rəqəmsal əkiz (Digital Twin)",          desc: "Mağazanın 2D xəritəsi, hər məhsulun virtual yerləşdiyi rəf",                          category: "Anbar/İdarəetmə",  status: "pending" },
     { id: 7,  title: "Sürətli audit rejimi",                  desc: "Kamera davamlı skan edir, sağa/sola sürüşdürərək təsdiq/yoxla/sil",                  category: "Anbar/İdarəetmə",  status: "pending" },
     { id: 8,  title: "Ölü zona analiz raportu",                desc: "Heç axtarılmayan/uzun müddət toxunulmayan malların siyahısı",                        category: "Anbar/İdarəetmə",  status: "pending" },
     { id: 9,  title: "Sürətli müqayisə rejimi",               desc: "İki oxşar məhsulu yan-yana (qiymət, tədarükçü, son satış tarixi)",                    category: "Anbar/İdarəetmə",  status: "pending" },
-    { id: 10, title: "Əl yazısı OCR",                          desc: "Kağız qeydin şəklini çək, AI strukturlaşdırılmış JOLLY qeydinə çevirsin",             category: "Anbar/İdarəetmə",  status: "pending" },
 
     { id: 11, title: "Generativ 3D məhsul modeli",            desc: "Bir şəkildən AI ilə sadə 3D model, kataloqda 360° fırlanan görünüş",                  category: "AI/Analitik",      status: "pending" },
     { id: 12, title: "Holoqrafik məhsul kartı (AR)",           desc: "Kameranı masaya tutanda 3D modelin fiziki oradaymış kimi görünməsi",                  category: "AI/Analitik",      status: "pending" },
     { id: 13, title: "AI qiymət tövsiyəsi",                    desc: "Tarixçə + oxşar mallara baxıb qiymət artır/azalt tövsiyəsi",                          category: "AI/Analitik",      status: "pending" },
-    { id: 14, title: "Avtomatik teq/kateqoriya təyini",        desc: "Şəkil+ad əsasında AI özü kateqoriya və açar sözləri təyin edir",                     category: "AI/Analitik",      status: "pending" },
     { id: 15, title: "'Nə olardı' simulyator söhbəti",         desc: "Gemini bridge-ə 'bu malı 20% ucuzlatsam?' desən fərziyyəli cavab",                    category: "AI/Analitik",      status: "pending" },
-    { id: 16, title: "Çoxdilli avtomatik tərcümə",             desc: "Məhsul adı/təsvirini AI ilə rus/ingilis dilinə avtomatik tərcümə",                    category: "AI/Analitik",      status: "pending" },
 
     { id: 17, title: "Gündəlik xülasə bildirişi",             desc: "Səhər açılışda: neçə məhsul əlavə olunub, şəkli yoxdur, unudulub",                    category: "Bildiriş/Xatırlatma", status: "pending" },
-    { id: 18, title: "Mövsümi xatırlatma bildirişi",           desc: "'Keçən il bu vaxt bu qrup çox axtarılırdı, hazırlaş' tipli bildiriş",                 category: "Bildiriş/Xatırlatma", status: "pending" },
     { id: 19, title: "Səsli sürətli qeyd → mətn",              desc: "'Bu rəf qarışıqdır' de, avtomatik qeyd kimi yadda saxlanılsın",                       category: "Bildiriş/Xatırlatma", status: "pending" },
 
-    { id: 20, title: "Avtomatik paylaşım linki (QR kataloq)",  desc: "Bir kliklə 'bu ay kataloqu' linki yaradıb göndərmək",                                 category: "Marketinq/Paylaşım", status: "pending" },
     { id: 21, title: "AI reklam mətni generatoru",             desc: "Məhsul şəklindən avtomatik İnstagram başlıq + haştəq təklifi",                        category: "Marketinq/Paylaşım", status: "pending" },
     { id: 22, title: "Rəqəmsal sərgi otağı (swipe-galeriya)",  desc: "Premium malları tam-ekran story tərzi sürüşdürərək baxmaq",                           category: "Marketinq/Paylaşım", status: "pending" },
 
-    { id: 23, title: "Blokçeyn əsaslı tədarük izi",            desc: "Hər məhsulun tədarükçüdən sənə qədər yolunun dəyişməz (log) qeydi",                  category: "Jurnal/Tarixçə",   status: "pending" },
-    { id: 24, title: "Time-lapse anbar videosu",               desc: "Aylıq snapshot-lardan avtomatik qısa video - mağazanın böyüməsi",                    category: "Jurnal/Tarixçə",   status: "pending" },
-    { id: 25, title: "Xatirə kapsulu / illik geriyə baxış",    desc: "İl sonunda avtomatik hesabat: neçə məhsul, neçə dəyişiklik oldu",                     category: "Jurnal/Tarixçə",   status: "pending" },
 
     { id: 26, title: "Gamifikasiya - nişanlar",                desc: "'100 məhsul əlavə etdin', '7 gün ardıcıl' kimi motivasiya nişanları",                 category: "Motivasiya",       status: "pending" }
   ];
