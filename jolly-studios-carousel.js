@@ -1,40 +1,50 @@
 /* ==========================================================================
-   JOLLY STUDIOS PREMIUM CARDS — İNLİNE STİL VERSİYASI (ən yüksək prioritet)
+   JOLLY STUDIOS PREMIUM CARDS — TAM VERSİYA (v9)
    ==========================================================================
-   Əvvəlki versiyalar stylesheet class-ı ilə işləyirdi, amma sənin
-   style.css-in qaydaları daha güclü çıxdı. Bu versiya HƏR KARTIN
-   ÜZƏRİNƏ BİRBAŞA (inline, !important ilə) stil yazır — bu, CSS-də
-   mümkün olan ƏN YÜKSƏK prioritetdir, heç nə onu üstələyə bilməz.
+   Fon rəngi (mavi/bənövşəyi) kartın özündə deyil, gizli bir ::before/::after
+   təbəqəsində idi — inline stil ora çata bilmirdi. Bu versiya əvvəlcə həmin
+   pseudo-təbəqələri "söndürür" (kiçik stylesheet ilə, çünki inline stil
+   pseudo-elementlərə təsir edə bilməz), sonra öz sakit fonunu qoyur.
    ========================================================================== */
 
 (function () {
   "use strict";
 
-  const banner = document.createElement("div");
-  banner.textContent = "✅ jolly-studios-carousel.js YÜKLƏNDİ (v8-inline)";
-  banner.style.cssText = `
-    position: fixed; top: 0; left: 0; right: 0; z-index: 999999;
-    background: red; color: white; text-align: center;
-    padding: 8px; font-size: 14px; font-weight: bold;
-  `;
-  document.addEventListener("DOMContentLoaded", () => document.body.appendChild(banner));
-  if (document.body) document.body.appendChild(banner);
+  function injectStyles() {
+    if (document.getElementById("jolly-sc-styles")) return;
+    const style = document.createElement("style");
+    style.id = "jolly-sc-styles";
+    style.textContent = `
+      .studio-card.jolly-premium-card::before,
+      .studio-card.jolly-premium-card::after {
+        background: none !important;
+        background-image: none !important;
+        opacity: 0 !important;
+        box-shadow: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   function isStudiosHubGrid(grid) {
     const titles = grid.querySelectorAll(".studio-card .title");
     for (let i = 0; i < titles.length; i++) {
-      if (titles[i].textContent.trim() === "AI Brain") return true;
+      if (titles[i].textContent.trim().replace(" ✨", "") === "AI Brain") return true;
     }
     return false;
   }
 
   function styleCard(card) {
+    card.classList.add("jolly-premium-card");
     const s = card.style;
-    s.setProperty("background", "linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)", "important");
+    s.setProperty("background", "linear-gradient(160deg, #1c1c22 0%, #131318 100%)", "important");
+    s.setProperty("background-image", "linear-gradient(160deg, #1c1c22 0%, #131318 100%)", "important");
     s.setProperty("border", "1px solid rgba(212,175,55,0.35)", "important");
     s.setProperty("border-radius", "18px", "important");
-    s.setProperty("box-shadow", "0 10px 24px rgba(0,0,0,0.4), 0 0 16px rgba(212,175,55,0.15)", "important");
+    s.setProperty("box-shadow", "0 10px 24px rgba(0,0,0,0.45), 0 0 16px rgba(212,175,55,0.12)", "important");
     s.setProperty("position", "relative", "important");
+    s.setProperty("backdrop-filter", "none", "important");
+    s.setProperty("-webkit-backdrop-filter", "none", "important");
 
     const icon = card.querySelector(".ic");
     if (icon) {
@@ -48,17 +58,11 @@
       icon.style.setProperty("margin-bottom", "10px", "important");
     }
 
-    // Görünən sübut: kart başlığına kiçik işarə əlavə et
-    const title = card.querySelector(".title");
-    if (title && !title.dataset.jollyMarked) {
-      title.dataset.jollyMarked = "1";
-      title.textContent = title.textContent + " ✨";
-    }
-
     card.dataset.jollyStyled = "1";
   }
 
   function pollAndApply() {
+    injectStyles();
     const grids = document.querySelectorAll(".studio-grid");
     grids.forEach((grid) => {
       if (!isStudiosHubGrid(grid)) return;
