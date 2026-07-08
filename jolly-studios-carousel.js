@@ -1,10 +1,7 @@
 /* ==========================================================================
-   JOLLY STUDIOS PREMIUM CARDS — TAM VERSİYA (v9)
+   JOLLY STUDIOS — ŞÜŞƏ + NEON VERSİYA (v10)
    ==========================================================================
-   Fon rəngi (mavi/bənövşəyi) kartın özündə deyil, gizli bir ::before/::after
-   təbəqəsində idi — inline stil ora çata bilmirdi. Bu versiya əvvəlcə həmin
-   pseudo-təbəqələri "söndürür" (kiçik stylesheet ilə, çünki inline stil
-   pseudo-elementlərə təsir edə bilməz), sonra öz sakit fonunu qoyur.
+   Glassmorphism (bulanıq, yarı-şəffaf fon) + neon gold parıltı birləşməsi.
    ========================================================================== */
 
 (function () {
@@ -18,9 +15,14 @@
       .studio-card.jolly-premium-card::before,
       .studio-card.jolly-premium-card::after {
         background: none !important;
-        background-image: none !important;
         opacity: 0 !important;
-        box-shadow: none !important;
+      }
+      .studio-card.jolly-premium-card {
+        animation: jollyGlassPulse 4s ease-in-out infinite;
+      }
+      @keyframes jollyGlassPulse {
+        0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 12px rgba(212,175,55,0.15), inset 0 1px 0 rgba(255,255,255,0.1); }
+        50% { box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 22px rgba(212,175,55,0.35), inset 0 1px 0 rgba(255,255,255,0.15); }
       }
     `;
     document.head.appendChild(style);
@@ -29,7 +31,7 @@
   function isStudiosHubGrid(grid) {
     const titles = grid.querySelectorAll(".studio-card .title");
     for (let i = 0; i < titles.length; i++) {
-      if (titles[i].textContent.trim().replace(" ✨", "") === "AI Brain") return true;
+      if (titles[i].textContent.trim() === "AI Brain") return true;
     }
     return false;
   }
@@ -37,24 +39,25 @@
   function styleCard(card) {
     card.classList.add("jolly-premium-card");
     const s = card.style;
-    s.setProperty("background", "linear-gradient(160deg, #1c1c22 0%, #131318 100%)", "important");
-    s.setProperty("background-image", "linear-gradient(160deg, #1c1c22 0%, #131318 100%)", "important");
-    s.setProperty("border", "1px solid rgba(212,175,55,0.35)", "important");
-    s.setProperty("border-radius", "18px", "important");
-    s.setProperty("box-shadow", "0 10px 24px rgba(0,0,0,0.45), 0 0 16px rgba(212,175,55,0.12)", "important");
+    s.setProperty("background", "rgba(255,255,255,0.05)", "important");
+    s.setProperty("background-image", "none", "important");
+    s.setProperty("backdrop-filter", "blur(14px) saturate(140%)", "important");
+    s.setProperty("-webkit-backdrop-filter", "blur(14px) saturate(140%)", "important");
+    s.setProperty("border", "1px solid rgba(212,175,55,0.4)", "important");
+    s.setProperty("border-radius", "20px", "important");
     s.setProperty("position", "relative", "important");
-    s.setProperty("backdrop-filter", "none", "important");
-    s.setProperty("-webkit-backdrop-filter", "none", "important");
+    s.setProperty("overflow", "hidden", "important");
 
     const icon = card.querySelector(".ic");
     if (icon) {
       icon.style.setProperty("display", "inline-flex", "important");
       icon.style.setProperty("align-items", "center", "important");
       icon.style.setProperty("justify-content", "center", "important");
-      icon.style.setProperty("width", "46px", "important");
-      icon.style.setProperty("height", "46px", "important");
+      icon.style.setProperty("width", "48px", "important");
+      icon.style.setProperty("height", "48px", "important");
       icon.style.setProperty("border-radius", "50%", "important");
-      icon.style.setProperty("background", "radial-gradient(circle, rgba(212,175,55,0.3) 0%, rgba(212,175,55,0.05) 70%, transparent 100%)", "important");
+      icon.style.setProperty("background", "radial-gradient(circle, rgba(212,175,55,0.35) 0%, rgba(212,175,55,0.08) 70%, transparent 100%)", "important");
+      icon.style.setProperty("box-shadow", "0 0 14px rgba(212,175,55,0.4)", "important");
       icon.style.setProperty("margin-bottom", "10px", "important");
     }
 
