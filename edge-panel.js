@@ -22,7 +22,7 @@ const JollyEdgePanel = (() => {
       ? c.action
       : `JollyEdgePanel.close();JollyRouter.go('${c.route}')`;
     return `
-      <div class="edge-cell" onclick="${onclick}">
+      <div class="edge-cell" data-id="${id}" onclick="${onclick}">
         <div class="ec-icon">${c.icon}</div>
         <div class="ec-label">${c.label}</div>
       </div>
