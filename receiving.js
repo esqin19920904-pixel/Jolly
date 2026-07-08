@@ -347,22 +347,37 @@ const JollyReceiving = (() => {
     const p = JollyDB.Products.get(targetId);
     if (!p) { zone.innerHTML = '<div class="empty-state"><h3>Məhsul tapılmadı</h3></div>'; return; }
     const barcode = (p.barcodes && p.barcodes[0]) || '';
+    const last4 = p.last4 || (barcode ? barcode.slice(-4) : '');
     let barcodeImg = null;
     if (barcode) {
       barcodeImg = (typeof JollyBarcodeGen !== 'undefined' && JollyBarcodeGen.toDataURL(barcode)) || (typeof JollyProducts !== 'undefined' && JollyProducts.generateBarcodeImage(barcode));
     }
     const img = (p.images && p.images[0])
-      ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:100%;max-height:34vh;object-fit:contain;border-radius:14px;">`
-      : '<div style="font-size:70px;text-align:center;padding:20px;">🧴</div>';
+      ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:100%;max-height:26vh;object-fit:contain;border-radius:14px;">`
+      : '<div style="font-size:60px;text-align:center;padding:16px;">🧴</div>';
     zone.innerHTML = `
       <div class="glass" style="padding:18px;text-align:center;">
+
+        <div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">1. Məhsulun şəkli</div>
         ${img}
-        <div style="font-family:var(--font-display);font-size:20px;font-weight:700;margin-top:12px;">${esc(p.name || 'Adsız')}</div>
+
+        <div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-top:16px;margin-bottom:4px;">2. Məhsulun adı</div>
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700;">${esc(p.name || 'Adsız')}</div>
         ${p.location ? `<div class="muted" style="font-size:12px;margin-top:2px;">📍 ${esc(p.location)}</div>` : ''}
-        ${barcodeImg ? `<div style="background:#fff;border-radius:10px;padding:12px;margin-top:14px;">
+
+        <div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-top:16px;margin-bottom:4px;">3. Barkodun nömrələri</div>
+        ${barcode ? `
+          <div class="row" style="justify-content:center;gap:14px;align-items:baseline;">
+            <div class="mono" style="font-size:16px;font-weight:700;">${esc(barcode)}</div>
+            <div class="mono" style="font-size:13px;color:var(--accent-2);background:rgba(41,224,201,0.12);padding:2px 10px;border-radius:8px;">son 4: ${esc(last4)}</div>
+          </div>
+        ` : '<div class="muted">Barkod yoxdur</div>'}
+
+        ${barcodeImg ? `
+        <div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:1px;margin-top:16px;margin-bottom:4px;">4. Barkodun şəkli (skaner üçün)</div>
+        <div style="background:#fff;border-radius:10px;padding:12px;">
             <img src="${barcodeImg}" style="width:100%;max-width:320px;">
-            <div class="mono" style="color:#000;font-size:17px;font-weight:700;margin-top:6px;">${esc(barcode)}</div>
-          </div>` : '<div class="muted" style="margin-top:14px;">Bu məhsulun barkodu yoxdur</div>'}
+          </div>` : ''}
       </div>
     `;
   }
@@ -573,4 +588,4 @@ const JollyReceiving = (() => {
     removeFromBasket,
     finishSession, clearBasketAndExit, captureUnknown,
   };
-})(); 
+})();
