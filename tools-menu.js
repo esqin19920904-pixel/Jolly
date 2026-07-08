@@ -66,6 +66,18 @@
     if (typeof window.JollyArchive !== "undefined") {
       tools.push({ icon: "🗄️", label: "Arxiv", run: () => window.JollyArchive.show() });
     }
+    if (typeof window.JollyShowcase !== "undefined") {
+      tools.push({ icon: "🎬", label: "Rəqəmsal Sərgi", run: () => window.JollyShowcase.show() });
+    }
+    if (typeof window.JollyAdGenerator !== "undefined") {
+      tools.push({ icon: "📣", label: "Reklam Mətni", run: () => window.JollyAdGenerator.show() });
+    }
+    if (typeof window.JollyHoloCard !== "undefined") {
+      tools.push({ icon: "🌈", label: "Holoqrafik Kart", run: () => window.JollyHoloCard.show() });
+    }
+    if (typeof window.JollyWhatIf !== "undefined") {
+      tools.push({ icon: "🔮", label: "Nə Olardı?", run: () => window.JollyWhatIf.show() });
+    }
     if (typeof window.JollyBgRemove !== "undefined") {
       tools.push({ icon: "🧹", label: "Şəkil Təmizləyici", run: () => window.JollyBgRemove.show() });
     }
