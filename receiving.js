@@ -1,4 +1,4 @@
-/* ============================================================
+/ ============================================================
    JOLLY Receiving Studio — Qəbul Studio
    Yeni gələn malları seç → səbətə at → skanerlə Turbo Qəbul Rejimi
    Özü-özünü ModuleRegistry-ə qeydiyyatdan keçirir (#/receiving).
