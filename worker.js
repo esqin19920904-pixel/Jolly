@@ -148,8 +148,11 @@ async function handleTelegramWebhook(request, env) {
         "Salam! 👋 Mən JOLLY Assistant.\n\n" +
         "🔍 /search [ad və ya barkod] — Məhsul axtar\n" +
         "📊 /report — Ümumi vəziyyət\n" +
+        "🆔 /myid — Chat ID-ni göstər\n" +
         "❓ /help — Kömək"
       );
+    } else if (text === "/myid") {
+      await sendTelegramMessage(env, chatId, `🆔 Sənin Chat ID-n: <code>${chatId}</code>`);
     } else if (text === "/help") {
       await sendTelegramMessage(env, chatId,
         "📋 <b>Əmrlər:</b>\n" +
