@@ -212,6 +212,8 @@
       .jarc-mini-btn.primary { background: #d4af37; color: #1a1a1a; font-weight: 600; }
       .jarc-mini-btn.danger { background: #3a1414; color: #e57373; }
       .jarc-empty { text-align: center; color: #888; font-size: 13px; padding: 24px 0; }
+      .jarc-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin: 16px 0 8px; }
+      .jarc-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; }
     `;
     document.head.appendChild(style);
   }
@@ -243,7 +245,7 @@
           </div>
         </div>
       `).join("") : `<div class="jarc-empty">Hələ snapshot yoxdur — bir azdan avtomatik alınacaq, ya da "İndi arxivlə" bas.</div>`;
-    } else {
+    } else if (activeTab === "meta") {
       bodyHtml = metaTrash.length ? metaTrash.map(item => `
         <div class="jarc-item">
           <div class="jarc-item-info">
@@ -256,17 +258,129 @@
           </div>
         </div>
       `).join("") : `<div class="jarc-empty">Silinən firma/qrup/yer/status/tədarükçü yoxdur.</div>`;
+    } else if (activeTab === "backup") {
+      bodyHtml = renderBackupTab();
+    } else if (activeTab === "cloud") {
+      bodyHtml = renderCloudTab();
+    } else if (activeTab === "images") {
+      bodyHtml = renderImagesTab();
     }
 
     panel.innerHTML = `
       <h2>🗄️ Arxiv <button onclick="document.getElementById('jolly-archive-overlay').remove()" style="background:none;border:none;color:#f0e6c8;font-size:22px;cursor:pointer;">&times;</button></h2>
-      <div class="jarc-sub">Hər gün avtomatik, tam köçürmə. Heç nə sənsiz həmişəlik silinmir.</div>
+      <div class="jarc-sub">Bütün backup, sinxron və bərpa alətləri bir yerdə. Heç nə sənsiz həmişəlik silinmir.</div>
       <button class="jarc-manual-btn" onclick="JollyArchive.manualSnapshot()">📸 İndi arxivlə</button>
-      <div class="jarc-tabs">
-        <div class="jarc-tab ${activeTab === 'snapshots' ? 'active' : ''}" onclick="JollyArchive.setTab('snapshots')">📅 Gündəlik nüsxələr</div>
-        <div class="jarc-tab ${activeTab === 'meta' ? 'active' : ''}" onclick="JollyArchive.setTab('meta')">🗑️ Silinən firma/qrup/s.</div>
+      <div class="jarc-tabs" style="flex-wrap:wrap;">
+        <div class="jarc-tab ${activeTab === 'snapshots' ? 'active' : ''}" onclick="JollyArchive.setTab('snapshots')">📅 Nüsxələr</div>
+        <div class="jarc-tab ${activeTab === 'meta' ? 'active' : ''}" onclick="JollyArchive.setTab('meta')">🗑️ Silinənlər</div>
+        <div class="jarc-tab ${activeTab === 'backup' ? 'active' : ''}" onclick="JollyArchive.setTab('backup')">💾 Backup/JSON</div>
+        <div class="jarc-tab ${activeTab === 'cloud' ? 'active' : ''}" onclick="JollyArchive.setTab('cloud')">☁️ Cloud</div>
+        <div class="jarc-tab ${activeTab === 'images' ? 'active' : ''}" onclick="JollyArchive.setTab('images')">🗜️ Şəkillər</div>
       </div>
       <div id="jarc-body">${bodyHtml}</div>
+    `;
+
+    if (activeTab === "cloud") {
+      setTimeout(() => {
+        if (typeof JollyDrive !== "undefined" && JollyDrive.isSignedIn) {
+          const zone = document.getElementById("jarc-drive-zone");
+          if (zone) zone.innerHTML = JollyDrive.renderPanel();
+          if (JollyDrive.isSignedIn()) JollyDrive.loadAndRenderList();
+          else if (JollyDrive.runDiagnostics) JollyDrive.runDiagnostics();
+        }
+      }, 0);
+      setTimeout(() => {
+        const el = document.getElementById("jarc-storage-estimate");
+        if (!el || !navigator.storage || !navigator.storage.estimate) return;
+        navigator.storage.estimate().then(est => {
+          const usedMB = (est.usage / 1048576).toFixed(1);
+          const quotaMB = (est.quota / 1048576).toFixed(0);
+          el.innerHTML = `💾 İstifadə olunan yaddaş: <b>${usedMB} MB</b> / ${quotaMB} MB`;
+        }).catch(() => {});
+      }, 0);
+    }
+  }
+
+  // ---- Backup/JSON tab: JollyStudios-un mövcud funksiyalarına istinad edir ----
+  function renderBackupTab() {
+    return `
+      <div class="jarc-section-title">JSON Backup</div>
+      <div class="jarc-item" style="display:block;">
+        <div class="jarc-btn-row" style="margin-bottom:6px;">
+          <button class="jarc-mini-btn primary" style="flex:1;" onclick="JollyStudios.exportBackup()">⬇️ JSON çıxart</button>
+          <button class="jarc-mini-btn" style="flex:1;" onclick="document.getElementById('jarcJsonFile').click()">⬆️ JSON yüklə</button>
+        </div>
+        <input type="file" id="jarcJsonFile" accept="application/json" style="display:none;" onchange="JollyStudios.importBackup(event)">
+      </div>
+
+      <div class="jarc-section-title">CSV</div>
+      <div class="jarc-item" style="display:block;">
+        <div class="jarc-btn-row" style="margin-bottom:6px;">
+          <button class="jarc-mini-btn" style="flex:1;" onclick="JollyStudios.exportCsv()">⬇️ CSV ixrac</button>
+          <button class="jarc-mini-btn" style="flex:1;" onclick="document.getElementById('jarcCsvFile').click()">⬆️ CSV idxal</button>
+        </div>
+        <input type="file" id="jarcCsvFile" accept=".csv" style="display:none;" onchange="JollyStudios.importCsvFile(this.files[0])">
+      </div>
+
+      <div class="jarc-section-title">Telefon Dəyişmə</div>
+      <div class="jarc-item" style="display:block;">
+        <button class="jarc-mini-btn primary" style="width:100%;margin-bottom:6px;" onclick="JollyStudios.exportBackup()">📱 Bütün məlumatı köçür</button>
+        <div class="jarc-item-sub">Yeni telefonda JOLLY-ni aç → Alətlər → Arxiv → Backup/JSON → "JSON yüklə" ilə bu faylı seç.</div>
+      </div>
+
+      <div class="jarc-section-title">Son avtomatik nüsxə</div>
+      <div class="jarc-item" style="cursor:pointer;" onclick="JollyStudios.restoreSnapshot()">
+        <div class="jarc-item-info"><div class="jarc-item-title">♻️ Son avtomatik nüsxəyə qayıt</div></div>
+        <span>›</span>
+      </div>
+    `;
+  }
+
+  // ---- Cloud tab: Firebase + Google Drive ----
+  function renderCloudTab() {
+    const s = JollyDB.getSettings();
+    const last = s.lastCloudSync;
+    const lastText = last ? new Date(last).toLocaleString("az-AZ") : "Heç vaxt";
+    const isOn = typeof JollyCloud !== "undefined" ? JollyCloud.enabled() : false;
+    const online = navigator.onLine;
+    return `
+      <div class="jarc-section-title">☁️ Firebase Sinxron</div>
+      <div class="jarc-item" style="display:block;">
+        <div class="jarc-item-sub" style="margin-bottom:8px;">Son sinxron: <b>${lastText}</b> · ${online ? "🟢 Onlayn" : "🔴 Oflayn"}</div>
+        <div class="jarc-btn-row" style="margin-bottom:8px;">
+          <button class="jarc-mini-btn primary" style="flex:1;" onclick="JollyCloud.manualPush()">⬆️ İndi göndər</button>
+          <button class="jarc-mini-btn" style="flex:1;" onclick="JollyCloud.restoreFromCloud()">⬇️ Bərpa et</button>
+        </div>
+        <div class="jarc-toggle-row" style="border:none;padding-top:0;">
+          <span>Avtomatik sinxron</span>
+          <input type="checkbox" ${isOn ? "checked" : ""} onchange="JollyCloud.toggle(this.checked)">
+        </div>
+      </div>
+
+      <div class="jarc-section-title">📁 Google Drive Backup</div>
+      <div class="jarc-item" style="display:block;" id="jarc-drive-zone">
+        <div class="jarc-item-sub">Yüklənir...</div>
+      </div>
+    `;
+  }
+
+  // ---- Şəkillər tab: sıxma ayarı + yaddaş ----
+  function renderImagesTab() {
+    const s = JollyDB.getSettings();
+    return `
+      <div class="jarc-section-title">🗜️ Şəkil sıxma</div>
+      <div class="jarc-item" style="display:block;">
+        <div class="jarc-toggle-row" style="border:none;padding-top:0;">
+          <span>Şəkilləri avtomatik sıx</span>
+          <input type="checkbox" ${s.compressImages !== false ? "checked" : ""} onchange="JollyStudios.toggleWaSetting('compressImages', this.checked)">
+        </div>
+        <div class="jarc-item-sub" style="margin-top:6px;">Açıq olanda hər yeni şəkil avtomatik kiçilir (max 1200px) — keyfiyyət gözlə görünmür, yaddaş 5-10 dəfə az tutulur.</div>
+        <div class="jarc-item-sub" id="jarc-storage-estimate" style="margin-top:10px;">Yaddaş hesablanır...</div>
+      </div>
+      <div class="jarc-section-title">📤 WhatsApp paylaşımı</div>
+      <div class="jarc-item" style="display:block;">
+        <div class="jarc-item-sub">Məhsul göndərmə düyməsi rəsmi wa.me linki ilə işləyir — ad və barkod mətn kimi göndərilir. Şəkil əlavəsi cihaz uyğunsuzluğu səbəbindən söndürülüb.</div>
+      </div>
     `;
   }
 
