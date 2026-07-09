@@ -142,5 +142,17 @@
   <script defer src="jolly-studios-carousel.js?v=11"></script>
   <script defer src="jolly-telegram.js"></script>
   <script defer src="tools-menu.js"></script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").then(() => {
+          console.log("[JOLLY] Service Worker qeydiyyatdan keçdi — offline dəstək aktivdir");
+        }).catch((e) => {
+          console.warn("[JOLLY] Service Worker qeydiyyata alınmadı:", e);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
