@@ -73,17 +73,22 @@ const JollyCloud = (() => {
   async function buildProductsWithThumbs(products) {
     // Paralel, amma həddindən artıq yüklənməsin deyə kiçik "batch"lərlə
     const out = [];
+    let successCount = 0;
+    let attemptCount = 0;
     const BATCH = 6;
     for (let i = 0; i < products.length; i += BATCH) {
       const batch = products.slice(i, i + BATCH);
       const withThumbs = await Promise.all(batch.map(async (p) => {
         if (!p.images || !p.images.length) return p;
+        attemptCount++;
         const thumb = await getThumbForRef(p.images[0]);
+        if (thumb) successCount++;
         return thumb ? { ...p, thumb } : p;
       }));
       out.push(...withThumbs);
     }
-    return out;
+    console.log(`[JollyCloud] Thumbnail: ${successCount}/${attemptCount} uğurlu (şəkli olan məhsullardan)`);
+    return { list: out, successCount, attemptCount };
   }
 
   /* ---------- REST əsaslı oxu/yaz (SDK-sız, yüngül) ---------- */
@@ -92,9 +97,12 @@ const JollyCloud = (() => {
     const data = JollyDB.exportAll();
     // şəkillərin ƏSLİNİ buluda YAZMIRIQ (böyükdür) — yalnız kiçik "thumb"
     // (Telegram botu üçün) əlavə olunur, qalan hər şey əvvəlki kimi
+    let thumbStats = { successCount: 0, attemptCount: 0 };
     try {
       if (Array.isArray(data.products) && data.products.length) {
-        data.products = await buildProductsWithThumbs(data.products);
+        const result = await buildProductsWithThumbs(data.products);
+        data.products = result.list;
+        thumbStats = result;
       }
     } catch (e) {
       console.warn('Thumbnail yaradıla bilmədi, adi sinxron davam edir:', e);
@@ -110,7 +118,7 @@ const JollyCloud = (() => {
     });
     if (!res.ok) throw new Error('Buluda yazıla bilmədi: ' + res.status);
     JollyDB.setSettings({ lastCloudSync: Date.now() });
-    return true;
+    return thumbStats;
   }
 
   async function pull() {
@@ -218,8 +226,8 @@ const JollyCloud = (() => {
   async function manualPush() {
     Toast.info('Göndərilir...');
     try {
-      await push();
-      Toast.success('Buluda yazıldı ✓');
+      const stats = await push();
+      Toast.success(`Buluda yazıldı ✓ (şəkil: ${stats.successCount}/${stats.attemptCount})`);
       JollyRouter.go('#/studios/cloud');
     } catch (e) {
       Toast.error(e.message);
