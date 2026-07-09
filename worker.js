@@ -54,7 +54,137 @@ export default {
       }
     }
 
-    // 3) Qalan hər şey — normal statik fayllar (index.html, app.js və s.)
+    // 3) TELEGRAM BOT WEBHOOK — YALNIZ OXUMA (Firebase-i dəyişmir, təhlükəsiz)
+    // Telegram bu ünvana POST edir: https://<worker-domenin>/telegram-webhook
+    if (url.pathname === "/telegram-webhook" && request.method === "POST") {
+      return handleTelegramWebhook(request, env);
+    }
+
+    // 4) Qalan hər şey — normal statik fayllar (index.html, app.js və s.)
     return env.ASSETS.fetch(request);
   }
+};
+
+/* ==========================================================================
+   TELEGRAM BOT MƏNTİQİ
+   ==========================================================================
+   env.TELEGRAM_BOT_TOKEN — Cloudflare Dashboard-da "Environment Variables"
+   (Secret) bölməsindən əlavə olunmalıdır.
+
+   Dəstəklənən əmrlər: /start, /help, /search <söz>, /report
+   /add, /stock, /voice BİLƏRƏKDƏN YOXDUR (stok/satış JOLLY-də mövcud deyil,
+   /add isə Firebase-ə təhlükəsiz yazmaq üçün əlavə diqqət tələb edir).
+   ========================================================================== */
+
+const FIREBASE_URL = "https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app/jolly.json";
+
+async function fetchJollyData() {
+  const res = await fetch(FIREBASE_URL);
+  if (!res.ok) throw new Error("Firebase oxuna bilmədi: " + res.status);
+  const payload = await res.json();
+  if (!payload || !payload.data) return null;
+  return payload.data;
+}
+
+async function sendTelegramMessage(env, chatId, text) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
+  });
+}
+
+function escHtml(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function handleTelegramWebhook(request, env) {
+  let update;
+  try {
+    update = await request.json();
+  } catch (e) {
+    return new Response("ok"); // Telegram-a hər halda 200 qaytarırıq
+  }
+
+  const message = update.message;
+  if (!message || !message.text) return new Response("ok");
+
+  const chatId = message.chat.id;
+  const text = message.text.trim();
+
+  try {
+    if (text === "/start") {
+      await sendTelegramMessage(env, chatId,
+        "Salam! 👋 Mən JOLLY Assistant.\n\n" +
+        "🔍 /search [ad və ya barkod] — Məhsul axtar\n" +
+        "📊 /report — Ümumi vəziyyət\n" +
+        "❓ /help — Kömək"
+      );
+    } else if (text === "/help") {
+      await sendTelegramMessage(env, chatId,
+        "📋 <b>Əmrlər:</b>\n" +
+        "/search corab — adına görə axtar\n" +
+        "/search 1234567890123 — barkoda görə axtar\n" +
+        "/report — ümumi say, şəkilsiz, barkodsuz say"
+      );
+    } else if (text.startsWith("/search")) {
+      const query = text.replace("/search", "").trim().toLowerCase();
+      if (!query) {
+        await sendTelegramMessage(env, chatId, "Axtarmaq üçün: /search corab");
+        return new Response("ok");
+      }
+      const data = await fetchJollyData();
+      if (!data || !Array.isArray(data.products)) {
+        await sendTelegramMessage(env, chatId, "⚠️ Bulud məlumatı tapılmadı — Cloud Studio-dan bir dəfə sinxron et.");
+        return new Response("ok");
+      }
+      const matches = data.products.filter(p => {
+        const hay = [p.name, p.mainCode, ...(p.barcodes || [])].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(query);
+      }).slice(0, 5);
+
+      if (!matches.length) {
+        await sendTelegramMessage(env, chatId, `❌ "${escHtml(query)}" üçün nəticə tapılmadı.`);
+      } else {
+        const lines = matches.map(p => {
+          const parts = [
+            "📦 <b>" + escHtml(p.name || "Adsız") + "</b>",
+            (p.price != null && p.price !== "") ? "💰 " + p.price + " ₼" : null,
+            p.location ? "📍 " + escHtml(p.location) : null,
+            (p.barcodes && p.barcodes[0]) ? "🏷️ " + escHtml(p.barcodes[0]) : null,
+          ].filter(Boolean).join("\n");
+          return parts;
+        });
+        await sendTelegramMessage(env, chatId, lines.join("\n\n"));
+      }
+    } else if (text === "/report") {
+      const data = await fetchJollyData();
+      if (!data || !Array.isArray(data.products)) {
+        await sendTelegramMessage(env, chatId, "⚠️ Bulud məlumatı tapılmadı — Cloud Studio-dan bir dəfə sinxron et.");
+        return new Response("ok");
+      }
+      const products = data.products;
+      const total = products.length;
+      const noImage = products.filter(p => !p.images || !p.images.length).length;
+      const noBarcode = products.filter(p => !p.barcodes || !p.barcodes.length).length;
+      const todayStr = new Date().toDateString();
+      const addedToday = products.filter(p => p.createdAt && new Date(p.createdAt).toDateString() === todayStr).length;
+
+      await sendTelegramMessage(env, chatId,
+        `📊 <b>Ümumi vəziyyət</b>\n` +
+        `📦 Ümumi məhsul: ${total}\n` +
+        `➕ Bu gün əlavə: ${addedToday}\n` +
+        `🖼️ Şəkli yoxdur: ${noImage}\n` +
+        `🏷️ Barkodsuz: ${noBarcode}`
+      );
+    } else {
+      await sendTelegramMessage(env, chatId, "Naməlum əmr. /help yaz.");
+    }
+  } catch (e) {
+    await sendTelegramMessage(env, chatId, "⚠️ Xəta baş verdi: " + String(e.message || e));
+  }
+
+  return new Response("ok");
 }
