@@ -96,6 +96,34 @@ async function sendTelegramMessage(env, chatId, text) {
   });
 }
 
+// Base64 data URL-i Telegram-a "photo" kimi göndərir (multipart/form-data)
+async function sendTelegramPhoto(env, chatId, caption, dataUrl) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  if (!token || !dataUrl) return false;
+  try {
+    const base64 = dataUrl.split(",")[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "image/jpeg" });
+
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    form.append("caption", caption);
+    form.append("parse_mode", "HTML");
+    form.append("photo", blob, "photo.jpg");
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: "POST",
+      body: form
+    });
+    const data = await res.json();
+    return !!data.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
 function escHtml(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -148,16 +176,22 @@ async function handleTelegramWebhook(request, env) {
       if (!matches.length) {
         await sendTelegramMessage(env, chatId, `❌ "${escHtml(query)}" üçün nəticə tapılmadı.`);
       } else {
-        const lines = matches.map(p => {
+        for (const p of matches) {
           const parts = [
             "📦 <b>" + escHtml(p.name || "Adsız") + "</b>",
             (p.price != null && p.price !== "") ? "💰 " + p.price + " ₼" : null,
             p.location ? "📍 " + escHtml(p.location) : null,
             (p.barcodes && p.barcodes[0]) ? "🏷️ " + escHtml(p.barcodes[0]) : null,
           ].filter(Boolean).join("\n");
-          return parts;
-        });
-        await sendTelegramMessage(env, chatId, lines.join("\n\n"));
+
+          let sentAsPhoto = false;
+          if (p.thumb) {
+            sentAsPhoto = await sendTelegramPhoto(env, chatId, parts, p.thumb);
+          }
+          if (!sentAsPhoto) {
+            await sendTelegramMessage(env, chatId, parts);
+          }
+        }
       }
     } else if (text === "/report") {
       const data = await fetchJollyData();
