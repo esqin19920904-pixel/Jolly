@@ -69,6 +69,72 @@
   }
 
   // ------------------------------------------------------------------------
+  // ŞƏKİL SIXMA — canvas ilə kiçik, sıxılmış versiya (Telegram üçün kifayət)
+  // ------------------------------------------------------------------------
+  function compressDataUrl(dataUrl, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality || 0.6));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  // "idb:" referansını əsl data URL-ə çevirir (JollyStorage varsa), yoxsa
+  // olduğu kimi qaytarır (artıq data: URL-dirsə)
+  async function resolveImageRef(ref) {
+    if (!ref) return null;
+    if (ref.startsWith && ref.startsWith("idb:") && typeof JollyStorage !== "undefined" && JollyStorage.resolveAll) {
+      try {
+        const resolved = await JollyStorage.resolveAll([ref]);
+        return (resolved && resolved[0]) || null;
+      } catch (e) { return null; }
+    }
+    return ref;
+  }
+
+  function dataUrlToBlob(dataUrl) {
+    const [meta, base64] = dataUrl.split(",");
+    const mime = /data:(.*?);base64/.exec(meta)[1];
+    const bin = atob(base64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
+
+  async function sendPhoto(caption, dataUrl) {
+    const token = getToken();
+    const chat = getChat();
+    if (!token || !chat) return { ok: false, error: "Token/Chat ID yoxdur" };
+    try {
+      const blob = dataUrlToBlob(dataUrl);
+      const form = new FormData();
+      form.append("chat_id", chat);
+      form.append("caption", caption);
+      form.append("parse_mode", "HTML");
+      form.append("photo", blob, "photo.jpg");
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: "POST",
+        body: form
+      });
+      const data = await res.json();
+      if (!data.ok) return { ok: false, error: data.description || "Naməlum xəta" };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: String(e.message || e) };
+    }
+  }
+
+  // ------------------------------------------------------------------------
   // 1) YENİ MƏHSUL BİLDİRİŞİ — JollyDB.Products.add-ı bükür
   // ------------------------------------------------------------------------
   function wrapProductAdd() {
@@ -78,13 +144,25 @@
       const record = originalAdd.call(this, item);
       const settings = getSettings();
       if (settings.newProduct !== false && isConfigured()) {
-        const lines = [
+        const caption = [
           "➕ <b>Yeni məhsul əlavə edildi</b>",
           record.name ? "📦 " + escHtml(record.name) : null,
           (record.price != null && record.price !== "") ? "💰 " + record.price + " ₼" : null,
           record.brand ? "🏭 " + escHtml(record.brand) : null,
         ].filter(Boolean).join("\n");
-        sendMessage(lines);
+
+        const firstImage = record.images && record.images[0];
+        if (firstImage) {
+          resolveImageRef(firstImage)
+            .then(resolved => resolved ? compressDataUrl(resolved, 700, 0.6) : null)
+            .then(compressed => {
+              if (compressed) return sendPhoto(caption, compressed);
+              return sendMessage(caption);
+            })
+            .catch(() => sendMessage(caption)); // şəkil alınmasa, heç olmasa mətni göndər
+        } else {
+          sendMessage(caption);
+        }
       }
       return record;
     };
