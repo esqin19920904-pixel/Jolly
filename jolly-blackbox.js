@@ -125,4 +125,10 @@
 
   if (document.body) makeBtn();
   else window.addEventListener('DOMContentLoaded', makeBtn);
+
+  // Diaqnostika mərkəzi (jolly-diagnostics.js) LOG-u oxuya bilsin deyə,
+  // yalnız-oxu bir "pəncərə" açırıq — LOG-un özünə birbaşa toxunulmur.
+  window.JollyBlackBox = {
+    getLog: function () { return LOG.slice(); },
+  };
 })();
