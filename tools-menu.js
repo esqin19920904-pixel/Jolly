@@ -87,6 +87,9 @@
     if (typeof window.JollyTelegram !== "undefined") {
       tools.push({ icon: "📨", label: "Telegram Bildirişləri", run: () => window.JollyTelegram.show() });
     }
+    if (typeof window.JollyDiagnostics !== "undefined") {
+      tools.push({ icon: "🩺", label: "Diaqnostika", run: () => window.JollyDiagnostics.show() });
+    }
 
     return tools;
   }
