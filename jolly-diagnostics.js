@@ -31,11 +31,23 @@
     "JollyAudit", "JollyPriceAdvisor",
   ];
 
+  // Bəzi modullar "window.X = {...}" kimi, bəziləri isə köhnə
+  // "const X = (()=>{...})()" kimi yazılıb — ikincilər texniki olaraq
+  // window-un xassəsi olmur, amma tam işlək olur. Hər ikisini yoxlayırıq.
+  function moduleExists(name) {
+    if (typeof window[name] !== "undefined") return true;
+    try {
+      return (0, eval)(`typeof ${name} !== "undefined"`);
+    } catch (e) {
+      return false;
+    }
+  }
+
   function checkModules() {
     const missing = [];
     const ok = [];
     [...CORE_MODULES, ...EXTRA_MODULES].forEach((m) => {
-      if (typeof window[m] === "undefined") missing.push(m);
+      if (!moduleExists(m)) missing.push(m);
       else ok.push(m);
     });
     return { ok, missing };
@@ -105,6 +117,86 @@
   }
 
   // ------------------------------------------------------------------------
+  // PROBLEM AŞKARLAMA — Qara Qutunun jurnalını oxuyub kateqoriyalaşdırır
+  // (Kimi Agent-in "detectIssuesFromLogs" məntiqindən uyğunlaşdırılıb)
+  // ------------------------------------------------------------------------
+  function detectIssuesFromBlackBox() {
+    if (typeof window.JollyBlackBox === "undefined") return [];
+    const log = window.JollyBlackBox.getLog();
+    const issues = [];
+
+    log.forEach((line) => {
+      if (line.includes("❌XƏTA")) {
+        const isMissing = /is not defined|Cannot read propert|is not a function/i.test(line);
+        const isSyntax = /SyntaxError|Unexpected/i.test(line);
+        issues.push({
+          severity: isSyntax ? "critical" : isMissing ? "high" : "medium",
+          category: isSyntax ? "syntax_error" : isMissing ? "missing_module" : "runtime_error",
+          title: line.replace("❌XƏTA:", "").trim().slice(0, 90),
+          suggestedFix: isMissing
+            ? `// Modul yüklənməyib ola bilər.\n// index.html-də script sətrinin olduğunu yoxla.\nif (typeof ModulAdi === "undefined") {\n  console.warn("ModulAdi yüklənməyib");\n}`
+            : `// Xətanı tut, tətbiqi çökmə\ntry {\n  // problemli kod bura\n} catch (err) {\n  console.error("Tutuldu:", err);\n}`,
+        });
+      } else if (line.includes("❌PROMISE")) {
+        issues.push({
+          severity: "high", category: "promise_rejection",
+          title: line.replace("❌PROMISE:", "").trim().slice(0, 90),
+          suggestedFix: `// Promise xətasını tut\nyourPromise.catch(function(err) {\n  console.error("Promise xətası:", err);\n});`,
+        });
+      } else if (line.includes("⚠️BOŞ")) {
+        issues.push({
+          severity: "medium", category: "empty_render",
+          title: line.replace("⚠️BOŞ:", "").trim().slice(0, 90),
+          suggestedFix: `// Bu route üçün render funksiyasının mövcud olduğunu yoxla`,
+        });
+      } else if (line.includes("❌GO-XƏTA") || line.includes("❌ ") && line.includes("TAPILMADI")) {
+        issues.push({
+          severity: "high", category: "route_error",
+          title: line.slice(0, 90),
+          suggestedFix: `// JollyRouter-in yükləndiyini yoxla`,
+        });
+      } else if (line.includes("ƏSKİK:")) {
+        const mods = line.split("ƏSKİK:")[1] || "";
+        issues.push({
+          severity: "high", category: "missing_module",
+          title: "Əskik modul(lar): " + mods.trim().slice(0, 80),
+          suggestedFix: `// Əskik modulları index.html-də <script> kimi əlavə et`,
+        });
+      }
+    });
+
+    // Təkrarları at (eyni başlıqdan yalnız 1 dəfə)
+    const seen = new Set();
+    return issues.filter((i) => {
+      if (seen.has(i.title)) return false;
+      seen.add(i.title);
+      return true;
+    }).slice(0, 20);
+  }
+
+  function sendIssueToCodeStudio(issueIdx) {
+    const issues = detectIssuesFromBlackBox();
+    const issue = issues[issueIdx];
+    if (!issue || typeof JollyDB === "undefined") return;
+    const SNIPPETS_KEY = "jolly_snippets";
+    const snippets = JollyDB.read(SNIPPETS_KEY, []);
+    snippets.push({
+      id: JollyDB.uid("snp"),
+      name: "🩺 " + issue.title.slice(0, 40),
+      code: issue.suggestedFix,
+      enabled: false,
+      createdAt: Date.now(),
+    });
+    JollyDB.write(SNIPPETS_KEY, snippets);
+    if (typeof Toast !== "undefined") Toast.success("Code Studio-ya snippet kimi göndərildi");
+    document.getElementById("jolly-diag-overlay").remove();
+    if (typeof JollyRouter !== "undefined") JollyRouter.go("#/studios/code");
+  }
+
+  const SEVERITY_COLOR = { critical: "bad", high: "bad", medium: "warn", low: "ok" };
+  const SEVERITY_LABEL = { critical: "🔴 Kritik", high: "🟠 Yüksək", medium: "🟡 Orta", low: "🟢 Aşağı" };
+
+  // ------------------------------------------------------------------------
   // UI
   // ------------------------------------------------------------------------
   function injectStyles() {
@@ -167,10 +259,28 @@
     const cloud = checkCloud();
     const telegram = checkTelegram();
     const storage = await checkStorageEstimate();
+    const issues = detectIssuesFromBlackBox();
 
     panel.innerHTML = `
       <h2>🩺 Diaqnostika <button onclick="document.getElementById('jolly-diag-overlay').remove()" style="background:none;border:none;color:#f0e6c8;font-size:22px;cursor:pointer;">&times;</button></h2>
       <div class="jdiag-sub">Sistemin ümumi sağlamlığı. Problem tapılsa, aşağıda düzəliş yolları var.</div>
+
+      ${issues.length ? `
+      <div class="jdiag-section">
+        <div class="jdiag-section-title">🔍 Aşkarlanan Problemlər (${issues.length})</div>
+        ${issues.map((issue, i) => `
+          <div class="jdiag-row ${SEVERITY_COLOR[issue.severity]}" style="flex-direction:column;align-items:stretch;gap:6px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span>${SEVERITY_LABEL[issue.severity]}</span>
+            </div>
+            <div style="font-size:11.5px;color:#ddd;">${issue.title}</div>
+            <button class="jdiag-btn primary" style="width:100%;" onclick="JollyDiagnostics.sendToCodeStudio(${i})">⌨️ Code Studio-ya snippet kimi göndər</button>
+          </div>
+        `).join("")}
+      </div>` : `
+      <div class="jdiag-section">
+        <div class="jdiag-row ok"><span>🎉 Heç bir problem aşkarlanmayıb</span><span>✅</span></div>
+      </div>`}
 
       <div class="jdiag-section">
         <div class="jdiag-section-title">📦 Modullar</div>
@@ -231,6 +341,7 @@
         <button class="jdiag-btn ghost" onclick="JollyDiagnostics.openBlackBox()">🐞 Qara Qutu jurnalı</button>
         <button class="jdiag-btn primary" onclick="JollyDiagnostics.openCodeStudio()">⌨️ Code Studio</button>
       </div>
+      <button class="jdiag-btn ghost" style="width:100%;margin-top:8px;" onclick="JollyDiagnostics.openGitHub()">🐙 GitHub-a birbaşa göndər</button>
       <button class="jdiag-btn ghost" style="width:100%;margin-top:8px;" onclick="JollyDiagnostics.show()">🔄 Yenidən yoxla</button>
     `;
   }
@@ -245,6 +356,12 @@
   function openCodeStudio() {
     document.getElementById("jolly-diag-overlay").remove();
     if (typeof JollyRouter !== "undefined") JollyRouter.go("#/studios/code");
+  }
+
+  function openGitHub() {
+    document.getElementById("jolly-diag-overlay").remove();
+    if (typeof window.JollyGitHub !== "undefined") window.JollyGitHub.show();
+    else if (typeof Toast !== "undefined") Toast.error("GitHub modulu yüklənməyib (jolly-github.js)");
   }
 
   function show() {
@@ -266,6 +383,8 @@
     show,
     openBlackBox,
     openCodeStudio,
+    openGitHub,
+    sendToCodeStudio: sendIssueToCodeStudio,
   };
 
   if (window.ModuleRegistry && typeof window.ModuleRegistry.register === "function") {
