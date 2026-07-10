@@ -146,33 +146,12 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").then((reg) => {
+        navigator.serviceWorker.register("sw.js").then(() => {
           console.log("[JOLLY] Service Worker qeydiyyatdan keçdi — offline dəstək aktivdir");
-          setTimeout(() => showSwDiag(reg), 1500);
         }).catch((e) => {
           console.warn("[JOLLY] Service Worker qeydiyyata alınmadı:", e);
-          setTimeout(() => showSwDiag(null, e), 1500);
         });
       });
-    } else {
-      setTimeout(() => showSwDiag(null, new Error("Bu brauzer Service Worker dəstəkləmir")), 1500);
-    }
-
-    function showSwDiag(reg, err) {
-      const box = document.createElement("div");
-      box.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:999999;background:#1a1a2e;color:#f0e6c8;padding:14px;font-family:monospace;font-size:12px;border-bottom:2px solid #d4af37;";
-      const controller = navigator.serviceWorker.controller;
-      const state = reg && reg.active ? reg.active.state : "yoxdur";
-      box.innerHTML = `
-        <div style="font-weight:bold;color:#d4af37;margin-bottom:6px;">🔴 SW DIAQNOSTIKA (bu qutunu skrinshot at)</div>
-        <div>Qeydiyyat: ${reg ? "UGURLU" : "UGURSUZ"}</div>
-        <div>Xeta: ${err ? String(err.message || err) : "yoxdur"}</div>
-        <div>Active state: ${state}</div>
-        <div>Controller (sehifeni idare edir?): ${controller ? "BELI" : "XEYR"}</div>
-        <div>Scope: ${reg ? reg.scope : "-"}</div>
-        <button onclick="this.parentElement.remove()" style="margin-top:8px;padding:6px 12px;background:#d4af37;color:#1a1a1a;border:none;border-radius:6px;">Baglа</button>
-      `;
-      document.body.appendChild(box);
     }
   </script>
 </body>
