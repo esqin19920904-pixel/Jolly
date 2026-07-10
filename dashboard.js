@@ -35,13 +35,11 @@ const JollyDashboard = (() => {
 
   function getConfig() {
     const cfg = JollyDB.read(CFG_KEY, { items: DEFAULT_ITEMS.slice(), attention: true });
-    // quickPhoto kartı ləğv edildi — köhnə konfiqdən təmizlə
     if (cfg.items) cfg.items = cfg.items.filter(id => id !== 'quickPhoto');
     return cfg;
   }
   function setConfig(cfg) { JollyDB.write(CFG_KEY, cfg); }
 
-  /* --- Nişan (badge) hesablamaları --- */
   const BADGES = {
     incompleteCount() {
       const p = JollyDB.Products.all();
@@ -62,7 +60,6 @@ const JollyDashboard = (() => {
     return BADGES[item.badgeFn]();
   }
 
-  /* --- "Bu gün diqqət" --- */
   function attentionItems() {
     const list = [];
     const inc = BADGES.incompleteCount();
@@ -77,15 +74,12 @@ const JollyDashboard = (() => {
     return list;
   }
 
-  /* --- Ana Dashboard səhifəsi --- */
-  // 4 əsas sürətli əməliyyat (böyük kartlar)
   const PRIMARY = [
     { icon: 'magic', label: 'Tez əlavə', sub: 'Yeni gələn mal', neon: 'gold', action: "JollyDashboard.quickPhoto()" },
     { icon: 'boxplus', label: 'Məhsul yarat', sub: 'Tam məhsul kartı', neon: 'pink', route: '#/product/new' },
     { icon: 'scancenter', label: 'Skan mərkəzi', sub: 'Barkodla tap', neon: 'teal', action: "JollyProducts.scanSearch()" },
     { icon: 'shield', label: 'Düzəldiləcək', sub: 'Tamamlanmamışlar', neon: 'purple', route: '#/dashboard/incomplete', badgeFn: 'incompleteCount' },
   ];
-  // "Daha çox" kiçik ikon-kartlar
   const MORE = [
     { icon: 'image', label: 'Qalereya', neon: 'teal', route: '#/dashboard/gallery' },
     { icon: 'clock', label: 'Sonuncular', neon: 'purple', route: '#/dashboard/recent' },
@@ -98,13 +92,12 @@ const JollyDashboard = (() => {
     { icon: 'inbox', label: 'Qəbul Studio', neon: 'green', route: '#/receiving' },
   ];
 
-  // Son 7 günün fəaliyyət datası (dalğa qrafiki + trend üçün)
   function weeklyActivity() {
     const all = JollyDB.Products.all();
     const day = 864e5;
     const now = Date.now();
     const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-    const buckets = new Array(7).fill(0);      // bu həftə: 7 gün
+    const buckets = new Array(7).fill(0);
     let thisWeek = 0, lastWeek = 0;
     all.forEach(p => {
       const t = p.createdAt || p.updatedAt;
@@ -118,14 +111,12 @@ const JollyDashboard = (() => {
         lastWeek++;
       }
     });
-    // Trend faizi
     let trendPct = 0;
     if (lastWeek > 0) trendPct = Math.round((thisWeek - lastWeek) / lastWeek * 100);
     else if (thisWeek > 0) trendPct = 100;
     return { buckets, thisWeek, lastWeek, trendPct };
   }
 
-  // Dalğa qrafikini data əsasında SVG path-a çevir
   function buildWavePath(buckets) {
     const max = Math.max(1, ...buckets);
     const w = 600, h = 44, pad = 6;
@@ -135,7 +126,6 @@ const JollyDashboard = (() => {
       const y = h - pad - (v / max) * (h - pad * 2);
       return [x, y];
     });
-    // Hamar əyri (Catmull-Rom → Bézier sadələşdirilmiş)
     let d = `M${pts[0][0]},${pts[0][1].toFixed(1)}`;
     for (let i = 0; i < pts.length - 1; i++) {
       const [x0, y0] = pts[i];
@@ -159,13 +149,6 @@ const JollyDashboard = (() => {
     const trendUp = wa.trendPct >= 0;
     const trendStr = `${trendUp ? '↑' : '↓'} ${Math.abs(wa.trendPct)}% bu həftə`;
     const trendColor = trendUp ? '#4ade80' : '#ff6b7d';
-
-    const statRow = (color, text, route) =>
-      `<div class="sp-stat" ${route ? `onclick="JollyRouter.go('${route}')"` : ''}>
-        <span class="sp-dot" style="background:${color};"></span>
-        <span class="sp-text">${text}</span>
-        <span class="sp-arrow">${JollyIcons.get('chevron')}</span>
-      </div>`;
 
     const bigCard = (c) => {
       const click = c.action ? c.action : `JollyRouter.go('${c.route}')`;
@@ -200,7 +183,6 @@ const JollyDashboard = (() => {
 
         ${(typeof JollyAIDaily !== 'undefined' && JollyAIDaily.shouldShow()) ? JollyAIDaily.render() : ''}
 
-        <!-- MAĞAZA VƏZİYYƏTİ -->
         <div class="gold-pulse">
           <div class="gp-head">
             <span class="gp-title">⚡ MAĞAZA VƏZİYYƏTİ</span>
@@ -244,16 +226,14 @@ const JollyDashboard = (() => {
           </div>
         </div>
 
-        <!-- SÜRƏTLİ ƏMƏLİYYATLAR -->
         <div class="dash-section-head">
           <span class="section-title" style="margin:0;">SÜRƏTLİ ƏMƏLİYYATLAR</span>
-          <span class="gp-tez-giris" onclick="JollyRouter.go('#/product/new')">${JollyIcons.get('bolt')} Tez giriş</span>
+          <span class="gp-tez-giris" onclick="JollyDashboard.openSmartSearch()">🔍 Smart Axtarış</span>
         </div>
         <div class="big-op-grid gold-ops">
           ${PRIMARY.map(bigCard).join('')}
         </div>
 
-        <!-- DAHA ÇOX -->
         <div class="dash-section-head">
           <span class="section-title" style="margin:0;">DAHA ÇOX</span>
           <span class="muted" style="font-size:11.5px;cursor:pointer;" onclick="JollyRouter.go('#/dashboard/studio')">Hamısına bax ${'›'}</span>
@@ -262,7 +242,6 @@ const JollyDashboard = (() => {
           ${MORE.map(moreCard).join('')}
         </div>
 
-        <!-- AI KÖMƏKÇİ -->
         <div class="ai-advice-card gold-ai">
           <div class="aac-head">${JollyIcons.get('brain', '#c86bff')} <span>JOLLLY AI KÖMƏKÇI</span></div>
           <div class="aac-body">
@@ -289,7 +268,7 @@ const JollyDashboard = (() => {
   }
 
   let fabOpen = false;
-  function toggleFab() { /* FAB ləğv edildi */ }
+  function toggleFab() { }
   function fabAction(type) {
     if (type === 'newProduct' || type === 'quickadd') JollyRouter.go('#/product/new');
     else if (type === 'photo') quickPhoto();
@@ -329,11 +308,9 @@ const JollyDashboard = (() => {
     `;
   }
 
-  /* --- Tez şəkil çək: kamera aç, çək, qaralama yarat --- */
   let _quickPhotoBusy = false;
   function quickPhoto(source) {
     if (_quickPhotoBusy) return;
-    // Mənbə seçilməyibsə, seçim təklif et
     if (!source) {
       const choice = confirm('Kameranı aç? (İmtina = Qalereyadan seç)');
       source = choice ? 'camera' : 'gallery';
@@ -361,12 +338,134 @@ const JollyDashboard = (() => {
       reader.onerror = () => { _quickPhotoBusy = false; };
       reader.readAsDataURL(file);
     };
-    // İstifadəçi seçim etmədən bağlasa, kilidi aç
     setTimeout(() => { _quickPhotoBusy = false; }, 30000);
     input.click();
   }
 
-  /* --- Tamamlanmamış səhifəsi --- */
+  /* ============================================================
+     SMART AXTARIŞ — "qırmızı köynək" kimi yazanda, rəngi VƏ adı
+     birlikdə tanıyıb süzür. "Tez giriş" düyməsinin yerinə keçdi.
+     ============================================================ */
+  const COLOR_WORDS = {
+    'qırmızı': 'qırmızı', 'qirmizi': 'qırmızı',
+    'göy': 'göy', 'goy': 'göy', 'mavi': 'göy',
+    'yaşıl': 'yaşıl', 'yasil': 'yaşıl',
+    'sarı': 'sarı', 'sari': 'sarı',
+    'qara': 'qara',
+    'ağ': 'ağ', 'ag': 'ağ',
+    'çəhrayı': 'çəhrayı', 'cehrayi': 'çəhrayı', 'pink': 'çəhrayı',
+    'bənövşəyi': 'bənövşəyi', 'benovseyi': 'bənövşəyi', 'bənövşə': 'bənövşəyi',
+    'narıncı': 'narıncı', 'narinci': 'narıncı',
+    'boz': 'boz', 'gri': 'boz',
+    'qəhvəyi': 'qəhvəyi', 'qehveyi': 'qəhvəyi',
+    'gümüşü': 'gümüşü', 'gumusu': 'gümüşü',
+    'qızılı': 'qızılı', 'qizili': 'qızılı', 'qızıl': 'qızılı',
+  };
+
+  function smartParseQuery(raw) {
+    const words = raw.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let color = null;
+    const rest = [];
+    words.forEach(w => {
+      const clean = w.replace(/[^\wəıöüğşçİıĞŞÇÖÜ]/gi, '');
+      if (!color && COLOR_WORDS[clean]) {
+        color = COLOR_WORDS[clean];
+      } else {
+        rest.push(w);
+      }
+    });
+    return { color, text: rest.join(' ').trim() };
+  }
+
+  function smartSearch(raw) {
+    const { color, text } = smartParseQuery(raw);
+    let list = JollyDB.Products.all();
+    if (color) {
+      list = list.filter(p => (p.color || '').toLowerCase().includes(color));
+    }
+    if (text) {
+      const nq = text.toLowerCase();
+      list = list.filter(p =>
+        (p.name || '').toLowerCase().includes(nq) ||
+        (p.barcodes || []).some(b => b.includes(text)) ||
+        (p.mainCode || '').toLowerCase().includes(nq) ||
+        (p.brand || '').toLowerCase().includes(nq) ||
+        (p.group || '').toLowerCase().includes(nq)
+      );
+    }
+    return { color, text, results: list.slice(0, 30) };
+  }
+
+  function injectSmartSearchStyles() {
+    if (document.getElementById('jolly-smartsearch-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'jolly-smartsearch-styles';
+    style.textContent = `
+      #jolly-ss-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; display: flex; align-items: flex-start; justify-content: center; padding-top: 60px; }
+      #jolly-ss-panel { background: #1a1a1a; width: 92%; max-width: 480px; max-height: 78vh; overflow-y: auto; border-radius: 18px; padding: 16px; border: 1px solid rgba(212,175,55,0.4); font-family: system-ui, sans-serif; color: #f0e6c8; }
+      #jolly-ss-panel h3 { margin: 0 0 10px; font-size: 16px; color: #d4af37; display: flex; justify-content: space-between; align-items: center; }
+      #jolly-ss-input { width: 100%; background: #232323; color: #f0e6c8; border: 1px solid #444; border-radius: 10px; padding: 12px 14px; font-size: 14px; box-sizing: border-box; margin-bottom: 10px; }
+      .jss-hint { font-size: 11px; color: #999; margin-bottom: 12px; }
+      .jss-result { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; background: #232323; margin-bottom: 6px; cursor: pointer; }
+      .jss-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #333; }
+      .jss-name { font-size: 13px; flex: 1; }
+      .jss-meta { font-size: 10.5px; color: #999; }
+      .jss-empty { text-align: center; color: #888; padding: 20px 0; font-size: 13px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function renderSmartSearchResults(query) {
+    const zone = document.getElementById('jolly-ss-results');
+    if (!zone) return;
+    if (!query.trim()) { zone.innerHTML = ''; return; }
+    const { color, text, results } = smartSearch(query);
+    const parsedHint = [color ? `rəng: ${color}` : null, text ? `mətn: "${text}"` : null].filter(Boolean).join(' · ');
+    zone.innerHTML = `
+      ${parsedHint ? `<div class="jss-hint">🔍 Tanındı — ${parsedHint}</div>` : ''}
+      ${results.length ? results.map(p => {
+        const thumb = (p.images && p.images[0])
+          ? `<img class="jss-thumb" ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'}>`
+          : `<div class="jss-thumb" style="display:flex;align-items:center;justify-content:center;">🧴</div>`;
+        return `
+          <div class="jss-result" onclick="JollyDashboard.closeSmartSearch();JollyRouter.go('#/product/${p.id}')">
+            ${thumb}
+            <div style="flex:1;min-width:0;">
+              <div class="jss-name">${JollyProducts.escapeHtml(p.name || 'Adsız')}</div>
+              <div class="jss-meta">${[p.color, p.brand].filter(Boolean).map(x => JollyProducts.escapeHtml(x)).join(' · ')}</div>
+            </div>
+          </div>
+        `;
+      }).join('') : '<div class="jss-empty">Nəticə tapılmadı</div>'}
+    `;
+  }
+
+  function openSmartSearch() {
+    injectSmartSearchStyles();
+    let overlay = document.getElementById('jolly-ss-overlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'jolly-ss-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div id="jolly-ss-panel">
+        <h3>🔍 Smart Axtarış <button onclick="JollyDashboard.closeSmartSearch()" style="background:none;border:none;color:#f0e6c8;font-size:20px;cursor:pointer;">&times;</button></h3>
+        <input id="jolly-ss-input" placeholder='Məs: "qırmızı köynək"' autofocus>
+        <div class="jss-hint">Rəng sözünü (qırmızı, göy, yaşıl, sarı, qara, ağ və s.) adla birlikdə yaz — ayrıca süzüləcək.</div>
+        <div id="jolly-ss-results"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const input = document.getElementById('jolly-ss-input');
+    input.oninput = () => renderSmartSearchResults(input.value);
+    setTimeout(() => input.focus(), 50);
+  }
+
+  function closeSmartSearch() {
+    const overlay = document.getElementById('jolly-ss-overlay');
+    if (overlay) overlay.remove();
+  }
+
   function renderIncomplete() {
     const items = JollyDB.Products.all().filter(x => !x.images || !x.images.length || !x.barcodes || !x.barcodes.length || x.price == null || x.price === '');
     return `
@@ -388,7 +487,6 @@ const JollyDashboard = (() => {
     `;
   }
 
-  /* --- Şəkil qalereyası --- */
   function renderGallery() {
     const products = JollyDB.Products.all().filter(p => p.images && p.images.length);
     const drafts = JollyDB.Drafts.all().filter(d => d.images && d.images.length);
@@ -411,7 +509,6 @@ const JollyDashboard = (() => {
     `;
   }
 
-  /* --- Son əlavələr --- */
   function renderRecent() {
     const items = JollyDB.Products.all().slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
     setTimeout(() => {
@@ -427,9 +524,8 @@ const JollyDashboard = (() => {
     `;
   }
 
-  /* --- Silinənlər səbəti --- */
   function renderTrash() {
-    JollyDB.Trash.purgeOld(30); // 30 gündən köhnələri təmizlə
+    JollyDB.Trash.purgeOld(30);
     const items = JollyDB.Trash.all();
     return `
       ${backBtn()}
@@ -472,7 +568,6 @@ const JollyDashboard = (() => {
     JollyRouter.go('#/dashboard/trash');
   }
 
-  /* --- Favorilər səhifəsi --- */
   function renderFavorites() {
     const items = JollyDB.getFavorites();
     setTimeout(() => {
@@ -488,7 +583,6 @@ const JollyDashboard = (() => {
     `;
   }
 
-  /* --- Dashboard Studio --- */
   function renderStudio() {
     const cfg = getConfig();
     const inDash = cfg.items;
@@ -585,5 +679,6 @@ const JollyDashboard = (() => {
     render, renderIncomplete, renderGallery, renderRecent, renderStudio, openGalleryImage,
     renderTrash, renderFavorites, restoreTrash, purgeTrash, emptyTrash,
     quickPhoto, toggleFab, fabAction, addItem, removeItem, toggleAttention, getConfig, CATALOG,
+    openSmartSearch, closeSmartSearch, smartSearch,
   };
 })();
