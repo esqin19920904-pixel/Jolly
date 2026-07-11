@@ -821,7 +821,11 @@ const JollyProducts = (() => {
     const strip = document.getElementById('imgStrip');
     if (!strip) return;
     let html = formState.images.map((src, i) => `
-      <div class="image-slot"><img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(src) : 'src="' + src + '"'}><div class="rm" onclick="JollyProducts.removeImage(${i})">✕</div></div>
+      <div class="image-slot" id="imgSlot${i}">
+        <img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(src) : 'src="' + src + '"'}>
+        <div class="rm" onclick="JollyProducts.removeImage(${i})">✕</div>
+        <div class="clean-ico" title="Arxa fonu təmizlə" onclick="JollyProducts.cleanImageAt(${i})" style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.55);border-radius:6px;padding:2px 5px;font-size:12px;cursor:pointer;line-height:1;">🧹</div>
+      </div>
     `).join('');
     html += `
       <div class="image-slot" onclick="document.getElementById('imgFileInput').click()">🖼️+</div>
@@ -855,6 +859,55 @@ const JollyProducts = (() => {
     }
     formState.images.splice(i, 1);
     renderImageStrip();
+  }
+
+  // ------------------------------------------------------------------------
+  // ARXA FON TƏMİZLƏMƏ — hər şəklin altındakı 🧹 düyməsi ilə, bg-remove.js
+  // faylının əsas məntiqini (cleanDataUrl) çağırır. Yükləmə axınına
+  // TOXUNMUR — yalnız artıq əlavə olunmuş bir şəkli, istəyəndə, əl ilə
+  // təmizləyib YERİNƏ QOYUR.
+  // ------------------------------------------------------------------------
+  async function cleanImageAt(i) {
+    if (typeof window.JollyBgRemove === 'undefined' || !window.JollyBgRemove.cleanDataUrl) {
+      Toast.error('Şəkil Təmizləyici modulu yüklənməyib (bg-remove.js)');
+      return;
+    }
+    const ref = formState.images[i];
+    if (!ref) return;
+
+    const wantsWhite = confirm('Ağ fonlu et? (İmtina = şəffaf fon)');
+
+    let sourceDataUrl = ref;
+    if (typeof JollyStorage !== 'undefined' && ref.startsWith && ref.startsWith('idb:')) {
+      const resolved = await JollyStorage.resolveAll([ref]);
+      sourceDataUrl = resolved && resolved[0];
+    }
+    if (!sourceDataUrl) { Toast.error('Şəkil oxunmadı'); return; }
+
+    const slot = document.getElementById('imgSlot' + i);
+    const originalHtml = slot ? slot.innerHTML : null;
+    if (slot) slot.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;text-align:center;padding:4px;">⏳ Təmizlənir...</div>`;
+
+    try {
+      const cleanedDataUrl = await window.JollyBgRemove.cleanDataUrl(sourceDataUrl, wantsWhite ? 'white' : 'transparent', (pct) => {
+        if (slot) slot.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;text-align:center;padding:4px;">⏳ ${pct != null ? pct + '%' : '...'}</div>`;
+      });
+      let newRef = cleanedDataUrl;
+      if (typeof JollyStorage !== 'undefined') newRef = await JollyStorage.saveImage(cleanedDataUrl);
+
+      if (typeof JollyStorage !== 'undefined' && ref.startsWith && ref.startsWith('idb:')) {
+        JollyStorage.deleteImage(ref);
+      }
+      formState.images[i] = newRef;
+      renderImageStrip();
+      if (typeof JollySound !== 'undefined') JollySound.success();
+      Toast.success('Şəkil təmizləndi ✓');
+    } catch (err) {
+      console.error('[cleanImageAt]', err);
+      if (slot && originalHtml) slot.innerHTML = originalHtml;
+      const isTimeout = /timeout|bitmədi/i.test(String(err && err.message));
+      Toast.error(isTimeout ? 'Vaxt bitdi — internet zəif ola bilər' : 'Fon silinmədi');
+    }
   }
 
   function renderBarcodeTags() {
@@ -1053,7 +1106,7 @@ const JollyProducts = (() => {
   return {
     renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch,
     renderFilteredPage, renderDraftsPage, deleteDraft, renderDetailPage, deleteProduct,
-    renderFormPage, afterFormRender, handleImageUpload, removeImage,
+    renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
     applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
