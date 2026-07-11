@@ -199,6 +199,37 @@
     };
   }
 
+  function blobUrlToDataUrl(blobUrl) {
+    return fetch(blobUrl).then(r => r.blob()).then(blob => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }));
+  }
+
+  // Başqa modullardan (məs. products.js-dəki tək-şəkil təmizləmə düyməsi)
+  // çağırıla bilən, UI-sız versiya. Mövcud show()/renderPicker() axınına
+  // TOXUNMUR — eyni əsas məntiqi (loadLib, removeBackground, whitenBackground)
+  // təkrar istifadə edir.
+  async function cleanDataUrl(dataUrl, mode, onProgress) {
+    const lib = await withTimeout(loadLib(), TIMEOUT_MS, "Model yüklənməsi");
+    const opts = { ...REMOVE_OPTS };
+    if (onProgress) {
+      opts.progress = (key, current, total) => {
+        const pct = total ? Math.round((current / total) * 100) : null;
+        onProgress(pct);
+      };
+    }
+    const resultBlob = await withTimeout(lib.removeBackground(dataUrl, opts), TIMEOUT_MS, "Fon silmə");
+    const transparentUrl = URL.createObjectURL(resultBlob);
+    if (mode === "white") {
+      const whiteUrl = await whitenBackground(transparentUrl);
+      return blobUrlToDataUrl(whiteUrl);
+    }
+    return blobUrlToDataUrl(transparentUrl);
+  }
+
   function show() {
     injectStyles();
     let overlay = document.getElementById("jolly-bg-overlay");
@@ -221,7 +252,8 @@
     id: "bg-remove",
     name: "Şəkil Təmizləyici",
     version: "1.1.0",
-    show
+    show,
+    cleanDataUrl
   };
 
   window.JollyBgRemove = JollyBgRemove;
