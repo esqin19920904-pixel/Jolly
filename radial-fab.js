@@ -63,18 +63,26 @@ const JollyRadialFab = (() => {
     const btn = root.querySelector('#rfabMain');
     let pressTimer = null;
     let longFired = false;
-    const startPress = () => {
+    const startPress = (e) => {
+      if (e.cancelable) e.preventDefault();
       longFired = false;
       pressTimer = setTimeout(() => { longFired = true; showFavorites(); }, 480);
     };
-    const endPress = () => {
+    const endPress = (e) => {
+      if (e.cancelable) e.preventDefault();
       clearTimeout(pressTimer);
       if (!longFired) toggle();
     };
-    btn.addEventListener('touchstart', startPress, { passive: true });
-    btn.addEventListener('touchend', endPress);
-    btn.addEventListener('mousedown', startPress);
-    btn.addEventListener('mouseup', endPress);
+    if (window.PointerEvent) {
+      btn.addEventListener('pointerdown', startPress);
+      btn.addEventListener('pointerup', endPress);
+      btn.addEventListener('pointercancel', () => clearTimeout(pressTimer));
+    } else {
+      // Köhnə brauzerlər üçün fallback — yalnız toxunma, sintetik siçan hadisələrini önləmək üçün preventDefault ilə
+      btn.addEventListener('touchstart', startPress, { passive: false });
+      btn.addEventListener('touchend', endPress);
+      btn.addEventListener('click', (e) => { e.preventDefault(); });
+    }
 
     document.addEventListener('click', (e) => {
       const r = document.getElementById('radialFabRoot');
@@ -94,7 +102,7 @@ const JollyRadialFab = (() => {
         background: linear-gradient(135deg, var(--accent-1, #7c8aff), var(--accent-2, #29e0c9));
         box-shadow: 0 8px 24px rgba(124,138,255,0.45);
         display: flex; align-items: center; justify-content: center;
-        transition: transform .25s; position: relative; z-index: 2; }
+        transition: transform .25s; position: relative; z-index: 2; touch-action: none; }
       #radialFabRoot.open .rfab-main { transform: rotate(45deg); }
       .rfab-petals { position: absolute; right: 0; bottom: 0; width: 0; height: 0; }
       .rfab-petal { position: absolute; width: 50px; height: 50px; border-radius: 50%;
