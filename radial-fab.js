@@ -105,15 +105,17 @@ const JollyRadialFab = (() => {
         transition: transform .25s; position: relative; z-index: 2; touch-action: none; }
       #radialFabRoot.open .rfab-main { transform: rotate(45deg); }
       .rfab-petals { position: absolute; right: 0; bottom: 0; width: 0; height: 0; }
-      .rfab-petal { position: absolute; width: 50px; height: 50px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
+      .rfab-petal { position: absolute; width: 62px; height: 62px; border-radius: 18px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
         border: 1px solid rgba(255,255,255,0.18);
         box-shadow: 0 6px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
-        font-size: 19px; color: #fff;
+        font-size: 19px; color: #fff; padding: 4px;
         opacity: 0; transform: scale(0.3); pointer-events: none;
         transition: transform .28s cubic-bezier(.34,1.56,.64,1), opacity .2s; }
+      .rfab-petal .rfab-lbl { font-size: 8.5px; line-height: 1.1; text-align: center; opacity: .9; max-width: 56px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #radialFabRoot.open .rfab-petal { opacity: 1; transform: scale(1); pointer-events: auto; }
       .rfab-favs { position: absolute; bottom: 70px; right: 0; display: flex; gap: 8px;
         background: rgba(255,255,255,0.08);
@@ -142,14 +144,22 @@ const JollyRadialFab = (() => {
     const root = ensureDom();
     const petals = root.querySelector('#rfabPetals');
     const n = items.length;
-    const radius = 92;
-    const startAngle = 180, endAngle = 270; // sol üfüqi → yuxarı üfüqi, yarım-dairə
+    const petalSize = 62;
+    const minGap = 14;
+    const minCenterDist = petalSize + minGap;
+    const radius = Math.max(100, 130);
+    let angleStep = n > 1 ? Math.max(28, (minCenterDist / radius) * (180 / Math.PI)) : 0;
+    const totalArc = Math.min(170, angleStep * (n - 1));
+    angleStep = n > 1 ? totalArc / (n - 1) : 0;
+    const startAngle = 200;
     petals.innerHTML = items.map((it, i) => {
-      const angle = n === 1 ? (startAngle + endAngle) / 2 : startAngle + (endAngle - startAngle) * (i / (n - 1));
+      const angle = startAngle + angleStep * i;
       const rad = angle * Math.PI / 180;
       const x = Math.cos(rad) * radius;
       const y = Math.sin(rad) * radius;
-      return `<button class="rfab-petal" style="right:${-x - 25}px;bottom:${-y - 25}px;" title="${esc(it.label)}" onclick="JollyRadialFab.run('${it.id}')">${it.icon}</button>`;
+      return `<button class="rfab-petal" style="right:${-x - petalSize / 2}px;bottom:${-y - petalSize / 2}px;" onclick="JollyRadialFab.run('${it.id}')">
+        <span>${it.icon}</span><span class="rfab-lbl">${esc(it.label)}</span>
+      </button>`;
     }).join('');
     root.classList.add('open');
     openState = true;
