@@ -29,6 +29,7 @@ const JollyDashboard = (() => {
     { id: 'voice', icon: '🎤', label: 'Səsli axtar', sub: 'Danış', action: 'JollyProducts.voiceSearch()', neon: 'pink' },
     { id: 'report', icon: '📊', label: 'Hesabat', sub: 'Statistika', route: '#/studios/report', neon: 'gold' },
     { id: 'insight', icon: '📈', label: 'Analitika', sub: 'Dərin mənzərə', route: '#/insight', neon: 'green' },
+    { id: 'expiring', icon: '⏰', label: 'SKT bitir', sub: 'Son istifadə tarixi', route: '#/products?filter=expiring', badgeFn: 'expiringCount', hideWhenZero: true, neon: 'red' },
   ];
 
   const DEFAULT_ITEMS = ['newProduct', 'scan', 'incomplete', 'gallery', 'recent', 'drafts', 'brain'];
@@ -52,6 +53,10 @@ const JollyDashboard = (() => {
       if (!JollyDB.Products.all().length) return 0;
       const last = s.lastBackup || 0;
       return (Date.now() - last) > 7 * 864e5 ? 1 : 0;
+    },
+    expiringCount() {
+      if (typeof JollyProducts === 'undefined' || !JollyProducts.expiringProducts) return 0;
+      return JollyProducts.expiringProducts(30).length;
     },
   };
 
@@ -91,6 +96,8 @@ const JollyDashboard = (() => {
     { icon: 'star', label: 'Seçilmişlər', neon: 'gold', route: '#/dashboard/favorites' },
     { icon: 'inbox', label: 'Qəbul Studio', neon: 'green', route: '#/receiving' },
     { icon: 'scancenter', label: 'Skan ilə Qəbul', neon: 'gold', route: '#/scan-receiving' },
+    { icon: 'shield', label: 'SKT bitir', neon: 'red', route: '#/products?filter=expiring' },
+    { icon: 'boxplus', label: 'Sürətli Menyu', neon: 'purple', route: '#/studios/quickmenu' },
   ];
 
   function weeklyActivity() {
