@@ -1,5 +1,9 @@
 /* ============================================================
    JOLLY Products — məhsul siyahısı, kartı, detalı və forması
+
+   YENİ: renderCard-a "+" düyməsi əlavə olundu — kartın üstündən,
+   Qəbul Studio-ya girmədən, birbaşa "Mal Qəbul" səbətinə əlavə
+   etmək üçün (JollyReceiving.quickAddToBasket çağırır).
    ============================================================ */
 
 const JollyProducts = (() => {
@@ -14,8 +18,12 @@ const JollyProducts = (() => {
     const pki = escapeHtml(JSON.stringify(p.images || []));
     const st = (p.status || '').toLowerCase();
     const glowClass = st.includes('problem') ? 'card-glow-danger' : (st.includes('yeni') ? 'card-glow-new' : '');
+    const quickAddBtn = (typeof JollyReceiving !== 'undefined')
+      ? `<button class="icon-btn" title="Qəbul səbətinə əlavə et" onclick="event.stopPropagation();JollyProducts.quickAddToReceiving('${p.id}', this)" style="position:absolute;top:6px;right:6px;z-index:5;width:30px;height:30px;min-width:30px;padding:0;border-radius:50%;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;color:#fff;border:1px solid rgba(255,255,255,0.15);">+</button>`
+      : '';
     return `
-      <div class="glass product-card ${glowClass}" data-id="${p.id}" onclick="JollyRouter.go('#/product/${p.id}')">
+      <div class="glass product-card ${glowClass}" data-id="${p.id}" onclick="JollyRouter.go('#/product/${p.id}')" style="position:relative;">
+        ${quickAddBtn}
         <div class="thumb peekable" data-pki='${pki}' data-pkx="0">${thumb}</div>
         <div class="p-name">${escapeHtml(p.name || 'Adsız məhsul')}</div>
         <div class="p-meta">${escapeHtml(p.mainCode || '')}${p.extraCodeValue ? ' · ' + escapeHtml(p.extraCodeType || '') + ' ' + escapeHtml(p.extraCodeValue) : ''}</div>
@@ -27,6 +35,23 @@ const JollyProducts = (() => {
         ${p.group ? `<div class="p-related" onclick="event.stopPropagation();JollyRouter.go('#/products?group=${encodeURIComponent(p.group)}')" style="font-size:10px;color:var(--accent-1);margin-top:5px;opacity:.85;">📦 ${escapeHtml(p.group)} qrupundan daha çox ›</div>` : ''}
       </div>
     `;
+  }
+
+  // "+" düyməsindən çağırılır — Qəbul Studio-ya girmədən tək kliklə
+  // "Mal Qəbul" səbətinə əlavə edir, düymənin özünü təsdiq işarəsinə çevirir.
+  function quickAddToReceiving(id, btnEl) {
+    if (typeof JollyReceiving === 'undefined') { Toast.error('Qəbul Studio modulu yüklənməyib'); return; }
+    const added = JollyReceiving.quickAddToBasket(id);
+    if (btnEl) {
+      if (added) {
+        btnEl.textContent = '✓';
+        btnEl.style.background = 'rgba(41,224,201,0.85)';
+        btnEl.style.borderColor = 'rgba(41,224,201,0.9)';
+      } else {
+        btnEl.textContent = '✓';
+        btnEl.style.background = 'rgba(255,184,77,0.75)';
+      }
+    }
   }
 
   function escapeHtml(str) {
@@ -1113,5 +1138,6 @@ const JollyProducts = (() => {
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
     lookupBarcodeOnline, applyOnlineLookup, focusNext,
+    quickAddToReceiving,
   };
 })();
