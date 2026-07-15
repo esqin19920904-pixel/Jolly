@@ -99,16 +99,22 @@ const JollyRadialFab = (() => {
       .rfab-petals { position: absolute; right: 0; bottom: 0; width: 0; height: 0; }
       .rfab-petal { position: absolute; width: 50px; height: 50px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        background: rgba(22,22,32,0.94); border: 1px solid rgba(255,255,255,0.12);
-        box-shadow: 0 6px 18px rgba(0,0,0,0.45); font-size: 19px; color: #fff;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+        border: 1px solid rgba(255,255,255,0.18);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+        font-size: 19px; color: #fff;
         opacity: 0; transform: scale(0.3); pointer-events: none;
         transition: transform .28s cubic-bezier(.34,1.56,.64,1), opacity .2s; }
       #radialFabRoot.open .rfab-petal { opacity: 1; transform: scale(1); pointer-events: auto; }
       .rfab-favs { position: absolute; bottom: 70px; right: 0; display: flex; gap: 8px;
-        background: rgba(22,22,32,0.94); padding: 8px; border-radius: 18px;
-        border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+        padding: 8px; border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.18);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15); }
       .rfab-fav-btn { width: 44px; height: 44px; border-radius: 50%; border: none;
-        background: rgba(255,255,255,0.07); color: #fff; font-size: 18px; }
+        background: rgba(255,255,255,0.1); color: #fff; font-size: 18px; }
     `;
     document.head.appendChild(style);
   }
