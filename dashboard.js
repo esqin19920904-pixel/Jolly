@@ -90,6 +90,7 @@ const JollyDashboard = (() => {
     { icon: 'map', label: 'Rəf xəritəsi', neon: 'blue', route: '#/store-map' },
     { icon: 'star', label: 'Seçilmişlər', neon: 'gold', route: '#/dashboard/favorites' },
     { icon: 'inbox', label: 'Qəbul Studio', neon: 'green', route: '#/receiving' },
+    { icon: 'scancenter', label: 'Skan ilə Qəbul', neon: 'gold', route: '#/scan-receiving' },
   ];
 
   function weeklyActivity() {
