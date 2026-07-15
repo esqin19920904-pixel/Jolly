@@ -1,6 +1,6 @@
 /* ============================================================
    JOLLY Skan ilə Qəbul — Scan Receiving
-   Əvvəlcədən bazada mövcud olan, barkodsuz TƏKRAR gələn 
+   Əvvəlcədən bazada mövcud olan, barkodsuz TƏKRAR gələn məhsullar
    üçün: kamera ilə ardıcıl şəkil çək → JollyVisualSearch ilə
    bazadakı məhsulu tap → təsdiqlə → şəkli məhsulun kartına
    avtomatik əlavə et → növbəti şəkli çək.
