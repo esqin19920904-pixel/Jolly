@@ -6,6 +6,9 @@
    DÜZƏLİŞ: Səbətdəki məhsullar indi SEÇİLMƏ SIRASI ilə, nömrələnmiş
    siyahı kimi göstərilir (renderBasketList) — hər birinin yanında
    "çıxar" düyməsi var (removeFromBasket).
+
+   YENİ: quickAddToBasket(id) — məhsul kartındakı "+" düyməsindən
+   Qəbul Studio-ya girmədən, birbaşa səbətə tək kliklə əlavə etmək.
    ============================================================ */
 
 const JollyReceiving = (() => {
@@ -657,9 +660,25 @@ const JollyReceiving = (() => {
     });
   }
 
+  // ── Tək kliklə birbaşa səbətə at (məhsul kartındakı "+" düyməsindən) ──
+  // Qəbul Studio-ya girib seçmədən, istənilən yerdən (Ana səhifə, Axtarış və s.)
+  // bir toxunuşla məhsulu "Mal Qəbul" səbətinə əlavə edir.
+  function quickAddToBasket(id) {
+    const basket = getBasket();
+    if (basket.productIds.includes(id)) {
+      Toast.info('Bu məhsul artıq Qəbul səbətindədir');
+      return false;
+    }
+    basket.productIds.push(id);
+    setBasket(basket);
+    if (typeof JollySound !== 'undefined') JollySound.success();
+    Toast.success('📥 Qəbul səbətinə əlavə olundu');
+    return true;
+  }
+
   return {
     setFilter, applyFilter, toggleSelect, selectAllVisible, addSelectedToBasket, clearBasket,
-    removeFromBasket,
+    removeFromBasket, quickAddToBasket,
     finishSession, clearBasketAndExit, captureUnknown,
   };
 })();
