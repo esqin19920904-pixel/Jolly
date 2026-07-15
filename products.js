@@ -33,6 +33,7 @@ const JollyProducts = (() => {
           ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
         </div>
         ${p.group ? `<div class="p-related" onclick="event.stopPropagation();JollyRouter.go('#/products?group=${encodeURIComponent(p.group)}')" style="font-size:10px;color:var(--accent-1);margin-top:5px;opacity:.85;">📦 ${escapeHtml(p.group)} qrupundan daha çox ›</div>` : ''}
+        ${expiryBadgeHtml(p)}
       </div>
     `;
   }
@@ -188,7 +189,12 @@ const JollyProducts = (() => {
     JollyBarcode.open((code) => {
       const found = JollyDB.Products.findByBarcode(code);
       if (found.length === 1) {
-        JollyRouter.go(`#/product/${found[0].id}`);
+        const cfg = (typeof JollyQuickMenu !== 'undefined') ? JollyQuickMenu.getConfig() : null;
+        if (cfg && cfg.enabledOnScan !== false) {
+          JollyQuickMenu.open(found[0].id);
+        } else {
+          JollyRouter.go(`#/product/${found[0].id}`);
+        }
       } else if (found.length > 1) {
         document.getElementById('homeSearch').value = code;
         liveSearch(code);
@@ -205,7 +211,8 @@ const JollyProducts = (() => {
   function renderFilteredPage(params) {
     let products = [];
     let title = 'Bütün məhsullar';
-    if (params.filter === 'problemli') { products = JollyDB.Products.all().filter(p => (p.status || '').toLowerCase().includes('problem')); title = 'Problemli məhsullar'; }
+    if (params.filter === 'expiring') { products = expiringProducts(30); title = '⏰ SKT-si yaxınlaşan məhsullar'; }
+    else if (params.filter === 'problemli') { products = JollyDB.Products.all().filter(p => (p.status || '').toLowerCase().includes('problem')); title = 'Problemli məhsullar'; }
     else if (params.filter === 'barkodsuz') { products = JollyDB.Products.filter({ hasBarcode: false }); title = 'Barkodsuz məhsullar'; }
     else if (params.filter === 'sekilsiz') { products = JollyDB.Products.filter({ hasImage: false }); title = 'Şəkilsiz məhsullar'; }
     else if (params.brand) { products = JollyDB.Products.filter({ brand: params.brand }); title = `Firma: ${params.brand}`; }
@@ -268,6 +275,37 @@ const JollyProducts = (() => {
     if (!p.barcodes || !p.barcodes.length) missing.push('Barkod yoxdur');
     if (p.price == null || p.price === '') missing.push('Qiymət yoxdur');
     return { ready: missing.length === 0, missing };
+  }
+
+  // ── SKT (Son İstifadə Tarixi) izləmə ──
+  function expiryInfo(p) {
+    if (!p.expiryDate) return null;
+    const exp = new Date(p.expiryDate + 'T00:00:00');
+    if (isNaN(exp.getTime())) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((exp.getTime() - today.getTime()) / 864e5);
+    let level = 'ok';
+    if (daysLeft < 0) level = 'expired';
+    else if (daysLeft <= 7) level = 'urgent';
+    else if (daysLeft <= 30) level = 'soon';
+    return { daysLeft, level, dateStr: exp.toLocaleDateString('az-AZ') };
+  }
+  function expiryBadgeHtml(p) {
+    const info = expiryInfo(p);
+    if (!info || info.level === 'ok') return '';
+    const map = {
+      expired: { color: '#ff5c6c', text: `⏰ Bitib (${Math.abs(info.daysLeft)} gün əvvəl)` },
+      urgent:  { color: '#ff5c6c', text: `⏰ ${info.daysLeft} gün qalıb!` },
+      soon:    { color: '#fbbf24', text: `⏰ ${info.daysLeft} gün qalıb` },
+    };
+    const m = map[info.level];
+    return `<div class="status-pill" style="background:${m.color}22;color:${m.color};margin-top:4px;">${m.text}</div>`;
+  }
+  function expiringProducts(days) {
+    return JollyDB.Products.all().filter(p => {
+      const info = expiryInfo(p);
+      return info && info.level !== 'ok' && info.daysLeft <= (days || 30);
+    }).sort((a, b) => expiryInfo(a).daysLeft - expiryInfo(b).daysLeft);
   }
 
   function infoRow(label, value, unit) {
@@ -343,6 +381,13 @@ const JollyProducts = (() => {
           ${infoRow('Qrup', p.group)}
           ${infoRow('Yer / Rəf', p.location)}
           ${infoRow('Tədarükçü', p.supplier)}
+          ${(() => {
+            const info = expiryInfo(p);
+            if (!info) return infoRow('SKT (Son istifadə tarixi)', null);
+            const colorMap = { expired: 'var(--accent-danger)', urgent: 'var(--accent-danger)', soon: 'var(--accent-warn)', ok: 'var(--accent-2)' };
+            const labelMap = { expired: `Bitib (${Math.abs(info.daysLeft)} gün əvvəl)`, urgent: `${info.daysLeft} gün qalıb ⚠️`, soon: `${info.daysLeft} gün qalıb`, ok: `${info.daysLeft} gün qalıb` };
+            return `<div class="list-row"><span>SKT (Son istifadə tarixi)</span><span class="mono" style="color:${colorMap[info.level]};">${info.dateStr} · ${labelMap[info.level]}</span></div>`;
+          })()}
         </div>
 
         <div class="section-title">Qeyd</div>
@@ -570,10 +615,11 @@ const JollyProducts = (() => {
     formState = existing ? JSON.parse(JSON.stringify(existing)) : {
       id: null, name: '', mainCode: '', extraCodeType: 'No', extraCodeValue: '',
       barcodes: [], last4: '', price: '', brand: '', group: '', location: '', color: '', note: '',
-      supplier: '', status: 'Aktiv', images: [],
+      supplier: '', status: 'Aktiv', images: [], expiryDate: '',
     };
     if (formState.supplier === undefined) formState.supplier = '';
     if (formState.last4 === undefined) formState.last4 = '';
+    if (formState.expiryDate === undefined) formState.expiryDate = '';
     if (!existing) {
       const carryRaw = sessionStorage.getItem('jolly_carry');
       if (carryRaw) {
@@ -724,6 +770,12 @@ const JollyProducts = (() => {
         </div>
 
         <div class="field">
+          <label>⏰ SKT — Son istifadə tarixi (könüllü)</label>
+          <input id="f_expiryDate" type="date" value="${escapeHtml(formState.expiryDate || '')}">
+          <div class="muted" style="font-size:11px;margin-top:5px;">Doldursan, bitməsinə 30 gündən az qalanda Dashboard-da xəbərdarlıq göstəriləcək.</div>
+        </div>
+
+        <div class="field">
           <label>Əlavə qeyd</label>
           <textarea id="f_note" placeholder="sərbəst qeyd...">${escapeHtml(formState.note || '')}</textarea>
         </div>
@@ -753,7 +805,7 @@ const JollyProducts = (() => {
   function afterFormRender() {
     renderImageStrip();
     renderBarcodeTags();
-    ['name', 'mainCode', 'price', 'extraCodeType', 'extraCodeValue', 'color', 'note', 'last4'].forEach(f => {
+    ['name', 'mainCode', 'price', 'extraCodeType', 'extraCodeValue', 'color', 'note', 'last4', 'expiryDate'].forEach(f => {
       const el = document.getElementById('f_' + f);
       if (el) {
         el.addEventListener('input', () => { formState[f] = el.value; });
@@ -1139,5 +1191,6 @@ const JollyProducts = (() => {
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
     lookupBarcodeOnline, applyOnlineLookup, focusNext,
     quickAddToReceiving,
+    expiryInfo, expiringProducts,
   };
 })();
