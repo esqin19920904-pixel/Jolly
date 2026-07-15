@@ -1,9 +1,14 @@
 /* ============================================================
-   JOLLY Skan ilə Qəbul — Scan Receiving
+   JOLLY Skan ilə Qəbul — Scan Receiving (v2)
    Əvvəlcədən bazada mövcud olan, barkodsuz TƏKRAR gələn məhsullar
    üçün: kamera ilə ardıcıl şəkil çək → JollyVisualSearch ilə
-   bazadakı məhsulu tap → təsdiqlə → şəkli məhsulun kartına
-   avtomatik əlavə et → növbəti şəkli çək.
+   bazadakı ən uyğun namizədləri tap → düzgününü seç → şəkil
+   avtomatik məhsulun kartına əlavə olunur → növbəti şəkli çək.
+
+   YENİLİKLƏR (v2):
+   - Bir yox, EN YAXIN 3 NAMİZƏD göstərilir — səhv uyğunlaşmanın qarşısını alır
+   - Sessiya sonunda hər maddənin ŞƏKLİ + ADI ilə xülasə (təkcə say yox)
+   - Sessiya başlamazdan əvvəl HƏSSASLIQ SEÇİMİ (Az / Orta / Çox)
 
    Tapılmazsa: əl ilə axtar, ya da "Yeni məhsul" kimi Gələn
    Mallar-a (Draft) at.
@@ -14,15 +19,32 @@
    ============================================================ */
 
 const JollyScanReceiving = (() => {
-  const MAX_DISTANCE = 20;          // JollyVisualSearch.findSimilar-dəki maxDistance
-  const CONFIDENT_SIMILARITY = 65;  // bundan yuxarı → "uyğun tapıldı" kartı göstərilir
+  const MAX_DISTANCE = 26;              // ən geniş axtarış radiusu (namizədləri toplamaq üçün)
+  const SENSITIVITY_KEY = 'jolly_scan_receiving_sensitivity';
+  const SENSITIVITY_PRESETS = {
+    low:    { label: 'Az həssas',  minSimilarity: 75 },
+    medium: { label: 'Orta',       minSimilarity: 60 },
+    high:   { label: 'Çox həssas', minSimilarity: 45 },
+  };
+  const CANDIDATE_COUNT = 3; // ən çox neçə namizəd göstərilsin
 
   let session = { count: 0, matched: 0, newCount: 0, log: [] };
   let stream = null;
-  let busy = false;          // bir şəkil emal olunarkən yeni çəkilişin qarşısını alır
-  let pendingImage = null;   // hazırkı çəkilmiş şəklin dataUrl-i (böyük olduğu üçün HTML-ə yazılmır)
+  let busy = false;
+  let pendingImage = null; // hazırkı çəkilmiş şəklin dataUrl-i
 
   function esc(s) { return (typeof JollyProducts !== 'undefined' ? JollyProducts.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s)); }
+
+  function getSensitivity() {
+    try { return localStorage.getItem(SENSITIVITY_KEY) || 'medium'; } catch (e) { return 'medium'; }
+  }
+  function setSensitivity(key) {
+    try { localStorage.setItem(SENSITIVITY_KEY, key); } catch (e) {}
+    renderMainInto();
+  }
+  function currentMinSimilarity() {
+    return (SENSITIVITY_PRESETS[getSensitivity()] || SENSITIVITY_PRESETS.medium).minSimilarity;
+  }
 
   /* ============================================================
      ƏSAS EKRAN
@@ -38,18 +60,32 @@ const JollyScanReceiving = (() => {
       </p>
 
       <div class="glass" style="padding:14px;margin-bottom:14px;">
-        <div class="row between">
+        <div class="row between" style="margin-bottom:12px;">
           <div>
             <div style="font-family:var(--font-display);font-size:20px;font-weight:700;" id="srCounter">0</div>
             <div class="muted" style="font-size:11px;">şəkil işləndi</div>
           </div>
           <button class="btn btn-primary" id="srStartBtn" onclick="JollyScanReceiving.startSession()">🚀 Skana başla</button>
         </div>
+        <div class="muted" style="font-size:11px;margin-bottom:6px;">🎯 Tanınma həssaslığı</div>
+        <div class="row" id="srSensitivityRow" style="gap:6px;">
+          ${Object.entries(SENSITIVITY_PRESETS).map(([key, p]) => `
+            <span class="chip ${getSensitivity() === key ? 'chip-active' : ''}" style="flex:1;text-align:center;" onclick="JollyScanReceiving.setSensitivity('${key}')">${esc(p.label)}</span>
+          `).join('')}
+        </div>
+        <div class="muted" style="font-size:10.5px;margin-top:6px;">"Çox həssas" daha çox namizəd göstərir amma səhv uyğunlaşma riski artır.</div>
       </div>
 
       <div id="srSessionZone"></div>
       <div style="height:40px;"></div>
     `;
+  }
+
+  function renderMainInto() {
+    const main = document.getElementById('main');
+    if (main && (window.location.hash || '').indexOf('/scan-receiving') >= 0) {
+      main.innerHTML = renderMain();
+    }
   }
 
   /* ============================================================
@@ -71,12 +107,12 @@ const JollyScanReceiving = (() => {
       <div class="glass" style="padding:10px;text-align:center;">
         <video id="srVideo" autoplay playsinline muted style="width:100%;border-radius:14px;max-height:300px;object-fit:cover;background:#000;"></video>
         <button class="btn btn-primary" id="srCaptureBtn" style="margin-top:12px;border-radius:999px;width:70px;height:70px;padding:0;font-size:26px;" onclick="JollyScanReceiving.captureOne()">📸</button>
-        <div class="muted" style="font-size:11.5px;margin-top:8px;">Məhsulu çərçivəyə tut, çək, təsdiqlə — sıra ilə davam et</div>
+        <div class="muted" style="font-size:11.5px;margin-top:8px;">Məhsulu çərçivəyə tut, çək, düzgününü seç — sıra ilə davam et</div>
       </div>
       <div id="srResultZone" style="margin-top:12px;"></div>
       <button class="btn btn-ghost btn-block" style="margin-top:14px;" onclick="JollyScanReceiving.endSession()">🏁 Sessiyanı bitir</button>
       <div class="section-title">Bu sessiyada</div>
-      <div class="glass" id="srLogList" style="padding:4px 14px;max-height:220px;overflow-y:auto;">
+      <div class="glass" id="srLogList" style="padding:4px 14px;max-height:280px;overflow-y:auto;">
         <div class="muted" style="padding:10px;font-size:12px;">Hələ heç nə yoxdur</div>
       </div>
     `;
@@ -111,28 +147,38 @@ const JollyScanReceiving = (() => {
     busy = false;
   }
 
+  /* ---------- Nəticə: TOP namizədlər siyahısı ---------- */
   function renderResult(results) {
     const resultZone = document.getElementById('srResultZone');
     if (!resultZone) return;
-    const top = results && results[0];
+    const minSim = currentMinSimilarity();
+    const candidates = (results || []).filter(r => r.similarity >= minSim).slice(0, CANDIDATE_COUNT);
 
-    if (top && top.similarity >= CONFIDENT_SIMILARITY) {
-      const p = top.product;
-      const thumb = (p.images && p.images[0])
-        ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:56px;height:56px;object-fit:cover;border-radius:10px;">`
-        : `<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;font-size:26px;">🧴</div>`;
+    if (candidates.length) {
       resultZone.innerHTML = `
         <div class="glass anim-pop" style="padding:14px;">
-          <div class="row" style="gap:12px;align-items:center;">
-            ${thumb}
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name || 'Adsız')}</div>
-              <div class="muted" style="font-size:11.5px;">${top.similarity}% uyğunluq</div>
-            </div>
-          </div>
-          <div class="row" style="gap:8px;margin-top:12px;">
-            <button class="btn btn-primary" style="flex:1;" onclick="JollyScanReceiving.confirmMatch('${p.id}')">✅ Bu məhsuldur</button>
-            <button class="btn btn-ghost" style="flex:1;" onclick="JollyScanReceiving.rejectMatch()">❌ Səhvdir</button>
+          <div class="muted" style="font-size:11px;margin-bottom:8px;">Uyğun ola biləcək məhsullar — düzgününə toxun:</div>
+          ${candidates.map(c => {
+            const p = c.product;
+            const thumb = (p.images && p.images[0])
+              ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:52px;height:52px;object-fit:cover;border-radius:10px;">`
+              : `<div style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:24px;background:rgba(255,255,255,0.05);border-radius:10px;">🧴</div>`;
+            return `
+              <div class="list-row" style="cursor:pointer;padding:8px 4px;align-items:center;" onclick="JollyScanReceiving.confirmMatch('${p.id}')">
+                <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                  ${thumb}
+                  <span style="flex:1;min-width:0;">
+                    <span style="display:block;font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name || 'Adsız')}</span>
+                    <span class="muted" style="font-size:11px;">${c.similarity}% uyğunluq</span>
+                  </span>
+                </span>
+                <span style="color:var(--accent-2);font-size:18px;">✓</span>
+              </div>
+            `;
+          }).join('')}
+          <div class="row" style="gap:8px;margin-top:10px;">
+            <button class="btn btn-ghost" style="flex:1;" onclick="JollyScanReceiving.manualSearch()">🔎 Bunların heç biri</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="JollyScanReceiving.markNew()">🆕 Yeni məhsul</button>
           </div>
         </div>
       `;
@@ -156,6 +202,7 @@ const JollyScanReceiving = (() => {
     const p = JollyDB.Products.get(productId);
     if (!p) { Toast.error('Məhsul tapılmadı'); return; }
 
+    const capturedThumb = pendingImage; // sessiya jurnalı üçün çəkilmiş şəklin özü
     let img = pendingImage;
     if (typeof JollyStorage !== 'undefined' && JollyStorage.compressImage) {
       try { img = await JollyStorage.compressImage(img); } catch (e) {}
@@ -164,14 +211,10 @@ const JollyScanReceiving = (() => {
     JollyDB.Products.update(productId, { images });
 
     session.count++; session.matched++;
-    session.log.unshift({ type: 'match', name: p.name || 'Adsız' });
+    session.log.unshift({ type: 'match', name: p.name || 'Adsız', thumb: capturedThumb });
     if (typeof JollySound !== 'undefined') JollySound.success();
     Toast.success(`✅ "${p.name || 'Adsız'}" — şəkil əlavə olundu`);
     afterOutcome();
-  }
-
-  function rejectMatch() {
-    manualSearch();
   }
 
   /* ---------- Əl ilə axtarış ---------- */
@@ -210,6 +253,7 @@ const JollyScanReceiving = (() => {
   /* ---------- Yeni məhsul → Gələn Mallar draftına at ---------- */
   async function markNew() {
     if (!pendingImage) return;
+    const capturedThumb = pendingImage;
     let img = pendingImage;
     if (typeof JollyStorage !== 'undefined' && JollyStorage.compressImage) {
       try { img = await JollyStorage.compressImage(img); } catch (e) {}
@@ -217,7 +261,7 @@ const JollyScanReceiving = (() => {
     JollyDB.Drafts.add({ name: '', images: [img], barcodes: [], price: '', createdAt: Date.now() });
 
     session.count++; session.newCount++;
-    session.log.unshift({ type: 'new', name: 'Yeni məhsul (Gələn Mallar)' });
+    session.log.unshift({ type: 'new', name: 'Yeni məhsul (Gələn Mallar)', thumb: capturedThumb });
     if (typeof JollySound !== 'undefined') JollySound.success();
     Toast.success('🆕 "Gələn Mallar"a əlavə olundu');
     afterOutcome();
@@ -237,8 +281,11 @@ const JollyScanReceiving = (() => {
     if (!el) return;
     if (!session.log.length) { el.innerHTML = '<div class="muted" style="padding:10px;font-size:12px;">Hələ heç nə yoxdur</div>'; return; }
     el.innerHTML = session.log.map(item => `
-      <div class="list-row">
-        <span>${item.type === 'match' ? '✅' : '🆕'} ${esc(item.name)}</span>
+      <div class="list-row" style="align-items:center;">
+        <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <img src="${item.thumb}" style="width:38px;height:38px;object-fit:cover;border-radius:8px;flex-shrink:0;">
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">${item.type === 'match' ? '✅' : '🆕'} ${esc(item.name)}</span>
+        </span>
       </div>
     `).join('');
   }
@@ -253,8 +300,21 @@ const JollyScanReceiving = (() => {
         <div style="font-size:46px;">🎉</div>
         <div style="font-family:var(--font-display);font-size:19px;font-weight:700;margin:10px 0 4px;">Sessiya bitdi</div>
         <div class="muted" style="font-size:12.5px;">${session.count} şəkil işləndi — ${session.matched} uyğun tapıldı, ${session.newCount} yeni</div>
-        <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="JollyRouter.go('#/scan-receiving')">‹ Bağla</button>
       </div>
+      ${session.log.length ? `
+        <div class="section-title">Bu sessiyada edilənlər</div>
+        <div class="glass" style="padding:4px 14px;max-height:340px;overflow-y:auto;">
+          ${session.log.map(item => `
+            <div class="list-row" style="align-items:center;">
+              <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                <img src="${item.thumb}" style="width:42px;height:42px;object-fit:cover;border-radius:9px;flex-shrink:0;">
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;">${item.type === 'match' ? '✅' : '🆕'} ${esc(item.name)}</span>
+              </span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="JollyRouter.go('#/scan-receiving')">‹ Bağla</button>
     `;
   }
 
@@ -286,7 +346,8 @@ const JollyScanReceiving = (() => {
   }
 
   return {
-    startSession, captureOne, confirmMatch, rejectMatch,
+    startSession, captureOne, confirmMatch,
     manualSearch, filterManual, markNew, endSession, exit,
+    setSensitivity,
   };
 })();
