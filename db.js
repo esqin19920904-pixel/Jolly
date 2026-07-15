@@ -26,7 +26,11 @@ const JollyDB = (() => {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return fallback;
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // localStorage-da hərfi "null" kimi yazılmış qeydlər (köhnə bug) —
+      // fallback-ə qayıt, çökməyə qoyma.
+      if (parsed === null || parsed === undefined) return fallback;
+      return parsed;
     } catch (e) {
       console.error('JollyDB read error', key, e);
       return fallback;
@@ -285,8 +289,8 @@ const JollyDB = (() => {
     Brands, Groups, Locations, Statuses, Suppliers, Products, Drafts,
     exportAll, importAll,
     getActivity: () => read(KEYS.activity, []),
-    getSettings: () => read(KEYS.settings, {}),
-    setSettings: (patch) => write(KEYS.settings, { ...read(KEYS.settings, {}), ...patch }),
+    getSettings: () => read(KEYS.settings, {}) || {},
+    setSettings: (patch) => write(KEYS.settings, { ...(read(KEYS.settings, {}) || {}), ...patch }),
     getEdgeConfig: () => read(KEYS.edge, { items: [] }),
     setEdgeConfig: (cfg) => write(KEYS.edge, cfg),
   };
