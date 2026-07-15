@@ -1,8 +1,9 @@
 /* ============================================================
-   JOLLY Radial FAB — Dairəvi "+" Sürətli Menyu
-   Ekranın küncündə üzən "+" düyməsi. Basanda ətrafına yarım-dairə
-   şəklində düymələr açılır (JOLLY-nin REAL mövcud əməliyyatları
-   ilə — kassa/satış YOXDUR, yalnız inventar əməliyyatları).
+   JOLLY Radial FAB — Sürətli "+" Menyu
+   Ekranın küncündə üzən "+" düyməsi. Basanda düz üstündə, yuxarı
+   doğru sütun şəklində düymələr açılır (JOLLY-nin REAL mövcud
+   əməliyyatları ilə — kassa/satış YOXDUR, yalnız inventar
+   əməliyyatları).
 
    UZUN BAS: düyməni basılı saxlasan, ⭐ işarələdiyin "sevimli"
    əməliyyatlar ayrıca kiçik zolaqda çıxır — sürətli çatmaq üçün.
@@ -104,19 +105,18 @@ const JollyRadialFab = (() => {
         display: flex; align-items: center; justify-content: center;
         transition: transform .25s; position: relative; z-index: 2; touch-action: none; }
       #radialFabRoot.open .rfab-main { transform: rotate(45deg); }
-      .rfab-petals { position: absolute; right: 0; bottom: 0; width: 0; height: 0; }
-      .rfab-petal { position: absolute; width: 62px; height: 62px; border-radius: 18px;
-        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+      .rfab-petals { position: absolute; right: 0; bottom: 72px; display: flex; flex-direction: column-reverse; gap: 10px; align-items: flex-end; }
+      .rfab-petal { width: auto; min-width: 150px; height: 46px; border-radius: 23px;
+        display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
         border: 1px solid rgba(255,255,255,0.18);
         box-shadow: 0 6px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
-        font-size: 19px; color: #fff; padding: 4px;
-        opacity: 0; transform: scale(0.3); pointer-events: none;
-        transition: transform .28s cubic-bezier(.34,1.56,.64,1), opacity .2s; }
-      .rfab-petal .rfab-lbl { font-size: 8.5px; line-height: 1.1; text-align: center; opacity: .9; max-width: 56px;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #radialFabRoot.open .rfab-petal { opacity: 1; transform: scale(1); pointer-events: auto; }
+        font-size: 19px; color: #fff; padding: 0 16px 0 14px;
+        opacity: 0; transform: translateY(10px) scale(0.9); pointer-events: none;
+        transition: transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s; }
+      .rfab-petal .rfab-lbl { font-size: 13px; line-height: 1.1; white-space: nowrap; opacity: .95; }
+      #radialFabRoot.open .rfab-petal { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
       .rfab-favs { position: absolute; bottom: 70px; right: 0; display: flex; gap: 8px;
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
@@ -143,24 +143,11 @@ const JollyRadialFab = (() => {
     hideFavorites();
     const root = ensureDom();
     const petals = root.querySelector('#rfabPetals');
-    const n = items.length;
-    const petalSize = 62;
-    const minGap = 14;
-    const minCenterDist = petalSize + minGap;
-    const radius = Math.max(100, 130);
-    let angleStep = n > 1 ? Math.max(28, (minCenterDist / radius) * (180 / Math.PI)) : 0;
-    const totalArc = Math.min(170, angleStep * (n - 1));
-    angleStep = n > 1 ? totalArc / (n - 1) : 0;
-    const startAngle = 200;
-    petals.innerHTML = items.map((it, i) => {
-      const angle = startAngle + angleStep * i;
-      const rad = angle * Math.PI / 180;
-      const x = Math.cos(rad) * radius;
-      const y = Math.sin(rad) * radius;
-      return `<button class="rfab-petal" style="right:${-x - petalSize / 2}px;bottom:${-y - petalSize / 2}px;" onclick="JollyRadialFab.run('${it.id}')">
+    petals.innerHTML = items.map((it, i) => `
+      <button class="rfab-petal" style="transition-delay:${i * 25}ms;" onclick="JollyRadialFab.run('${it.id}')">
         <span>${it.icon}</span><span class="rfab-lbl">${esc(it.label)}</span>
-      </button>`;
-    }).join('');
+      </button>
+    `).join('');
     root.classList.add('open');
     openState = true;
     if (typeof JollySound !== 'undefined') JollySound.tap();
