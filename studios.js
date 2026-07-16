@@ -17,7 +17,7 @@ const JollyStudios = (() => {
     { key: 'ai', icon: '🤖', title: 'AI Studio', sub: 'JOLLY AI köməkçisi', ready: true },
     { key: 'module', icon: '🧩', title: 'Modul Studio', sub: 'Göstər / gizlət / sırala', ready: true },
     { key: 'theme', icon: '🎨', title: 'Theme Studio', sub: 'Görünüş və rənglər', ready: true },
-    { key: 'data', icon: '💾', title: 'Data Studio', sub: 'Backup, idxal, ixrac', ready: true },
+    { key: 'data', icon: '💾', title: 'Backup Mərkəzi', sub: 'JSON, Drive, Cloud, CSV — hamısı bir yerdə', ready: true },
     { key: 'cloud', icon: '☁️', title: 'Cloud Studio', sub: 'Firebase sinxron', ready: true },
     { key: 'security', icon: '🔐', title: 'Security Studio', sub: 'PIN, giriş qorunması', ready: true },
     { key: 'report', icon: '📊', title: 'Report Studio', sub: 'Statistika və hesabatlar', ready: true },
@@ -26,7 +26,7 @@ const JollyStudios = (() => {
     { key: 'voicevision', icon: '👁️', title: 'Voice & Vision Studio', sub: 'Səs, kamera, OCR', ready: true },
     { key: 'notification', icon: '🔔', title: 'Bildiriş Studio', sub: 'Xəbərdarlıq mərkəzi', ready: true },
     { key: 'print', icon: '🖨️', title: 'Print / Export Studio', sub: 'Barkod Print Center', ready: true },
-    { key: 'integration', icon: '🔗', title: 'Integration Studio', sub: '1C, WhatsApp, Cloud', ready: true },
+    { key: 'integration', icon: '🔗', title: 'İnteqrasiyalar', sub: 'Backup Mərkəzinə keçir', ready: true, route: '#/studios/data' },
     { key: 'updates', icon: '🔄', title: 'Yeniləmələr', sub: 'İçəridən yeni funksiya al', ready: true, route: '#/updates' },
     { key: 'analytics', icon: '🔮', title: 'Analytics Studio', sub: 'Proqnoz və anomaliya', ready: true },
   ];
@@ -250,67 +250,9 @@ const JollyStudios = (() => {
   function escapeAS(s) { return (typeof JollyProducts !== 'undefined' ? JollyProducts.escapeHtml(String(s)) : String(s)); }
 
   function renderIntegration() {
-    const s = JollyDB.getSettings();
-    setTimeout(() => {
-      if (typeof JollyDrive === 'undefined') return;
-      if (JollyDrive.isSignedIn()) JollyDrive.loadAndRenderList();
-      else if (JollyDrive.runDiagnostics) JollyDrive.runDiagnostics();
-    }, 0);
-    setTimeout(() => loadStorageEstimate(), 0);
-    return `
-      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">🔗 Integration Studio</h2>
-      <p class="muted" style="font-size:12.5px;margin:0 0 16px;">Backup, idxal/ixrac və xarici sistemlərlə bağlantı mərkəzi.</p>
-
-      <div class="section-title" style="margin-top:0;">☁️ Google Drive Backup</div>
-      <div class="glass" style="padding:14px;">
-        ${typeof JollyDrive !== 'undefined' ? JollyDrive.renderPanel() : '<p class="muted" style="font-size:12px;">Modul yüklənməyib</p>'}
-      </div>
-
-      <div class="section-title">JSON Backup</div>
-      <div class="glass" style="padding:14px;">
-        <div class="row" style="gap:10px;">
-          <button class="btn btn-primary" style="flex:1;" onclick="JollyStudios.exportBackup()">⬇️ JSON çıxart</button>
-          <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('integJsonFile').click()">⬆️ JSON yüklə</button>
-        </div>
-        <input type="file" id="integJsonFile" accept="application/json" style="display:none;" onchange="JollyStudios.importBackup(event)">
-      </div>
-
-      <div class="section-title">CSV</div>
-      <div class="glass" style="padding:14px;">
-        <div class="row" style="gap:10px;">
-          <button class="btn btn-ghost" style="flex:1;" onclick="JollyStudios.exportCsv()">⬇️ CSV ixrac et</button>
-          <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('integCsvFile').click()">⬆️ CSV idxal et</button>
-        </div>
-        <input type="file" id="integCsvFile" accept=".csv" style="display:none;" onchange="JollyStudios.importCsvFile(this.files[0])">
-        <p class="muted" style="font-size:11px;margin-top:8px;">Sütunlar: ad, xüsusiKod, qiymət, firma, qrup, yer, barkod</p>
-      </div>
-
-      <div class="section-title">Telefon dəyişmə</div>
-      <div class="glass" style="padding:14px;">
-        <button class="btn btn-primary btn-block" onclick="JollyStudios.exportBackup()">📱 Bütün məlumatı köçür (tam JSON)</button>
-        <p class="muted" style="font-size:11px;margin-top:8px;">Yeni telefonda JOLLY-ni aç → Integration Studio → "JSON yüklə" ilə bu faylı seç.</p>
-      </div>
-
-      <div class="section-title">☁️ Firebase Sync</div>
-      <div class="glass" style="padding:14px;">
-        <button class="btn btn-ghost btn-block" onclick="JollyRouter.go('#/studios/cloud')">Cloud Studio-nu aç</button>
-      </div>
-
-      <div class="section-title">🗜️ Şəkil sıxma (yaddaş qənaəti)</div>
-      <div class="glass" style="padding:14px;">
-        <div class="list-row" style="padding:6px 0;">
-          <span>Şəkilləri avtomatik sıx</span>
-          <label><input type="checkbox" ${s.compressImages !== false ? 'checked' : ''} onchange="JollyStudios.toggleWaSetting('compressImages', this.checked)"></label>
-        </div>
-        <p class="muted" style="font-size:11px;margin:6px 0 0;">Açıq olanda hər yeni şəkil avtomatik kiçilir (max 1200px) — keyfiyyət gözlə görünmür, yaddaş 5-10 dəfə az tutulur. Köhnə şəkillərə toxunmur.</p>
-        <div id="storageEstimate" class="muted" style="font-size:11.5px;margin-top:10px;">Yaddaş hesablanır...</div>
-      </div>
-
-      <div class="section-title">📤 WhatsApp paylaşım ayarı</div>
-      <div class="glass" style="padding:14px;">
-        <p class="muted" style="font-size:12px;margin:0;">Məhsul göndərmə düyməsi rəsmi <span class="mono">wa.me</span> linki ilə işləyir — ad və barkod mətn kimi göndərilir. Şəkil əlavəsi cihaz uyğunsuzluğu (custom URL sxem xətası) səbəbindən söndürülüb ki, göndərmə həmişə etibarlı işləsin.</p>
-      </div>
-    `;
+    // Bütün məzmun Backup Mərkəzinə (renderData) köçürülüb — köhnə link qırılmasın deyə yönləndirir.
+    setTimeout(() => JollyRouter.go('#/studios/data'), 0);
+    return `<div class="empty-state"><div class="big-icon">💾</div><h3>Backup Mərkəzinə yönləndirilir...</h3></div>`;
   }
 
   function loadStorageEstimate() {
@@ -884,8 +826,17 @@ const JollyStudios = (() => {
     const statusText = lastBackup
       ? (daysSince === 0 ? 'Bu gün' : `${daysSince} gün əvvəl`)
       : 'Heç vaxt';
+
+    setTimeout(() => {
+      if (typeof JollyDrive === 'undefined') return;
+      if (JollyDrive.isSignedIn()) JollyDrive.loadAndRenderList();
+      else if (JollyDrive.runDiagnostics) JollyDrive.runDiagnostics();
+    }, 0);
+    setTimeout(() => loadStorageEstimate(), 0);
+
     return `
-      <h2 style="font-family:var(--font-display);margin:0 0 16px;font-size:19px;">💾 Data Studio</h2>
+      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">💾 Backup Mərkəzi</h2>
+      <p class="muted" style="font-size:12.5px;margin:0 0 16px;">Nüsxələmənin BÜTÜN üsulları bir yerdə — JSON, avtomatik nüsxə, Google Drive, Cloud, CSV.</p>
 
       <div class="glass" style="padding:16px;margin-bottom:14px;">
         <div class="row between" style="margin-bottom:12px;">
@@ -900,7 +851,7 @@ const JollyStudios = (() => {
         </div>
         ${needBackup ? `<div style="font-size:12px;color:var(--accent-warn);margin-bottom:12px;">⚠️ Backup vaxtıdır — məlumatlarını qoru.</div>` : ''}
         <div class="row" style="gap:10px;">
-          <button class="btn btn-primary" style="flex:1;" onclick="JollyStudios.exportBackup()">⬇️ Backup çıxar</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="JollyStudios.exportBackup()">⬇️ JSON Backup çıxar</button>
           <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('importFile').click()">⬆️ Bərpa et</button>
         </div>
         <input type="file" id="importFile" accept="application/json" style="display:none" onchange="JollyStudios.importBackup(event)">
@@ -911,9 +862,46 @@ const JollyStudios = (() => {
           <span>♻️ Son avtomatik nüsxəyə qayıt</span><span>›</span>
         </div>
         <div class="list-row">
-          <span>🔔 Backup xatırlatması</span>
+          <span>🔔 Backup xatırlatması (hər girişdə)</span>
           <label style="display:flex;align-items:center;"><input type="checkbox" ${settings.backupReminder !== false ? 'checked' : ''} onchange="JollyStudios.toggleBackupReminder(this.checked)"></label>
         </div>
+      </div>
+
+      <div class="section-title" style="margin-top:0;">☁️ Google Drive Backup</div>
+      <div class="glass" style="padding:14px;">
+        ${typeof JollyDrive !== 'undefined' ? JollyDrive.renderPanel() : '<p class="muted" style="font-size:12px;">Modul yüklənməyib</p>'}
+      </div>
+
+      <div class="section-title">☁️ Firebase Cloud Sync</div>
+      <div class="glass" style="padding:14px;">
+        <button class="btn btn-ghost btn-block" onclick="JollyRouter.go('#/studios/cloud')">Cloud Studio-nu aç</button>
+        <p class="muted" style="font-size:11px;margin-top:8px;">İki cihazdan (məs. telefon + tablet) eyni anda istifadə edəndə, dəyişikliklər avtomatik ötürülür.</p>
+      </div>
+
+      <div class="section-title">📊 CSV (Excel-də açıla bilər)</div>
+      <div class="glass" style="padding:14px;">
+        <div class="row" style="gap:10px;">
+          <button class="btn btn-ghost" style="flex:1;" onclick="JollyStudios.exportCsv()">⬇️ CSV ixrac et</button>
+          <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('integCsvFile').click()">⬆️ CSV idxal et</button>
+        </div>
+        <input type="file" id="integCsvFile" accept=".csv" style="display:none;" onchange="JollyStudios.importCsvFile(this.files[0])">
+        <p class="muted" style="font-size:11px;margin-top:8px;">Sütunlar: ad, xüsusiKod, qiymət, firma, qrup, yer, barkod</p>
+      </div>
+
+      <div class="section-title">📱 Telefon dəyişmə</div>
+      <div class="glass" style="padding:14px;">
+        <button class="btn btn-primary btn-block" onclick="JollyStudios.exportBackup()">📱 Bütün məlumatı köçür (tam JSON)</button>
+        <p class="muted" style="font-size:11px;margin-top:8px;">Yeni telefonda JOLLY-ni aç → Backup Mərkəzi → "Bərpa et" ilə bu faylı seç.</p>
+      </div>
+
+      <div class="section-title">🗜️ Şəkil sıxma (yaddaş qənaəti)</div>
+      <div class="glass" style="padding:14px;">
+        <div class="list-row" style="padding:6px 0;">
+          <span>Şəkilləri avtomatik sıx</span>
+          <label><input type="checkbox" ${settings.compressImages !== false ? 'checked' : ''} onchange="JollyStudios.toggleWaSetting('compressImages', this.checked)"></label>
+        </div>
+        <p class="muted" style="font-size:11px;margin:6px 0 0;">Açıq olanda hər yeni şəkil avtomatik kiçilir (max 1200px) — keyfiyyət gözlə görünmür, yaddaş 5-10 dəfə az tutulur.</p>
+        <div id="storageEstimate" class="muted" style="font-size:11.5px;margin-top:10px;">Yaddaş hesablanır...</div>
       </div>
 
       <div class="section-title">Son fəaliyyət</div>
