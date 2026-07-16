@@ -13,6 +13,7 @@
 
 const JollyReceiving = (() => {
   const BASKET_KEY = 'jolly_receiving_basket';
+  const DOCS_KEY = 'jolly_receiving_docs';
 
   function esc(s) { return (typeof JollyProducts !== 'undefined' ? JollyProducts.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s)); }
 
@@ -20,6 +21,68 @@ const JollyReceiving = (() => {
     return JollyDB.read(BASKET_KEY, { productIds: [], received: {}, startedAt: null });
   }
   function setBasket(b) { JollyDB.write(BASKET_KEY, b); }
+
+  /* ============================================================
+     MAL QƏBULU SƏNƏDLƏRİ (PARTİYALAR) — 1C-dəki "Mal hərəkəti
+     sənədi" konsepsiyasının sadə JOLLY versiyası. Hər "Qəbul
+     Rejimi" sessiyası bitəndə (clearBasketAndExit) avtomatik
+     bir sənəd yaranır: nömrə, tarix, hansı məhsullar, nə vaxt
+     qəbul edilib. Məhsulun öz səhifəsindən bu sənədlərə keçid
+     edilə bilər (bax: products.js → renderDetailPage).
+     ============================================================ */
+  function getDocs() { return JollyDB.read(DOCS_KEY, []); }
+  function saveDoc(doc) {
+    const docs = getDocs();
+    docs.unshift(doc);
+    JollyDB.write(DOCS_KEY, docs);
+  }
+  function nextDocNumber() { return getDocs().length + 1; }
+
+  // Verilən məhsulun hansı sənədlərdə (partiyalarda) olduğunu tapır —
+  // products.js-də "Partiya tarixçəsi" bölməsi bunu çağırır.
+  function docsForProduct(productId) {
+    return getDocs()
+      .filter(d => d.items.some(it => it.productId === productId))
+      .map(d => {
+        const item = d.items.find(it => it.productId === productId);
+        return { id: d.id, number: d.number, date: d.date, receivedAt: item ? item.receivedAt : d.date };
+      });
+  }
+
+  function renderDocsList() {
+    const docs = getDocs();
+    return `
+      <div class="back-btn anim-slide" onclick="JollyRouter.go('#/receiving')">‹ Geri</div>
+      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">📦 Mal Qəbulu Sənədləri</h2>
+      <p class="muted" style="font-size:12px;margin:0 0 14px;">${docs.length} sənəd — hər "Qəbul Rejimi" sessiyası bitəndə avtomatik yaranır.</p>
+      <div class="glass" style="padding:4px 14px;">
+        ${docs.length ? docs.map(d => `
+          <div class="list-row" style="cursor:pointer;" onclick="JollyRouter.go('#/receiving/docs/${d.id}')">
+            <span>📄 Sənəd #${d.number} <span class="muted" style="font-size:11px;">— ${new Date(d.date).toLocaleDateString('az-AZ')}</span></span>
+            <span class="muted" style="font-size:11px;">${d.items.length} məhsul ›</span>
+          </div>
+        `).join('') : '<div class="muted" style="padding:14px;">Hələ sənəd yoxdur — bir "Qəbul Rejimi" sessiyasını tamamla.</div>'}
+      </div>
+    `;
+  }
+
+  function renderDocDetail(id) {
+    const doc = getDocs().find(d => d.id === id);
+    if (!doc) return `<div class="back-btn anim-slide" onclick="JollyRouter.go('#/receiving/docs')">‹ Geri</div><div class="empty-state"><div class="big-icon">📭</div><h3>Sənəd tapılmadı</h3></div>`;
+    return `
+      <div class="back-btn anim-slide" onclick="JollyRouter.go('#/receiving/docs')">‹ Geri</div>
+      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">📄 Sənəd #${doc.number}</h2>
+      <p class="muted" style="font-size:12px;margin:0 0 14px;">${new Date(doc.date).toLocaleString('az-AZ')} · ${doc.items.length} məhsul</p>
+      <div class="glass" style="padding:4px 14px;">
+        ${doc.items.map(it => `
+          <div class="list-row" ${it.productId ? `onclick="JollyRouter.go('#/product/${it.productId}')" style="cursor:pointer;"` : ''}>
+            <span>${esc(it.name)}</span>
+            <span class="muted" style="font-size:11px;">${new Date(it.receivedAt).toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' })} ${it.productId ? '›' : ''}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
 
   /* ============================================================
      PICKER (toplu seçim ekranı)
@@ -61,6 +124,10 @@ const JollyReceiving = (() => {
         ${renderBasketListRows(basket)}
       </div>
       ` : ''}
+
+      <div class="row" style="margin-bottom:14px;">
+        <button class="btn btn-ghost btn-block" onclick="JollyRouter.go('#/receiving/docs')">📦 Mal Qəbulu Sənədləri (partiyalar)</button>
+      </div>
 
       <div class="section-title" style="margin-top:0;">Filtrlə</div>
       <div class="chip-row" id="recvFilterChips" style="margin-bottom:8px;">
@@ -594,8 +661,26 @@ const JollyReceiving = (() => {
   }
 
   function clearBasketAndExit() {
+    const basket = getBasket();
+    const receivedIds = Object.keys(basket.received || {});
+    if (receivedIds.length) {
+      const items = receivedIds.map(id => {
+        const p = JollyDB.Products.get(id);
+        return { productId: id, name: p ? (p.name || 'Adsız') : 'Silinmiş məhsul', receivedAt: basket.received[id] };
+      }).sort((a, b) => a.receivedAt - b.receivedAt);
+      const doc = {
+        id: JollyDB.uid('snd'),
+        number: nextDocNumber(),
+        date: basket.startedAt || Date.now(),
+        finishedAt: Date.now(),
+        items,
+      };
+      saveDoc(doc);
+      Toast.success(`📄 Sənəd #${doc.number} yaradıldı — ${items.length} məhsul`);
+    } else {
+      Toast.info('Sessiya bitdi, səbət təmizləndi');
+    }
     setBasket({ productIds: [], received: {}, startedAt: null });
-    Toast.info('Sessiya bitdi, səbət təmizləndi');
     JollyRouter.go('#/receiving');
   }
 
@@ -653,6 +738,8 @@ const JollyReceiving = (() => {
       render(rest) {
         if (rest === 'scan') return renderScanMode();
         if (rest === 'sheet') return renderConfirmSheet();
+        if (rest === 'docs') return renderDocsList();
+        if (rest && rest.indexOf('docs/') === 0) return renderDocDetail(rest.slice(5));
         return renderPicker();
       },
       afterRender: afterRenderDispatch,
@@ -680,5 +767,6 @@ const JollyReceiving = (() => {
     setFilter, applyFilter, toggleSelect, selectAllVisible, addSelectedToBasket, clearBasket,
     removeFromBasket, quickAddToBasket,
     finishSession, clearBasketAndExit, captureUnknown,
+    docsForProduct,
   };
 })();
