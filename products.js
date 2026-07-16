@@ -408,6 +408,23 @@ const JollyProducts = (() => {
           <div class="list-row"><span class="muted" style="font-size:12px;">Son redaktə</span><span class="mono" style="font-size:12px;">${fmtDate(p.updatedAt)}</span></div>
           ${p.whatsappCount ? `<div class="list-row"><span class="muted" style="font-size:12px;">WhatsApp göndərildi</span><span class="mono" style="font-size:12px;">${p.whatsappCount} dəfə</span></div>` : ''}
         </div>
+
+        ${(() => {
+          if (typeof JollyReceiving === 'undefined' || !JollyReceiving.docsForProduct) return '';
+          const batches = JollyReceiving.docsForProduct(p.id);
+          if (!batches.length) return '';
+          return `
+            <div class="section-title">📦 Partiya tarixçəsi</div>
+            <div class="glass" style="padding:4px 14px;">
+              ${batches.map(b => `
+                <div class="list-row" style="cursor:pointer;" onclick="JollyRouter.go('#/receiving/docs/${b.id}')">
+                  <span>Sənəd #${b.number}</span>
+                  <span class="muted" style="font-size:11px;">${new Date(b.receivedAt).toLocaleDateString('az-AZ')} ›</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        })()}
       </div>
     `;
   }
