@@ -3,13 +3,16 @@
    ==========================================================================
    Bütün əlavə modulları (roadmap, gecə rejimi, gamifikasiya, səsli qeydlər,
    unudulan mallar, gündəlik xülasə, rəng axtarışı, müqayisə, audit,
-   qiymət tövsiyəsi) TEK bir topbar düyməsinin arxasına yığır ki, topbar
-   qarışmasın, sürüşdürmə lazım olmasın.
+   qiymət tövsiyəsi, QARA QUTU) TEK bir topbar düyməsinin arxasına yığır ki,
+   topbar qarışmasın, sürüşdürmə lazım olmasın.
 
    Necə işləyir:
    - Topbar-da YALNIZ bir düymə: 🧰 Alətlər
    - Basanda grid şəklində bütün alətlər açılır (ikon + ad)
    - Hər alətə toxunanda öz overlay-i açılır (əvvəlki kimi işləyir)
+
+   DƏYİŞİKLİK: "🐞 Qara Qutu" indi burada — əvvəlki ekranda üzən 🐞
+   düyməsi silinib, diaqnostika paneli bu grid-dən açılır.
 
    Quraşdırma:
    1. Bu faylı JOLLY-nin flat qovluğuna at.
@@ -24,6 +27,9 @@
   function getTools() {
     const tools = [];
 
+    if (typeof window.JollyBlackBox !== "undefined" && typeof window.JollyBlackBox.show === "function") {
+      tools.push({ icon: "🐞", label: "Qara Qutu (diaqnostika)", run: () => window.JollyBlackBox.show() });
+    }
     if (typeof window.JollyRoadmap !== "undefined") {
       tools.push({ icon: "🗺️", label: "Gələcək Fikirlər", run: () => window.JollyRoadmap.show() });
     }
