@@ -29,7 +29,6 @@ const JollyDashboard = (() => {
     { id: 'voice', icon: '🎤', label: 'Səsli axtar', sub: 'Danış', action: 'JollyProducts.voiceSearch()', neon: 'pink' },
     { id: 'report', icon: '📊', label: 'Hesabat', sub: 'Statistika', route: '#/studios/report', neon: 'gold' },
     { id: 'insight', icon: '📈', label: 'Analitika', sub: 'Dərin mənzərə', route: '#/insight', neon: 'green' },
-    { id: 'expiring', icon: '⏰', label: 'SKT bitir', sub: 'Son istifadə tarixi', route: '#/products?filter=expiring', badgeFn: 'expiringCount', hideWhenZero: true, neon: 'red' },
   ];
 
   const DEFAULT_ITEMS = ['newProduct', 'scan', 'incomplete', 'gallery', 'recent', 'drafts', 'brain'];
@@ -91,7 +90,7 @@ const JollyDashboard = (() => {
     { icon: 'inbox', label: 'Gələnlər', neon: 'red', route: '#/drafts' },
     { icon: 'brain', label: 'AI Brain', neon: 'purple', route: '#/brain' },
     { icon: 'barcode', label: 'Barkod Doctor', neon: 'blue', route: '#/data-doctor' },
-    { icon: 'cloud', label: 'Backup', neon: 'teal', route: '#/studios/integration' },
+    { icon: 'cloud', label: 'Backup', neon: 'teal', route: '#/studios/data' },
     { icon: 'map', label: 'Rəf xəritəsi', neon: 'blue', route: '#/store-map' },
     { icon: 'star', label: 'Seçilmişlər', neon: 'gold', route: '#/dashboard/favorites' },
     { icon: 'inbox', label: 'Qəbul Studio', neon: 'green', route: '#/receiving' },
@@ -188,6 +187,19 @@ const JollyDashboard = (() => {
           </div>
           <span class="icon-btn" style="width:36px;height:36px;" onclick="JollyRouter.go('#/dashboard/studio')" title="Dashboard Studio">${JollyIcons.get('gear')}</span>
         </div>
+
+        ${(() => {
+          if (!backupOk && s.backupReminder !== false && total > 0) {
+            return `
+              <div class="glass anim-pop" style="padding:12px 14px;margin-bottom:14px;border:1px solid rgba(255,184,77,0.4);background:rgba(255,184,77,0.08);display:flex;align-items:center;gap:10px;">
+                <span style="font-size:22px;">💾</span>
+                <span style="flex:1;font-size:12.5px;">Backup vaxtıdır — məlumatların qorunmayıb.</span>
+                <button class="btn btn-primary btn-sm" onclick="JollyStudios.exportBackup()">İndi et</button>
+              </div>
+            `;
+          }
+          return '';
+        })()}
 
         ${(typeof JollyAIDaily !== 'undefined' && JollyAIDaily.shouldShow()) ? JollyAIDaily.render() : ''}
 
