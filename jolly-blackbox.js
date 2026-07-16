@@ -1,8 +1,10 @@
 /* ============================================================
    JOLLY Qara Qutu (Black Box) — gizli diaqnostika jurnalı
    Hər klik, xəta, route dəyişməsi, funksiya çağırışını yazır.
-   Aşağı-sağdakı kiçik 🐞 düyməsi ilə jurnalı görüb kopyalaya bilərsən.
-   Problem tapılandan sonra bu fayl silinə bilər.
+
+   DƏYİŞİKLİK: Ekranda üzən 🐞 düyməsi ARTIQ YOXDUR — panel indi
+   "🧰 Alətlər" menyusundan açılır (bax: tools-menu.js). Jurnalın
+   özü (LOG) və yığılması eynən davam edir, dəyişməyib.
    ============================================================ */
 (function () {
   const LOG = [];
@@ -69,16 +71,8 @@
 
   push('🟢', 'Qara qutu başladı');
 
-  /* ---------- Görünən panel ---------- */
+  /* ---------- Görünən panel (indi "Alətlər"dən açılır, üzən düymə yoxdur) ---------- */
   let open = false;
-  function makeBtn() {
-    const btn = document.createElement('div');
-    btn.id = 'bbBtn';
-    btn.textContent = '🐞';
-    btn.style.cssText = 'position:fixed;left:8px;bottom:100px;z-index:999999;width:44px;height:44px;border-radius:50%;background:#1a1a2e;border:2px solid #7c5cff;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,.5);';
-    btn.onclick = togglePanel;
-    document.body.appendChild(btn);
-  }
   function togglePanel() {
     open = !open;
     let p = document.getElementById('bbPanel');
@@ -123,12 +117,11 @@
     if (c && open) c.textContent = LOG.join('\n');
   }
 
-  if (document.body) makeBtn();
-  else window.addEventListener('DOMContentLoaded', makeBtn);
-
   // Diaqnostika mərkəzi (jolly-diagnostics.js) LOG-u oxuya bilsin deyə,
   // yalnız-oxu bir "pəncərə" açırıq — LOG-un özünə birbaşa toxunulmur.
+  // "show" — tools-menu.js buradan çağırır (əvvəlki üzən 🐞 düyməsinin yerinə).
   window.JollyBlackBox = {
     getLog: function () { return LOG.slice(); },
+    show: togglePanel,
   };
 })();
