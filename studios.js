@@ -270,6 +270,41 @@ const JollyStudios = (() => {
     }
   }
 
+  function loadPersistStatus() {
+    const el = document.getElementById('persistStatusZone');
+    if (!el || typeof JollyStorage === 'undefined' || !JollyStorage.isPersisted) { if (el) el.textContent = 'Modul yüklənməyib'; return; }
+    JollyStorage.isPersisted().then(p => {
+      if (!el.isConnected) return;
+      if (p === null) { el.textContent = 'Bu brauzer dəstəkləmir'; return; }
+      el.innerHTML = p
+        ? '🔒 <b style="color:var(--accent-2);">Aktivdir</b> — brauzer bu datanı avtomatik silməyəcək'
+        : '⚠️ Hələ aktiv deyil — aşağıdan istə';
+    });
+  }
+
+  function requestPersist() {
+    if (typeof JollyStorage === 'undefined' || !JollyStorage.requestPersistence) { Toast.error('Modul yoxdur'); return; }
+    JollyStorage.requestPersistence().then(r => {
+      if (!r.supported) { Toast.error('Bu brauzer daimi yaddaşı dəstəkləmir'); return; }
+      if (r.granted) Toast.success(r.already ? 'Artıq daimi yaddaş aktivdir ✓' : 'Daimi yaddaş aktivləşdi ✓');
+      else Toast.info('Brauzer icazə vermədi — daha çox istifadə etdikcə avtomatik veriləcək');
+      loadPersistStatus();
+    });
+  }
+
+  async function exportAllImages() {
+    if (typeof JollyStorage === 'undefined' || !JollyStorage.exportAllImagesToDevice) { Toast.error('Modul yoxdur'); return; }
+    const progressEl = document.getElementById('imgExportProgress');
+    const total = JollyDB.Products.all().reduce((n, p) => n + (p.images || []).length, 0) + JollyDB.Drafts.all().reduce((n, d) => n + (d.images || []).length, 0);
+    if (!total) { Toast.info('Şəkil tapılmadı'); return; }
+    Toast.info(`${total} şəkil yüklənir, bir az gözlə...`);
+    const result = await JollyStorage.exportAllImagesToDevice((cur, tot) => {
+      if (progressEl) progressEl.textContent = `${cur} / ${tot} şəkil yükləndi...`;
+    });
+    if (progressEl) progressEl.textContent = `✓ ${result} şəkil "Yükləmələr" qovluğuna köçürüldü`;
+    Toast.success(`${result} şəkil yükləndi ✓`);
+  }
+
   function toggleWaSetting(key, on) {
     JollyDB.setSettings({ [key]: !!on });
   }
@@ -833,6 +868,7 @@ const JollyStudios = (() => {
       else if (JollyDrive.runDiagnostics) JollyDrive.runDiagnostics();
     }, 0);
     setTimeout(() => loadStorageEstimate(), 0);
+    setTimeout(() => loadPersistStatus(), 0);
 
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">💾 Backup Mərkəzi</h2>
@@ -867,7 +903,21 @@ const JollyStudios = (() => {
         </div>
       </div>
 
-      <div class="section-title" style="margin-top:0;">☁️ Google Drive Backup</div>
+      <div class="section-title" style="margin-top:0;">📁 Şəkilləri telefona yüklə (əsl fayl kimi)</div>
+      <div class="glass" style="padding:14px;">
+        <p class="muted" style="font-size:12px;margin:0 0 10px;">Bütün məhsul şəkillərini telefonun öz "Yükləmələr" qovluğuna, adi foto kimi köçürür — brauzer yaddaşı nə olursa olsun, bu şəkillər telefonda qalır.</p>
+        <button class="btn btn-primary btn-block" onclick="JollyStudios.exportAllImages()">⬇️ Bütün şəkilləri yüklə</button>
+        <div id="imgExportProgress" class="muted" style="font-size:11.5px;margin-top:8px;"></div>
+      </div>
+
+      <div class="section-title">🔒 Daimi Yaddaş</div>
+      <div class="glass" style="padding:14px;">
+        <div id="persistStatusZone" class="muted" style="font-size:12px;">Yoxlanılır...</div>
+        <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="JollyStudios.requestPersist()">🔒 Daimi yaddaş istə</button>
+        <p class="muted" style="font-size:11px;margin-top:8px;">Brauzerə "bu tətbiqin datasını yaddaş azalanda avtomatik silmə" deyir — şəkillərin təsadüfən silinmə ehtimalını azaldır.</p>
+      </div>
+
+      <div class="section-title">☁️ Google Drive Backup</div>
       <div class="glass" style="padding:14px;">
         ${typeof JollyDrive !== 'undefined' ? JollyDrive.renderPanel() : '<p class="muted" style="font-size:12px;">Modul yüklənməyib</p>'}
       </div>
@@ -1058,6 +1108,7 @@ const JollyStudios = (() => {
     addEdgeItem, getEdgeCatalog, getEdgeCatalogItem,
     renderTheme, applyTheme, applySavedTheme, THEMES, toggleAnim, toggleSound, toggleVibrate, toggleFx,
     renderData, exportBackup, importBackup, saveSnapshot, restoreSnapshot, toggleBackupReminder,
+    loadPersistStatus, requestPersist, exportAllImages,
     renderSecurity, togglePinLock, viewActivityLog,
     renderReport,
     renderVoiceVision, startVisualSearchFromStudio, runOcr,
