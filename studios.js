@@ -1,5 +1,13 @@
 /* ============================================================
    JOLLY Studios — bütün Studio-ların mərkəzi
+
+   YENİLİK: renderHome() indi "JOLLY Store" görünüşündədir —
+   1) Statik Studio-lar (əvvəlki kimi) kateqoriyalara bölünüb
+   2) ModuleRegistry-ə qeydiyyatdan keçən HƏR modul (Qəbul Studio,
+      Skan ilə Qəbul, Sürətli Menyu və s.) AVTOMATİK burada görünür
+      — aç/bağla (toggle) düyməsi ilə birlikdə.
+   Bundan sonra yeni modul əlavə edəndə heç bir başqa fayla (dashboard.js
+   və s.) toxunmağa ehtiyac qalmır, ModuleRegistry.register() kifayətdir.
    ============================================================ */
 
 const JollyStudios = (() => {
@@ -23,20 +31,85 @@ const JollyStudios = (() => {
     { key: 'analytics', icon: '🔮', title: 'Analytics Studio', sub: 'Proqnoz və anomaliya', ready: true },
   ];
 
-  function renderHome() {
+  // JOLLY Store-da statik Studio-ları qruplaşdırmaq üçün kateqoriya xəritəsi.
+  // Yalnız görünüş qruplaşdırmasıdır — LIST-in özünə toxunmur.
+  const STORE_CATEGORIES = [
+    { label: '🛠️ Əsas İdarəetmə', keys: ['admin', 'module', 'theme', 'security', 'code'] },
+    { label: '💾 Backup & Bulud', keys: ['data', 'cloud'] },
+    { label: '🧠 AI & Avtomatlaşdırma', keys: ['brain', 'ai', 'workflow'] },
+    { label: '📊 Analitika', keys: ['report', 'analytics'] },
+    { label: '👁️ Görüntü & Səs', keys: ['voicevision'] },
+    { label: '🖨️ Çap & İnteqrasiya', keys: ['print', 'integration'] },
+    { label: '🔔 Digər', keys: ['notification', 'updates'] },
+  ];
+
+  function storeCardHtml(s) {
     return `
-      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:20px;">🏛️ JOLLY Studios</h2>
-      <p class="muted" style="margin:0 0 16px;font-size:13px;">Bütün idarəetmə mərkəzləri bir yerdə</p>
-      <div class="studio-grid">
-        ${LIST.map(s => `
-          <div class="glass studio-card" onclick="JollyRouter.go('${s.route || '#/studios/' + s.key}')" style="${s.ready ? '' : 'opacity:.6;'}">
-            <div class="ic">${s.icon}</div>
-            <div class="title">${s.title}</div>
-            <div class="sub">${s.sub}${s.ready ? '' : ' · tezliklə'}</div>
-          </div>
-        `).join('')}
+      <div class="glass studio-card" onclick="JollyRouter.go('${s.route || '#/studios/' + s.key}')" style="${s.ready ? '' : 'opacity:.6;'}">
+        <div class="ic">${s.icon}</div>
+        <div class="title">${s.title}</div>
+        <div class="sub">${s.sub}${s.ready ? '' : ' · tezliklə'}</div>
       </div>
     `;
+  }
+
+  function renderHome() {
+    const staticSections = STORE_CATEGORIES.map(cat => {
+      const items = cat.keys.map(k => LIST.find(x => x.key === k)).filter(Boolean);
+      if (!items.length) return '';
+      return `
+        <div class="section-title" style="margin-top:16px;">${cat.label}</div>
+        <div class="studio-grid">${items.map(storeCardHtml).join('')}</div>
+      `;
+    }).join('');
+
+    // ── Dinamik modullar (ModuleRegistry) — Qəbul Studio, Skan ilə Qəbul,
+    // Sürətli Menyu Studio və gələcəkdə əlavə olunan HƏR yeni modul burada
+    // avtomatik görünür, aç/bağla düyməsi ilə. ──
+    let dynamicSections = '';
+    if (typeof ModuleRegistry !== 'undefined') {
+      const groups = {};
+      ModuleRegistry.list().forEach(m => { (groups[m.group] = groups[m.group] || []).push(m); });
+      const groupLabel = (g) => {
+        if (g === 'Anbar') return '📦 Anbar Modulları';
+        if (g === 'Studio') return '⚡ Sürətli Alətlər';
+        return '🧩 ' + g;
+      };
+      dynamicSections = Object.keys(groups).map(g => `
+        <div class="section-title" style="margin-top:16px;">${groupLabel(g)}</div>
+        <div class="studio-grid">
+          ${groups[g].map(m => `
+            <div class="glass studio-card" style="position:relative;${m.enabled ? '' : 'opacity:.5;'}">
+              <div onclick="JollyRouter.go('${m.route}')" style="cursor:pointer;">
+                <div class="ic">${m.icon}</div>
+                <div class="title">${escapeAS(m.name)}</div>
+                <div class="sub">${m.enabled ? 'Aktiv' : 'Söndürülüb'}</div>
+              </div>
+              <label style="position:absolute;top:10px;right:10px;display:flex;align-items:center;" onclick="event.stopPropagation();">
+                <input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="JollyStudios.toggleModuleReg('${m.id}', this.checked)">
+              </label>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+    }
+
+    return `
+      <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:20px;">🏛️ JOLLY Store</h2>
+      <p class="muted" style="margin:0 0 16px;font-size:13px;">Bütün modulların idarəetmə mərkəzi — kateqoriya üzrə gəz, aç/bağla.</p>
+      ${staticSections}
+      ${dynamicSections}
+    `;
+  }
+
+  function toggleModuleReg(id, on) {
+    if (typeof ModuleRegistry === 'undefined') return;
+    if (on) ModuleRegistry.enable(id); else ModuleRegistry.disable(id);
+    Toast.success(on ? 'Modul aktivləşdirildi' : 'Modul söndürüldü');
+    // Eyni hash-ə göndərmək hashchange tetiklənmir — bir anlıq başqa
+    // hash-ə keçib dərhal geri qayıdıb məcburi yenidən render edirik.
+    window.location.hash = '#/dashboard';
+    setTimeout(() => { window.location.hash = '#/studios'; }, 30);
   }
 
   function renderComingSoon(key) {
@@ -963,7 +1036,7 @@ const JollyStudios = (() => {
   }
 
   return {
-    renderHome, renderComingSoon,
+    renderHome, renderComingSoon, toggleModuleReg,
     renderAI, aiSend, aiQuick, aiVoice,
     renderModuleStudio, toggleNavItem, removeEdgeItem, getNavConfig, NAV_ITEMS_DEFAULT,
     addEdgeItem, getEdgeCatalog, getEdgeCatalogItem,
