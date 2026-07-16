@@ -754,7 +754,35 @@ const JollyStudios = (() => {
     'cyber-magenta': { name: 'Cyber Magenta', a1: '#ff4fd8', a2: '#4fe8ff', a3: '#ffe14f' },
     'deep-forest': { name: 'Deep Emerald', a1: '#34e89e', a2: '#0f3443', a3: '#7ee8fa' },
     'amoled-black': { name: 'AMOLED True-Black', a1: '#7c8aff', a2: '#29e0c9', a3: '#ff5fa2', bg: '#000000', bgDeep: '#000000' },
+    'ocean': { name: 'Ocean', a1: '#1e6fa8', a2: '#29c7de', a3: '#7fe9ff' },
+    'fire': { name: 'Fire', a1: '#ff4d4d', a2: '#ff9142', a3: '#ffce56' },
+    'pastel': { name: 'Pastel', a1: '#ffb3d1', a2: '#c9a7ff', a3: '#ffe1ec' },
+    'mono-blue': { name: 'Mono Blue', a1: '#3b82f6', a2: '#60a5fa', a3: '#93c5fd' },
+    'auto-smart': { name: 'Auto Smart (gündüz/gecə)', a1: '#7fe9ff', a2: '#7c8aff', a3: '#fbbf24' },
   };
+
+  // Auto Smart üçün: gündüz/gecə hansı əsl temalara uyğunlaşdırılsın
+  const AUTO_DAY_THEME = 'ocean';
+  const AUTO_NIGHT_THEME = 'dark-neon';
+  const AUTO_DAY_START = 7;   // 07:00
+  const AUTO_DAY_END = 19;    // 19:00
+  let autoSmartWatcherStarted = false;
+  function ensureAutoSmartWatcher() {
+    if (autoSmartWatcherStarted) return;
+    autoSmartWatcherStarted = true;
+    setInterval(() => {
+      const s = JollyDB.getSettings();
+      if (s.theme === 'auto-smart') applySavedTheme();
+    }, 15 * 60 * 1000); // hər 15 dəqiqədən bir yoxla, saat dəyişdisə tema da dəyişsin
+  }
+  function isAutoSmartDaytime() {
+    const h = new Date().getHours();
+    return h >= AUTO_DAY_START && h < AUTO_DAY_END;
+  }
+  function resolveThemeKey(rawKey) {
+    if (rawKey === 'auto-smart') return isAutoSmartDaytime() ? AUTO_DAY_THEME : AUTO_NIGHT_THEME;
+    return rawKey;
+  }
 
   function renderTheme() {
     const settings = JollyDB.getSettings();
@@ -770,7 +798,9 @@ const JollyStudios = (() => {
               <span style="width:14px;height:14px;border-radius:50%;background:${t.a3};display:inline-block;"></span>
             </div>
             <div class="title">${t.name}</div>
-            <div class="sub">${current === key ? 'Aktiv' : 'Toxun və tətbiq et'}</div>
+            <div class="sub">${key === 'auto-smart'
+              ? (current === key ? (isAutoSmartDaytime() ? '🌞 İndi: Gündüz rejimi' : '🌙 İndi: Gecə rejimi') : 'Toxun və tətbiq et')
+              : (current === key ? 'Aktiv' : 'Toxun və tətbiq et')}</div>
           </div>
         `).join('')}
       </div>
@@ -821,21 +851,19 @@ const JollyStudios = (() => {
   }
 
   function applyTheme(key) {
-    const t = THEMES[key];
-    if (!t) return;
-    document.documentElement.style.setProperty('--accent-1', t.a1);
-    document.documentElement.style.setProperty('--accent-2', t.a2);
-    document.documentElement.style.setProperty('--accent-3', t.a3);
-    document.documentElement.style.setProperty('--bg-void', t.bg || '#06070d');
-    document.documentElement.style.setProperty('--bg-deep', t.bgDeep || '#0b0e1a');
+    if (!THEMES[key]) return;
     JollyDB.setSettings({ theme: key });
-    Toast.success(`${t.name} tətbiq olundu`);
+    applySavedTheme();
+    Toast.success(`${THEMES[key].name} tətbiq olundu`);
     JollyRouter.go('#/studios/theme');
   }
 
   function applySavedTheme() {
+    ensureAutoSmartWatcher();
     const settings = JollyDB.getSettings();
-    const t = THEMES[settings.theme || 'dark-neon'];
+    const rawKey = settings.theme || 'dark-neon';
+    const effectiveKey = resolveThemeKey(rawKey);
+    const t = THEMES[effectiveKey];
     if (t) {
       document.documentElement.style.setProperty('--accent-1', t.a1);
       document.documentElement.style.setProperty('--accent-2', t.a2);
