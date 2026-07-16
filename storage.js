@@ -2,6 +2,13 @@
    JOLLY Storage — IndexedDB şəkil anbarı
    Şəkillər burada saxlanılır (böyük tutum), məlumatlar localStorage-də
    Köhnə (localStorage-dəki) şəkillər ilk açılışda avtomatik köçürülür
+
+   YENİ:
+   - requestPersistence()/isPersisted() — brauzerdən "bu saytın
+     datasını avtomatik silmə" icazəsi istəyir (Daimi Yaddaş).
+   - exportAllImagesToDevice() — bütün məhsul şəkillərini telefonun
+     öz Yükləmələr qovluğuna, ƏSL FAYL kimi köçürür (real ehtiyat
+     nüsxə — brauzer yaddaşı silinsə belə bu fayllar qalır).
    ============================================================ */
 
 const JollyStorage = (() => {
@@ -141,8 +148,12 @@ const JollyStorage = (() => {
     return `src="${ref}"`;
   }
 
-  /* Köhnə localStorage şəkillərini IndexedDB-yə köçür (bir dəfə) */
+  /* Köhnə localStorage şəkillərini IndexedDB-yə köçür (bir dəfə).
+     Həm də hər açılışda Daimi Yaddaş sorğusunu (sükutla) təkrar edir. */
   async function migrateOldImages() {
+    // Daimi yaddaş sorğusu — hər sessiyada, səssiz, ayrıca xəta üçün gözləmir
+    try { requestPersistence(); } catch (e) {}
+
     if (!isSupported()) return;
     const s = JollyDB.getSettings();
     if (s.idbMigrated) return;
@@ -198,5 +209,69 @@ const JollyStorage = (() => {
     mo.observe(document.body, { childList: true, subtree: true });
   }
 
-  return { isSupported, saveImage, getImage, deleteImage, hydrate, imgAttr, migrateOldImages, resolveAll, initAutoHydrate, compressImage };
+  /* ============================================================
+     DAİMİ YADDAŞ (Persistent Storage)
+     Brauzerə "bu saytın datasını yaddaş azalanda avtomatik silmə"
+     deyir. Dəstəklənirsə və artıq aktiv deyilsə, icazə istəyir
+     (adətən dialoq çıxmadan, sükutla verilir/rədd edilir).
+     ============================================================ */
+  async function requestPersistence() {
+    if (!(navigator.storage && navigator.storage.persist)) return { supported: false };
+    try {
+      const already = await navigator.storage.persisted();
+      if (already) return { supported: true, granted: true, already: true };
+      const granted = await navigator.storage.persist();
+      return { supported: true, granted, already: false };
+    } catch (e) { return { supported: false }; }
+  }
+  async function isPersisted() {
+    if (!(navigator.storage && navigator.storage.persisted)) return null;
+    try { return await navigator.storage.persisted(); } catch (e) { return null; }
+  }
+
+  /* ============================================================
+     ŞƏKİLLƏRİ CİHAZA FAYL KİMİ İXRAC ET
+     Bütün məhsul/qaralama şəkillərini telefonun öz Yükləmələr
+     qovluğuna, adi foto faylı kimi köçürür. Brauzer yaddaşı
+     silinsə belə, bu fayllar telefonun özündə qalır — real
+     ehtiyat nüsxə.
+     ============================================================ */
+  async function exportAllImagesToDevice(onProgress) {
+    const items = [];
+    JollyDB.Products.all().forEach(p => (p.images || []).forEach((img, i) => items.push({ name: p.name || 'mehsul', ref: img, idx: i })));
+    JollyDB.Drafts.all().forEach(d => (d.images || []).forEach((img, i) => items.push({ name: d.name || 'qaralama', ref: img, idx: i })));
+    const total = items.length;
+    let done = 0;
+    for (const it of items) {
+      let dataUrl = it.ref;
+      if (dataUrl && dataUrl.startsWith && dataUrl.startsWith('idb:')) {
+        dataUrl = await getImage(dataUrl);
+      }
+      if (dataUrl && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+        const extMatch = dataUrl.match(/^data:image\/(\w+);/);
+        const ext = extMatch ? extMatch[1].replace('jpeg', 'jpg') : 'jpg';
+        const safeName = String(it.name).replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 40) || 'mehsul';
+        const filename = `jolly_${safeName}_${it.idx + 1}.${ext}`;
+        try {
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } catch (e) { console.error('JollyStorage export image error', e); }
+        // Brauzer ard-arda çox sürətli endirməni bloklamasın deyə kiçik fasilə
+        await new Promise(res => setTimeout(res, 260));
+      }
+      done++;
+      if (onProgress) onProgress(done, total);
+    }
+    return done;
+  }
+
+  return {
+    isSupported, saveImage, getImage, deleteImage, hydrate, imgAttr, migrateOldImages,
+    resolveAll, initAutoHydrate, compressImage,
+    requestPersistence, isPersisted, exportAllImagesToDevice,
+  };
 })();
