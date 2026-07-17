@@ -11,6 +11,7 @@ const JollyDB = (() => {
     locations: 'jolly_locations',
     statuses: 'jolly_statuses',
     suppliers: 'jolly_suppliers',
+    tags: 'jolly_filter_tags',
     settings: 'jolly_settings',
     activity: 'jolly_activity',
     edge: 'jolly_edge_config',
@@ -158,6 +159,7 @@ const JollyDB = (() => {
   const Locations = makeStore(KEYS.locations, 'yer');
   const Statuses = makeStore(KEYS.statuses, 'status');
   const Suppliers = makeStore(KEYS.suppliers, 'tədarükçü');
+  const Tags = makeStore(KEYS.tags, 'etiket');
   const Products = makeStore(KEYS.products, 'məhsul');
   const Drafts = makeStore(KEYS.drafts, 'qaralama');
 
@@ -286,7 +288,7 @@ const JollyDB = (() => {
   return {
     KEYS, uid, read, write, logActivity, seedIfEmpty, repairIds,
     Trash, toggleFavorite, getFavorites,
-    Brands, Groups, Locations, Statuses, Suppliers, Products, Drafts,
+    Brands, Groups, Locations, Statuses, Suppliers, Tags, Products, Drafts,
     exportAll, importAll,
     getActivity: () => read(KEYS.activity, []),
     getSettings: () => read(KEYS.settings, {}) || {},
