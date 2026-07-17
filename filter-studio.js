@@ -21,6 +21,27 @@ const JollyFilterStudio = (() => {
 
   function esc(s) { return (typeof JollyProducts !== 'undefined' ? JollyProducts.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s)); }
 
+  // Bu etiketi daşıyan ilk məhsulun şəklini tapır (önizləmə üçün)
+  function findSampleImageForTag(tagName) {
+    const list = JollyDB.Products.all();
+    for (const p of list) {
+      if (p.filterTags && p.filterTags.includes(tagName) && p.images && p.images.length) {
+        return p.images[0];
+      }
+    }
+    return null;
+  }
+
+  function tagThumbHtml(tagName, size) {
+    size = size || 20;
+    const img = findSampleImageForTag(tagName);
+    if (img) {
+      const attr = typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(img) : `src="${img}"`;
+      return `<img ${attr} style="width:${size}px;height:${size}px;border-radius:6px;object-fit:cover;flex-shrink:0;">`;
+    }
+    return `<span style="font-size:${Math.round(size * 0.8)}px;flex-shrink:0;">🏷️</span>`;
+  }
+
   /* ============================================================
      ƏSAS SƏHİFƏ
      ============================================================ */
@@ -56,7 +77,7 @@ const JollyFilterStudio = (() => {
       ${tags.length ? `
       <div class="section-title">🏷️ Etiket</div>
       <div class="chip-row" id="fsTagChips" style="margin-bottom:12px;">
-        ${tags.map(t => `<span class="chip" data-v="${esc(t.name)}" onclick="JollyFilterStudio.toggle('tags','${esc(t.name)}',this)">${esc(t.name)}</span>`).join('')}
+        ${tags.map(t => `<span class="chip" data-v="${esc(t.name)}" style="display:inline-flex;align-items:center;gap:6px;" onclick="JollyFilterStudio.toggle('tags','${esc(t.name)}',this)">${tagThumbHtml(t.name, 18)}${esc(t.name)}</span>`).join('')}
       </div>` : ''}
 
       <div class="section-title">🎨 Rəng</div>
@@ -83,6 +104,7 @@ const JollyFilterStudio = (() => {
 
   function afterRender() {
     applyFilters();
+    if (typeof JollyStorage !== 'undefined') setTimeout(() => JollyStorage.hydrate(), 0);
   }
 
   /* ============================================================
@@ -94,7 +116,7 @@ const JollyFilterStudio = (() => {
     return tags.map(t => `
       <div class="list-row" style="align-items:center;">
         <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-          <span style="font-size:20px;">🏷️</span>
+          ${tagThumbHtml(t.name, 28)}
           <span style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.name)}</span>
         </span>
         <span class="actions" style="flex-shrink:0;">
