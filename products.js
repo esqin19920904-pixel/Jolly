@@ -632,11 +632,12 @@ const JollyProducts = (() => {
     formState = existing ? JSON.parse(JSON.stringify(existing)) : {
       id: null, name: '', mainCode: '', extraCodeType: 'No', extraCodeValue: '',
       barcodes: [], last4: '', price: '', brand: '', group: '', location: '', color: '', note: '',
-      supplier: '', status: 'Aktiv', images: [], expiryDate: '',
+      supplier: '', status: 'Aktiv', images: [], expiryDate: '', filterTags: [],
     };
     if (formState.supplier === undefined) formState.supplier = '';
     if (formState.last4 === undefined) formState.last4 = '';
     if (formState.expiryDate === undefined) formState.expiryDate = '';
+    if (formState.filterTags === undefined) formState.filterTags = [];
     if (!existing) {
       const carryRaw = sessionStorage.getItem('jolly_carry');
       if (carryRaw) {
@@ -779,6 +780,14 @@ const JollyProducts = (() => {
           <div class="chip-row" id="statusChips">
             ${statuses.map(s => `<span class="chip ${formState.status === s.name ? 'selected' : ''}" data-status="${escapeHtml(s.name)}" onclick="JollyProducts.selectStatus('${escapeHtml(s.name)}')">${escapeHtml(s.name)}</span>`).join('')}
           </div>
+        </div>
+
+        <div class="field">
+          <label>🏷️ Etiketlər (bir neçəsini seçə bilərsən)</label>
+          <div class="chip-row" id="filterTagChips">
+            ${renderFilterTagChips()}
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="JollyProducts.addNewFilterTagInline()">+ Yeni etiket yarat</button>
         </div>
 
         <div class="field">
@@ -1120,6 +1129,39 @@ const JollyProducts = (() => {
     });
   }
 
+  // ── Etiketlər (Filter Tags) — çoxseçimli, JollyDB.Tags master siyahısından ──
+  function renderFilterTagChips() {
+    const all = JollyDB.Tags.all();
+    if (!all.length) return '<span class="muted" style="font-size:12px;">Hələ etiket yoxdur — aşağıdan yeni yarat</span>';
+    return all.map(t => `<span class="chip ${(formState.filterTags || []).includes(t.name) ? 'selected' : ''}" data-tag="${escapeHtml(t.name)}" onclick="JollyProducts.toggleFilterTag('${escapeHtml(t.name)}')">${escapeHtml(t.name)}</span>`).join('');
+  }
+
+  function toggleFilterTag(name) {
+    formState.filterTags = formState.filterTags || [];
+    if (formState.filterTags.includes(name)) {
+      formState.filterTags = formState.filterTags.filter(x => x !== name);
+    } else {
+      formState.filterTags.push(name);
+    }
+    const zone = document.getElementById('filterTagChips');
+    if (zone) zone.innerHTML = renderFilterTagChips();
+  }
+
+  function addNewFilterTagInline() {
+    const name = prompt('Yeni etiket adı (məs. "Salon malları", "Xırdavat"):');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    const existing = JollyDB.Tags.all().find(t => t.name.toLowerCase() === trimmed.toLowerCase());
+    if (!existing) {
+      JollyDB.Tags.add({ name: trimmed });
+      Toast.success(`"${trimmed}" etiketi yaradıldı`);
+    }
+    formState.filterTags = formState.filterTags || [];
+    if (!formState.filterTags.includes(trimmed)) formState.filterTags.push(trimmed);
+    const zone = document.getElementById('filterTagChips');
+    if (zone) zone.innerHTML = renderFilterTagChips();
+  }
+
   function handleInlineAdd(selectEl, kind) {
     if (selectEl.value !== '__new__') {
       formState[kind] = selectEl.value;
@@ -1209,5 +1251,6 @@ const JollyProducts = (() => {
     lookupBarcodeOnline, applyOnlineLookup, focusNext,
     quickAddToReceiving,
     expiryInfo, expiringProducts,
+    renderFilterTagChips, toggleFilterTag, addNewFilterTagInline,
   };
 })();
