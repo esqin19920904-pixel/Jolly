@@ -1,7 +1,7 @@
 /* ============================================================
    JOLLY DB — LocalStorage əsaslı verilənlər bazası qatı
    Bütün CRUD əməliyyatları, ID generasiyası və aktivlik jurnalı
-   ============================================================ */
+   =========================================================== */
 
 const JollyDB = (() => {
   const KEYS = {
