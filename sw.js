@@ -13,9 +13,16 @@
       that aren't cached yet, fall back to the cached app shell.
    4) External requests (Firebase, Telegram, UPCitemdb, Google fonts, etc.)
       are left untouched - only same-origin JOLLY files are cached.
+
+   YENİ: Web Share Target — WhatsApp (və ya hər hansı tətbiq) vasitəsilə
+   "Paylaş → JOLLY" edəndə göndərilən şəkli tutur, "jolly-share-cache"-ə
+   müvəqqəti saxlayır, sonra "#/share-received" səhifəsinə yönləndirir.
+   Əsl emal (Visual Search, namizəd seçimi) share-target.js-dəki
+   JollyShareTarget modulu tərəfindən edilir.
    ========================================================================== */
 
-const CACHE_NAME = "jolly-cache-v2";
+const CACHE_NAME = "jolly-cache-v3";
+const SHARE_CACHE = "jolly-share-cache";
 const APP_SHELL = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (event) => {
@@ -34,18 +41,45 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      // Köhnə cache versiyalarını sil, AMMA cari cache-i və paylaşım
+      // cache-ini (jolly-share-cache) toxunma — orada gözləyən şəkil ola bilər.
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== SHARE_CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
+/* ---------- Web Share Target — paylaşılan şəkli tut ---------- */
+async function handleShareTarget(request) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("sharedFile");
+    if (file) {
+      const cache = await caches.open(SHARE_CACHE);
+      await cache.put(
+        "/shared-image",
+        new Response(file, { headers: { "Content-Type": file.type || "image/jpeg" } })
+      );
+    }
+  } catch (e) {
+    console.error("[JOLLY SW] share-target xətası:", e);
+  }
+  // "Paylaşılan Şəkil" səhifəsinə yönləndir — JollyShareTarget modulu
+  // (share-target.js) orada gözləyən şəkli özü Cache Storage-dan oxuyur.
+  return Response.redirect("./index.html#/share-received", 303);
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
+  const url = new URL(req.url);
+
+  // Paylaşım hədəfi (Share Target) — WhatsApp və s.-dən gələn POST sorğusu
+  if (req.method === "POST" && url.pathname.endsWith("/share-target")) {
+    event.respondWith(handleShareTarget(req));
+    return;
+  }
 
   if (req.method !== "GET") return;
-
-  const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
