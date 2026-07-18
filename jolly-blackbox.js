@@ -38,17 +38,22 @@
 
   // 3) Bütün kliklər (hansı elementə basıldı, hansı onclick var)
   document.addEventListener('click', function (e) {
-    const el = e.target.closest('[onclick],button,.dash-card,.big-op,.more-card,.gp-stat,.nav-item,.chip,.list-row,a');
+    const el = e.target.closest('[onclick],button,select,input,.dash-card,.big-op,.more-card,.gp-stat,.nav-item,.chip,.list-row,a');
     if (!el) { push('👆TAP', 'boş yerə (' + (e.target.className || e.target.tagName) + ')'); return; }
     // HTML-dəki onclick="..." atributunu YOXDA, JS-də `el.onclick = function(){}`
     // şəklində bağlanmış handler-ları da yoxla — əks halda işlək düymələr
     // (məs. bu panelin öz "Kopyala" düyməsi) yalan yerə "onclick YOX" kimi görünür.
     const ocAttr = el.getAttribute('onclick');
     const ocProp = (typeof el.onclick === 'function') ? '(JS ilə bağlanıb)' : null;
+    const isNativeField = el.tagName === 'SELECT' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
     const oc = ocAttr || ocProp;
     const cls = (el.className || '').toString().slice(0, 40);
-    const txt = (el.textContent || '').trim().slice(0, 25);
-    push('👆TAP', `<${el.tagName.toLowerCase()} class="${cls}"> "${txt}"` + (oc ? ' onclick=' + (ocAttr ? ocAttr.slice(0, 60) : ocProp) : ' (onclick YOX)'));
+    const txt = (el.textContent || el.value || '').toString().trim().slice(0, 25);
+    let ocLabel;
+    if (oc) ocLabel = ' onclick=' + (ocAttr ? ocAttr.slice(0, 60) : ocProp);
+    else if (isNativeField) ocLabel = ' (native sahə, onclick lazım deyil)';
+    else ocLabel = ' (onclick YOX)';
+    push('👆TAP', `<${el.tagName.toLowerCase()} class="${cls}"> "${txt}"` + ocLabel);
   }, true);
 
   // 4) JollyRouter.go izləmə (əgər varsa)
