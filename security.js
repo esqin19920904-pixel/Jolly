@@ -618,6 +618,14 @@ const JollySecurity = (() => {
     });
   }
 
+  // Tətbiq yükləndikdən sonra avtomatik kilid yoxlaması
+  // (app.js-dən ayrıca çağırmağa ehtiyac yoxdur)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(init, 200));
+  } else {
+    setTimeout(init, 200);
+  }
+
   return {
     init, isViewer, isAdmin, isUnlocked, clearSession, applyViewerMode,
     toggleEnabled, toggleViewer, setupPin, setupViewerPin, setupPattern, setupBiometric,
