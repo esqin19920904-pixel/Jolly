@@ -1056,9 +1056,14 @@ const JollyProducts = (() => {
   function lookupBarcodeOnline(code) {
     const zone = document.getElementById('brainSuggestZone');
     if (zone) zone.innerHTML = `<div class="muted" style="font-size:11px;">🌐 İnternetdə axtarılır...</div>`;
-    fetch(`/api/barcode-lookup?upc=${encodeURIComponent(code)}`)
+    // Server yavaş/cavabsız olsa əbədi "axtarılır..." yazısında donmasın —
+    // 6 saniyədən sonra özü ləğv edib sakitcə imtina etsin.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    fetch(`/api/barcode-lookup?upc=${encodeURIComponent(code)}`, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
+        clearTimeout(timeoutId);
         const z = document.getElementById('brainSuggestZone');
         if (!z) return;
         if (data && data.found && data.title) {
@@ -1073,6 +1078,7 @@ const JollyProducts = (() => {
         }
       })
       .catch(() => {
+        clearTimeout(timeoutId);
         const z = document.getElementById('brainSuggestZone');
         if (z) z.innerHTML = '';
       });
