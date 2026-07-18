@@ -17,7 +17,13 @@ export default {
       });
     }
 
-    // 2) Barkod-ilə avtomatik məhsul adı axtarışı (UPCitemdb pulsuz trial, key tələb etmir)
+    // 2) Barkod-ilə avtomatik məhsul adı axtarışı
+    // Open Food/Beauty/Products Facts (pulsuz, açıq mənbə, AÇAR TƏLƏB ETMİR).
+    // "product_type=all" — Qida, Kosmetika (Nivea kimi) və Ümumi Məhsullar
+    // bazalarının HAMISINDA birdən axtarır, avtomatik düzgününü tapır.
+    // (Əvvəlki UPCitemdb "trial" yolu İP-ə görə günlük 100 sorğu ilə
+    // məhdudlaşırdı — Cloudflare-in paylaşılan İP-lərini minlərlə başqa
+    // sayt da işlətdiyi üçün, demək olar həmişə artıq dolu idi.)
     if (url.pathname === "/api/barcode-lookup") {
       const upc = (url.searchParams.get("upc") || "").replace(/\D/g, "");
       if (!upc) {
@@ -26,22 +32,26 @@ export default {
         });
       }
       try {
-        const upstream = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(upc)}`, {
-          headers: { "accept": "application/json" }
-        });
+        const upstream = await fetch(
+          `https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(upc)}?product_type=all`,
+          { headers: { "accept": "application/json", "User-Agent": "JOLLY-Store-App/1.0 (kicik-magaza-inventar-tetbiqi)" } }
+        );
         if (!upstream.ok) {
           return new Response(JSON.stringify({ found: false, reason: "upstream_" + upstream.status }), {
             headers: { "content-type": "application/json" }
           });
         }
         const data = await upstream.json();
-        if (data && data.code === "OK" && Array.isArray(data.items) && data.items.length) {
-          const item = data.items[0];
+        const product = data && data.product;
+        // "status" sahəsinin dəqiq formatından asılı qalmamaq üçün,
+        // sadəcə əsl ad sahəsinin olub-olmadığına baxırıq.
+        if (product && (product.product_name || product.generic_name)) {
+          const brand = (product.brands || "").split(",")[0].trim();
           return new Response(JSON.stringify({
             found: true,
-            title: item.title || "",
-            brand: item.brand || "",
-            image: (item.images && item.images[0]) || null
+            title: product.product_name || product.generic_name || "",
+            brand,
+            image: product.image_front_small_url || product.image_url || null
           }), { headers: { "content-type": "application/json" } });
         }
         return new Response(JSON.stringify({ found: false, reason: "not_in_db" }), {
