@@ -441,46 +441,59 @@ const JollySecurity = (() => {
 
   // ── PIN qurma ──
   function setupPin(isViewer) {
-    let first = null;
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg-void,#06070d);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;';
     overlay.innerHTML = `
       <h3 style="font-family:var(--font-display);margin:0 0 6px;">${isViewer ? '👁️ Viewer PIN' : '🔢 Yeni PIN'}</h3>
       <p class="muted" style="font-size:12px;margin:0 0 20px;" id="pinSetupHint">PIN daxil edin (4-8 rəqəm)</p>
-      <div style="width:100%;max-width:280px;">${pinPadHtml()}</div>
-      <div id="secMsg" style="margin-top:12px;font-size:12px;color:var(--accent-danger);min-height:18px;"></div>
-      <button onclick="this.closest('div[style]').remove();JollyRouter.go('#/studios/security')" style="margin-top:16px;background:none;border:none;color:var(--muted,#888);cursor:pointer;font-size:13px;">Ləğv et</button>
+      <div style="width:100%;max-width:280px;">
+        <input id="pinSetupInput1" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"
+          style="width:100%;padding:16px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid var(--border-soft);color:#fff;font-size:22px;text-align:center;letter-spacing:8px;box-sizing:border-box;margin-bottom:12px;">
+        <input id="pinSetupInput2" type="password" inputmode="numeric" maxlength="8" placeholder="Təkrar"
+          style="width:100%;padding:16px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid var(--border-soft);color:#fff;font-size:22px;text-align:center;letter-spacing:8px;box-sizing:border-box;display:none;margin-bottom:12px;">
+        <button class="btn btn-primary btn-block" onclick="JollySecurity.confirmSetupPin(${isViewer})">Davam et</button>
+      </div>
+      <div id="secMsg" style="margin-top:12px;font-size:12px;color:var(--accent-danger);min-height:18px;text-align:center;"></div>
+      <button onclick="document.getElementById('jollySetupPinOverlay').remove();JollyRouter.go('#/studios/security')"
+        style="margin-top:16px;background:none;border:none;color:var(--muted,#888);cursor:pointer;font-size:13px;">Ləğv et</button>
     `;
+    overlay.id = 'jollySetupPinOverlay';
     document.body.appendChild(overlay);
-    pinBuffer = '';
-
-    // PIN təsdiqi üçün monkey-patch pinKey
-    const origPinKey = window.__jollySecPinKeyOrig || pinKey;
-    window.__jollySecPinKeyOrig = origPinKey;
-    JollySecurity.__setupPinStep = function (entered) {
-      if (!first) {
-        first = entered;
-        pinBuffer = '';
-        const hint = overlay.querySelector('#pinSetupHint');
-        if (hint) hint.textContent = 'PIN-i təkrar daxil edin';
-      } else {
-        if (entered === first) {
-          if (isViewer) saveCfg({ viewerPinHash: simpleHash(entered) });
-          else saveCfg({ pinHash: simpleHash(entered), method: 'pin' });
-          overlay.remove();
-          Toast.success(isViewer ? 'Viewer PIN saxlanıldı ✓' : 'PIN saxlanıldı ✓');
-          JollyRouter.go('#/studios/security');
-        } else {
-          first = null; pinBuffer = '';
-          showSecMsgInEl(overlay, '❌ PIN uyğun gəlmədi, yenidən cəhd edin');
-          const hint = overlay.querySelector('#pinSetupHint');
-          if (hint) hint.textContent = 'PIN daxil edin (4-8 rəqəm)';
-        }
-      }
-    };
+    setTimeout(() => { const el = document.getElementById('pinSetupInput1'); if (el) el.focus(); }, 100);
   }
 
-  function setupViewerPin() { setupPin(true); }
+  function confirmSetupPin(isViewer) {
+    const inp1 = document.getElementById('pinSetupInput1');
+    const inp2 = document.getElementById('pinSetupInput2');
+    const msg = document.getElementById('secMsg');
+
+    if (!inp2 || inp2.style.display === 'none') {
+      // Birinci addım
+      const val = (inp1 && inp1.value) || '';
+      if (val.length < 4) { if (msg) msg.textContent = '❌ Ən azı 4 rəqəm daxil edin'; return; }
+      inp1.style.display = 'none';
+      if (inp2) { inp2.style.display = 'block'; inp2.focus(); }
+      const hint = document.getElementById('pinSetupHint');
+      if (hint) hint.textContent = 'PIN-i təkrar daxil edin';
+      if (msg) msg.textContent = '';
+    } else {
+      // İkinci addım — müqayisə
+      const val1 = (inp1 && inp1.value) || '';
+      const val2 = (inp2 && inp2.value) || '';
+      if (val1 !== val2) {
+        if (msg) msg.textContent = '❌ PIN uyğun gəlmədi — yenidən cəhd edin';
+        inp1.value = ''; inp2.value = ''; inp1.style.display = 'block'; inp2.style.display = 'none'; inp1.focus();
+        const hint = document.getElementById('pinSetupHint');
+        if (hint) hint.textContent = 'PIN daxil edin (4-8 rəqəm)';
+        return;
+      }
+      if (isViewer) saveCfg({ viewerPinHash: simpleHash(val1) });
+      else saveCfg({ pinHash: simpleHash(val1), method: 'pin' });
+      document.getElementById('jollySetupPinOverlay').remove();
+      Toast.success(isViewer ? 'Viewer PIN saxlanıldı ✓' : 'PIN saxlanıldı ✓');
+      JollyRouter.go('#/studios/security');
+    }
+  }
 
   // ── Nümunə qurma ──
   function setupPattern() {
@@ -606,6 +619,7 @@ const JollySecurity = (() => {
   return {
     init, isViewer, isAdmin, isUnlocked, clearSession, applyViewerMode,
     toggleEnabled, toggleViewer, setupPin, setupViewerPin, setupPattern, setupBiometric,
+    confirmSetupPin,
     pinKey, checkRecovery, tryBiometric, showRecovery, startViewerLogin,
     showRecoveryCode, genNewRecovery, disableAll,
   };
