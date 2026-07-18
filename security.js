@@ -462,8 +462,9 @@ const JollySecurity = (() => {
     setTimeout(() => { const el = document.getElementById('pinSetupInput1'); if (el) el.focus(); }, 100);
   }
 
+  function setupViewerPin() { setupPin(true); }
+
   function confirmSetupPin(isViewer) {
-    const inp1 = document.getElementById('pinSetupInput1');
     const inp2 = document.getElementById('pinSetupInput2');
     const msg = document.getElementById('secMsg');
 
