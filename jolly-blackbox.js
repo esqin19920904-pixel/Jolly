@@ -40,10 +40,15 @@
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[onclick],button,.dash-card,.big-op,.more-card,.gp-stat,.nav-item,.chip,.list-row,a');
     if (!el) { push('👆TAP', 'boş yerə (' + (e.target.className || e.target.tagName) + ')'); return; }
-    const oc = el.getAttribute('onclick');
+    // HTML-dəki onclick="..." atributunu YOXDA, JS-də `el.onclick = function(){}`
+    // şəklində bağlanmış handler-ları da yoxla — əks halda işlək düymələr
+    // (məs. bu panelin öz "Kopyala" düyməsi) yalan yerə "onclick YOX" kimi görünür.
+    const ocAttr = el.getAttribute('onclick');
+    const ocProp = (typeof el.onclick === 'function') ? '(JS ilə bağlanıb)' : null;
+    const oc = ocAttr || ocProp;
     const cls = (el.className || '').toString().slice(0, 40);
     const txt = (el.textContent || '').trim().slice(0, 25);
-    push('👆TAP', `<${el.tagName.toLowerCase()} class="${cls}"> "${txt}"` + (oc ? ' onclick=' + oc.slice(0, 60) : ' (onclick YOX)'));
+    push('👆TAP', `<${el.tagName.toLowerCase()} class="${cls}"> "${txt}"` + (oc ? ' onclick=' + (ocAttr ? ocAttr.slice(0, 60) : ocProp) : ' (onclick YOX)'));
   }, true);
 
   // 4) JollyRouter.go izləmə (əgər varsa)
