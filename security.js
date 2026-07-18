@@ -343,6 +343,12 @@ const JollySecurity = (() => {
     setSession(role);
     const overlay = document.getElementById('jollySecOverlay');
     if (overlay) overlay.remove();
+    // Fəaliyyət jurnalına yaz
+    logActivity('login', role === 'viewer' ? 'Viewer girişi' : 'Admin girişi');
+    // Viewer girəndə Telegram-dan Admin-ə xəbər ver
+    if (role === 'viewer') {
+      notifyAdminViaTelegram('👁️ Viewer girdi', new Date().toLocaleString('az-AZ'));
+    }
     if (role === 'viewer') {
       setTimeout(() => applyViewerMode(), 100);
     }
@@ -412,6 +418,12 @@ const JollySecurity = (() => {
       </div>
 
       <button class="btn btn-ghost btn-block" style="margin-top:8px;color:var(--accent-danger);" onclick="JollySecurity.disableAll()">🗑️ Bütün qorumanı sil</button>
+
+      <div class="section-title" style="margin-top:20px;">📊 İstifadəçi Fəaliyyəti</div>
+      <div class="glass" style="padding:4px 14px;margin-bottom:10px;" id="activityLogZone">
+        <div class="muted" style="padding:12px;font-size:12px;">Yüklənir...</div>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-block" onclick="JollySecurity.clearActivityLog()">🗑️ Jurnalı təmizlə</button>
       ` : `
       <div class="glass" style="padding:16px;text-align:center;">
         <div style="font-size:36px;margin-bottom:8px;">🔓</div>
@@ -570,6 +582,28 @@ const JollySecurity = (() => {
     alert(`🗝️ Yeni bərpa kodunuz:\n\n${code}\n\nBu kodu yazıb saxlayın!`);
   }
 
+  function afterRenderStudio() {
+    const zone = document.getElementById('activityLogZone');
+    if (!zone) return;
+    getActivityLog().then(logs => {
+      if (!zone.isConnected) return;
+      if (!logs.length) {
+        zone.innerHTML = '<div class="muted" style="padding:12px;font-size:12px;">Hələ heç bir fəaliyyət yoxdur</div>';
+        return;
+      }
+      zone.innerHTML = logs.map(l => `
+        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:2px;padding:10px 4px;">
+          <div style="display:flex;gap:8px;width:100%;align-items:center;">
+            <span style="font-size:12px;">${l.role === 'viewer' ? '👁️' : '👑'} <b>${l.role === 'viewer' ? 'Viewer' : 'Admin'}</b></span>
+            <span style="font-size:11px;color:var(--accent-1);">${l.action}</span>
+            <span class="muted" style="font-size:10px;margin-left:auto;">${l.date}</span>
+          </div>
+          ${l.detail ? `<div class="muted" style="font-size:11px;">${l.detail}</div>` : ''}
+        </div>
+      `).join('');
+    });
+  }
+
   function disableAll() {
     if (!confirm('Bütün giriş qorumasını silmək istəyirsiniz?')) return;
     JollyDB.write(KEY, { enabled: false });
@@ -585,8 +619,62 @@ const JollySecurity = (() => {
   }
 
   /* ============================================================
-     Tətbiq başlayanda yoxla
+     FƏALİYYƏT JURNALI (Activity Log)
+     Hər giriş, axtarış, məhsula baxış Firebase-də saxlanılır.
+     Admin Security Studio-dan görür.
      ============================================================ */
+  const ACTIVITY_NODE = 'jolly_user_activity';
+  const FIREBASE_BASE = 'https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app';
+
+  async function logActivity(action, detail) {
+    try {
+      const session = getSession();
+      const role = session ? session.role : 'unknown';
+      const entry = {
+        role,
+        action,
+        detail: detail || '',
+        ts: Date.now(),
+        date: new Date().toLocaleString('az-AZ'),
+        ua: navigator.userAgent.slice(0, 80),
+      };
+      await fetch(`${FIREBASE_BASE}/${ACTIVITY_NODE}.json`, {
+        method: 'POST',
+        body: JSON.stringify(entry),
+      });
+    } catch (e) {
+      // Sessiz xəta — jurnal iş axınını bloklamasın
+    }
+  }
+
+  async function getActivityLog() {
+    try {
+      const res = await fetch(`${FIREBASE_BASE}/${ACTIVITY_NODE}.json`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!data) return [];
+      return Object.values(data).sort((a, b) => b.ts - a.ts).slice(0, 100);
+    } catch (e) { return []; }
+  }
+
+  async function clearActivityLog() {
+    try {
+      await fetch(`${FIREBASE_BASE}/${ACTIVITY_NODE}.json`, { method: 'DELETE' });
+      Toast.success('Jurnal təmizləndi');
+      JollyRouter.go('#/studios/security');
+    } catch (e) { Toast.error('Silinmədi'); }
+  }
+
+  // Telegram bildirişi — Viewer girəndə Admin-ə xəbər ver
+  async function notifyAdminViaTelegram(action, detail) {
+    try {
+      await fetch('/api/notify-admin', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action, detail, ts: new Date().toLocaleString('az-AZ') }),
+      });
+    } catch (e) {}
+  }
   function init() {
     const cfg = getCfg();
     if (!cfg.enabled) return;
@@ -615,6 +703,7 @@ const JollySecurity = (() => {
       group: 'Sistem',
       enabled: true,
       render() { return renderStudio(); },
+      afterRender() { afterRenderStudio(); },
     });
   }
 
@@ -629,8 +718,9 @@ const JollySecurity = (() => {
   return {
     init, isViewer, isAdmin, isUnlocked, clearSession, applyViewerMode,
     toggleEnabled, toggleViewer, setupPin, setupViewerPin, setupPattern, setupBiometric,
-    confirmSetupPin,
+    confirmSetupPin, logActivity,
     pinKey, checkRecovery, tryBiometric, showRecovery, startViewerLogin,
     showRecoveryCode, genNewRecovery, disableAll,
+    getActivityLog, clearActivityLog,
   };
 })();
