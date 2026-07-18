@@ -465,6 +465,7 @@ const JollySecurity = (() => {
   function setupViewerPin() { setupPin(true); }
 
   function confirmSetupPin(isViewer) {
+    const inp1 = document.getElementById('pinSetupInput1');
     const inp2 = document.getElementById('pinSetupInput2');
     const msg = document.getElementById('secMsg');
 
