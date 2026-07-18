@@ -139,7 +139,7 @@ const JollyReceiving = (() => {
 
       <div class="glass command-bar" style="margin-bottom:10px;">
         <span style="opacity:.6">🔎</span>
-        <input id="recvSearch" placeholder="Ad, barkod, kod ilə axtar..." oninput="JollyReceiving.applyFilter()">
+        <input id="recvSearch" placeholder="Ad, barkod, kod ilə axtar..." oninput="JollyReceiving.debouncedApplyFilter()">
       </div>
 
       <div class="row" style="gap:8px;margin-bottom:12px;">
@@ -292,6 +292,15 @@ const JollyReceiving = (() => {
     if (chipEl) chipEl.classList.add('chip-active');
     if (typeof JollySound !== 'undefined') JollySound.tap();
     applyFilter();
+  }
+
+  // Hər hərfdə deyil, yazmağı dayandırandan ~220ms sonra süzülsün —
+  // böyük kataloqlarda hər klikdə tam grid+şəkil yenidən qurulmasının
+  // qarşısını alır (donma/gecikmə hissini azaldır).
+  let searchDebounceTimer = null;
+  function debouncedApplyFilter() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => applyFilter(), 220);
   }
 
   function applyFilter() {
@@ -764,7 +773,7 @@ const JollyReceiving = (() => {
   }
 
   return {
-    setFilter, applyFilter, toggleSelect, selectAllVisible, addSelectedToBasket, clearBasket,
+    setFilter, applyFilter, debouncedApplyFilter, toggleSelect, selectAllVisible, addSelectedToBasket, clearBasket,
     removeFromBasket, quickAddToBasket,
     finishSession, clearBasketAndExit, captureUnknown,
     docsForProduct,
