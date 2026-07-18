@@ -105,7 +105,8 @@ const JollyRadialFab = (() => {
         display: flex; align-items: center; justify-content: center;
         transition: transform .25s; position: relative; z-index: 2; touch-action: none; }
       #radialFabRoot.open .rfab-main { transform: rotate(45deg); }
-      .rfab-petals { position: absolute; right: 0; bottom: 72px; display: flex; flex-direction: column-reverse; gap: 10px; align-items: flex-end; }
+      .rfab-petals { position: absolute; right: 0; bottom: 72px; display: flex; flex-direction: column-reverse; gap: 10px; align-items: flex-end; pointer-events: none; }
+      #radialFabRoot.open .rfab-petals { pointer-events: auto; }
       .rfab-petal { width: auto; min-width: 150px; height: 46px; border-radius: 23px;
         display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px;
         background: rgba(255,255,255,0.08);
