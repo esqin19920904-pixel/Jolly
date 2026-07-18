@@ -129,13 +129,17 @@ const JollyStorage = (() => {
      ona görə data-idb atributu istifadə olunur. */
   async function hydrate(root) {
     const scope = root || document;
-    const imgs = scope.querySelectorAll('img[data-idb]');
-    for (const img of imgs) {
+    const imgs = Array.from(scope.querySelectorAll('img[data-idb]'));
+    if (!imgs.length) return;
+    // Paralel — hər şəkli eyni anda sorğula, bir-bir gözləmə.
+    // Məhsul sayı çoxaldıqca (məs. Qəbul Studio-nun siyahısında) bu,
+    // ardıcıl versiyaya nisbətən dəfələrlə sürətlidir.
+    await Promise.all(imgs.map(async (img) => {
       const ref = img.getAttribute('data-idb');
       const data = await getImage(ref);
       if (data) img.src = data;
       img.removeAttribute('data-idb');
-    }
+    }));
   }
 
   // img tag-i üçün düzgün atribut qaytarır
