@@ -64,6 +64,24 @@ export default {
       }
     }
 
+    // 3a) Admin bildirişi — Viewer girəndə/axtarış edəndə Telegram-dan Admin-ə xəbər
+    if (url.pathname === "/api/notify-admin" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const token = env.TELEGRAM_BOT_TOKEN;
+        const chatId = env.ADMIN_TELEGRAM_CHAT_ID;
+        if (token && chatId) {
+          const text = `🔔 JOLLY Bildiriş\n${body.action || ''}\n${body.detail || ''}\n🕐 ${body.ts || ''}`;
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, text }),
+          });
+        }
+      } catch (e) {}
+      return new Response("ok");
+    }
+
     // 3) TELEGRAM BOT WEBHOOK — YALNIZ OXUMA (Firebase-i dəyişmir, təhlükəsiz)
     // Telegram bu ünvana POST edir: https://<worker-domenin>/telegram-webhook
     if (url.pathname === "/telegram-webhook" && request.method === "POST") {
