@@ -181,7 +181,7 @@
 @keyframes jaHueSpin { to { --hue: 360deg; } }
 @property --hue { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 #ja-canvas { position:absolute; inset:0; z-index:1; pointer-events:none; width:100%; height:100%; }
-.ja-content { position:relative; z-index:10; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+.ja-content { position:relative; z-index:10; display:flex; align-items:center; justify-content:center; min-height:100vh; min-height:100dvh; padding:20px; }
 .ja-card { position:relative; width:100%; max-width:400px; background: linear-gradient(135deg, rgba(10,10,20,0.8), rgba(20,10,30,0.7)); backdrop-filter: blur(50px) saturate(200%); -webkit-backdrop-filter: blur(50px) saturate(200%); border-radius: 28px; padding: 36px 28px; overflow:hidden; animation: jaCardFloat 5s ease-in-out infinite; box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,212,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08); }
 @keyframes jaCardFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
 .ja-card::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:2px; background: linear-gradient(135deg, rgba(0,212,255,0.4), rgba(168,85,247,0.3), rgba(236,72,153,0.2), rgba(34,197,94,0.2), rgba(0,212,255,0.4)); background-size:300% 300%; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: jaBorderGlow 4s ease infinite; opacity:0.7; }
@@ -325,6 +325,7 @@
   let S = { screen: 'role', role: null, pin: '', animRunning: false };
 
   window.jollyAuthShow = function() {
+    resizeC();
     document.getElementById('jolly-auth-overlay').style.display = 'block';
     jaGo('role');
     jaStartParticles();
