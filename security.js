@@ -72,6 +72,8 @@ const JollySecurity = (() => {
       document.body.appendChild(b);
     }
 
+    // JollyDB-ni blokla — ən etibarlı
+    blockJollyDB();
     // Funksiyaları blokla
     blockViewerFunctions();
 
@@ -79,6 +81,63 @@ const JollySecurity = (() => {
     if (window.location.hash && window.location.hash.includes('studio')) {
       JollyRouter.go('#/home');
     }
+  }
+
+  // JollyDB-ni viewer üçün blokla — ən etibarlı yol
+  function blockJollyDB() {
+    if (!window.JollyDB || window.JollyDB._viewerBlocked) return;
+
+    const _origWrite = JollyDB.write.bind(JollyDB);
+    const _origDelete = JollyDB.delete ? JollyDB.delete.bind(JollyDB) : null;
+    const _origRemove = JollyDB.remove ? JollyDB.remove.bind(JollyDB) : null;
+
+    const ALLOWED_KEYS = ['jolly_security_cfg','jolly_sec_session'];
+
+    JollyDB.write = function(key, ...args) {
+      if (ALLOWED_KEYS.some(k => (key||'').includes(k))) return _origWrite(key, ...args);
+      Toast.error('❌ İcazəniz yoxdur');
+      if (navigator.vibrate) navigator.vibrate([50,30,50]);
+      return false;
+    };
+
+    if (_origDelete) {
+      JollyDB.delete = function(key, ...args) {
+        Toast.error('❌ İcazəniz yoxdur');
+        if (navigator.vibrate) navigator.vibrate([50,30,50]);
+        return false;
+      };
+    }
+
+    if (_origRemove) {
+      JollyDB.remove = function(key, ...args) {
+        Toast.error('❌ İcazəniz yoxdur');
+        if (navigator.vibrate) navigator.vibrate([50,30,50]);
+        return false;
+      };
+    }
+
+    // localStorage.setItem-i də blokla
+    const _origSetItem = localStorage.setItem.bind(localStorage);
+    const _origRemoveItem = localStorage.removeItem.bind(localStorage);
+    localStorage.setItem = function(key, ...args) {
+      if (ALLOWED_KEYS.some(k => (key||'').includes(k))) return _origSetItem(key, ...args);
+      // Məhsul açarlarını blokla
+      if ((key||'').includes('product') || (key||'').includes('jolly_prod')) {
+        Toast.error('❌ İcazəniz yoxdur');
+        return false;
+      }
+      return _origSetItem(key, ...args);
+    };
+    localStorage.removeItem = function(key, ...args) {
+      if (ALLOWED_KEYS.some(k => (key||'').includes(k))) return _origRemoveItem(key, ...args);
+      if ((key||'').includes('product') || (key||'').includes('jolly_prod')) {
+        Toast.error('❌ İcazəniz yoxdur');
+        return false;
+      }
+      return _origRemoveItem(key, ...args);
+    };
+
+    JollyDB._viewerBlocked = true;
   }
 
   // Viewer üçün funksiyaları blokla
