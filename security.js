@@ -100,6 +100,9 @@ const JollySecurity = (() => {
         <div class="list-row" style="cursor:pointer;" onclick="JollySecurity.setupPin(false)">
           <span>🔢 Admin PIN ${cfg.pinHash?'✅':'—'}</span><span style="color:var(--accent-1);">›</span>
         </div>
+        <div class="list-row" style="cursor:pointer;" onclick="JollySecurity.setupBiometric()">
+          <span>👆 Barmaq izi ${cfg.biometricCredId?'✅':'—'}</span><span style="color:var(--accent-1);">›</span>
+        </div>
       </div>
       <div class="section-title">👁️ Viewer rejimi</div>
       <div class="glass" style="padding:4px 14px;margin-bottom:14px;">
@@ -158,6 +161,31 @@ const JollySecurity = (() => {
     saveCfg({ viewerEnabled: on });
     if (on) setupPin(true);
     else JollyRouter.go('#/studios/security');
+  }
+
+  async function setupBiometric() {
+    if (!window.PublicKeyCredential) { Toast.error('Bu cihaz biometrik dəstəkləmir'); return; }
+    try {
+      Toast.info('Barmağınızı sensora toxundurun...');
+      const cred = await navigator.credentials.create({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rp: { name: 'JOLLY Store', id: location.hostname },
+          user: { id: new Uint8Array(16), name: 'jolly-admin', displayName: 'JOLLY Admin' },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+          authenticatorSelection: { userVerification: 'required', authenticatorAttachment: 'platform' },
+          timeout: 30000
+        }
+      });
+      if (cred) {
+        const credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+        saveCfg({ biometricCredId: credId });
+        Toast.success('Barmaq izi qeydiyyatdan keçdi ✓');
+        JollyRouter.go('#/studios/security');
+      }
+    } catch(e) {
+      Toast.error('Barmaq izi qeydiyyat uğursuz oldu');
+    }
   }
 
   function setupPin(isViewer) {
@@ -241,7 +269,7 @@ const JollySecurity = (() => {
   }
 
   return {
-    init, isViewer, isAdmin, isUnlocked, clearSession, applyViewerMode,
+    init, isViewer, isAdmin, isUnlocked, clearSession, applyViewerMode, setupBiometric,
     toggleEnabled, toggleViewer, setupPin, confirmSetupPin, genNewRecovery, disableAll, clearActivityLog,
   };
 })();
