@@ -32,13 +32,38 @@ const JollySecurity = (() => {
   function isAdmin() { const s = getSession(); return !!(s && s.role === 'admin'); }
   function isUnlocked() { return !!getSession(); }
 
+  const VIEWER_HIDE = [
+    // Düymələr
+    '.btn-primary','.rfab-main','#jbdTab',
+    // onclick ilə
+    '[onclick*="deleteProduct"]','[onclick*="product/new"]',
+    '[onclick*="submitForm"]','[onclick*="quickAdd"]',
+    '[onclick*="addBarcodeField"]','[onclick*="editProduct"]',
+    '[onclick*="copyProduct"]','[onclick*="duplicateProduct"]',
+    '[onclick*="removeProduct"]','[onclick*="studios"]',
+    '[onclick*="bulkDelete"]','[onclick*="bulkEdit"]',
+    // Siniflər
+    '.edit-btn','.delete-btn','.copy-btn','.duplicate-btn',
+    '.btn-edit','.btn-delete','.btn-danger',
+    '.product-actions','.item-actions',
+    // Studio düyməsi
+    '#topStudiosBtn',
+    // Alt nav studio
+    '[data-route*="studio"]','[href*="studio"]',
+  ].join(',');
+
   function applyViewerMode() {
     if (!isViewer()) return;
-    document.querySelectorAll(
-      '.btn-primary,.rfab-main,#jbdTab,[onclick*="product/new"],[onclick*="submitForm"],' +
-      '[onclick*="deleteProduct"],[onclick*="quickAdd"],[onclick*="addBarcodeField"],.edit-btn,.delete-btn,' +
-      '#topStudiosBtn,[onclick*="studios"],[href*="studios"],.studios-btn'
-    ).forEach(el => { el.style.display = 'none'; });
+
+    // Elementləri gizlət
+    try {
+      document.querySelectorAll(VIEWER_HIDE).forEach(el => {
+        el.style.display = 'none';
+        el.setAttribute('data-viewer-hidden','1');
+      });
+    } catch(e) {}
+
+    // Badge
     if (!document.getElementById('viewerBadge')) {
       const b = document.createElement('div');
       b.id = 'viewerBadge';
@@ -46,7 +71,28 @@ const JollySecurity = (() => {
       b.textContent = '👁️ Yalnız baxış rejimi';
       document.body.appendChild(b);
     }
+
+    // Studio-ya birbaşa giriş bloku
+    if (window.location.hash && window.location.hash.includes('studio')) {
+      JollyRouter.go('#/home');
+    }
   }
+
+  // MutationObserver — DOM dəyişəndə avtomatik tətbiq et
+  let _viewerObserver = null;
+  function startViewerObserver() {
+    if (_viewerObserver) return;
+    _viewerObserver = new MutationObserver(() => {
+      if (isViewer()) applyViewerMode();
+    });
+    _viewerObserver.observe(document.getElementById('main') || document.body, {
+      childList: true, subtree: true
+    });
+  }
+
+  // Viewer session qurulandan sonra observer başlat
+  // (authentication.js jollyAuthHide-dan sonra applyViewer çağırır, o da buraya gəlir)
+  const _origApplyViewer = applyViewerMode;
 
   // Overlay-ə cfg ötür
   function pushCfgToOverlay() {
@@ -59,7 +105,9 @@ const JollySecurity = (() => {
     if (!cfg.enabled) return;
     const session = getSession();
     if (session) {
-      if (session.role === 'viewer') setTimeout(() => applyViewerMode(), 300);
+      if (session.role === 'viewer') {
+        setTimeout(() => { applyViewerMode(); startViewerObserver(); }, 300);
+      }
       return;
     }
     // Kilid lazımdır
@@ -70,7 +118,11 @@ const JollySecurity = (() => {
   }
 
   window.addEventListener('hashchange', () => {
-    if (isViewer()) setTimeout(() => applyViewerMode(), 150);
+    if (isViewer()) {
+      setTimeout(() => applyViewerMode(), 150);
+      // Studio-ya giriş bloku
+      if (window.location.hash.includes('studio')) JollyRouter.go('#/home');
+    }
   });
 
   // Firebase log
