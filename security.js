@@ -72,10 +72,49 @@ const JollySecurity = (() => {
       document.body.appendChild(b);
     }
 
+    // Funksiyaları blokla
+    blockViewerFunctions();
+
     // Studio-ya birbaşa giriş bloku
     if (window.location.hash && window.location.hash.includes('studio')) {
       JollyRouter.go('#/home');
     }
+  }
+
+  // Viewer üçün funksiyaları blokla
+  function blockViewerFunctions() {
+    const BLOCKED = [
+      'deleteProduct','removeProduct','editProduct','saveProduct',
+      'submitForm','quickAdd','addProduct','updateProduct',
+      'bulkDelete','bulkEdit','copyProduct','duplicateProduct',
+      'clearAllData','resetData','importData','deleteAll',
+    ];
+    BLOCKED.forEach(fn => {
+      if (window[fn] && !window[fn]._viewerBlocked) {
+        const orig = window[fn];
+        window[fn] = function() {
+          Toast.error('❌ İcazəniz yoxdur');
+          if (navigator.vibrate) navigator.vibrate([50,30,50]);
+          return false;
+        };
+        window[fn]._viewerBlocked = true;
+      }
+    });
+
+    // onclick-ləri blokla
+    document.addEventListener('click', function(e) {
+      if (!isViewer()) return;
+      const el = e.target.closest('button, a, [onclick], [data-action]');
+      if (!el) return;
+      const danger = ['sil','delete','remove','edit','redakt','yenilə','əlavə','add','copy','kopyala','saxla','save','submit','clear','təmizlə'];
+      const text = (el.textContent||'').toLowerCase() + (el.getAttribute('onclick')||'').toLowerCase() + (el.getAttribute('data-action')||'').toLowerCase();
+      if (danger.some(d => text.includes(d))) {
+        e.preventDefault();
+        e.stopPropagation();
+        Toast.error('❌ İcazəniz yoxdur');
+        if (navigator.vibrate) navigator.vibrate([50,30,50]);
+      }
+    }, true);
   }
 
   // MutationObserver — DOM dəyişəndə avtomatik tətbiq et
