@@ -1,12 +1,10 @@
-const CACHE_NAME = 'jolly-v5';
+const CACHE_NAME = 'jolly-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './style.css',
-  './jolly-edge-neon.css',
-  './share-target.html',
-  './import.html'
+  './jolly-edge-neon.css'
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,7 +27,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method === 'POST' && url.pathname.includes('share-target')) {
-    event.respondWith(fetch(request).catch(() => caches.match('./share-target.html')));
+    event.respondWith(fetch(request).catch(() => new Response('Share target offline', { status: 503 })));
     return;
   }
 
@@ -56,7 +54,7 @@ self.addEventListener('fetch', (event) => {
           return resp;
         }).catch(() => {
           if (request.destination === 'document') return caches.match('./index.html');
-          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+          return new Response('Offline', { status: 503 });
         });
       })
     );
