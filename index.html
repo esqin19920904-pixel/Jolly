@@ -260,6 +260,7 @@
       <p class="ja-sub">Giriş üsulunu seçin</p>
       <div class="ja-methods" id="ja-methods">
         <button class="ja-method" id="ja-btn-pin" onclick="jaMethod('pin')"><span class="ja-micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></span><span>PIN kodu ilə daxil ol</span><svg class="ja-marrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        <button class="ja-method" id="ja-btn-fp" onclick="jaMethod('fingerprint')" style="display:none;"><span class="ja-micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" opacity="0.3"/><path d="M12 5c-3.87 0-7 3.13-7 7" opacity="0.6"/><path d="M12 7c-2.76 0-5 2.24-5 5" opacity="0.6"/><path d="M12 9c-1.66 0-3 1.34-3 3" opacity="0.6"/><circle cx="12" cy="12" r="1.5" opacity="0.7"/></svg></span><span>Barmaq izi ilə daxil ol</span><svg class="ja-marrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
     </div>
     <!-- PIN -->
@@ -277,6 +278,25 @@
         <button class="ja-pin-key" onclick="jaPinBack()" style="font-size:0.75rem;color:rgba(255,255,255,0.5);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg></button>
         <button class="ja-pin-key" onclick="jaPin('0')">0</button>
         <button class="ja-pin-key" onclick="jaPinClear()" style="font-size:0.75rem;color:rgba(255,255,255,0.5);">C</button>
+      </div>
+    </div>
+    <!-- Fingerprint -->
+    <div class="ja-screen" id="ja-scr-fingerprint">
+      <button class="ja-back" onclick="jaBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Geri</button>
+      <h1 class="ja-title">Barmaq izi</h1>
+      <p class="ja-sub">Barmağınızı sensora toxundurun</p>
+      <div style="display:flex;flex-direction:column;align-items:center;padding:24px 0;">
+        <div id="ja-fp-ring" onclick="jaFpScan()" style="position:relative;width:130px;height:130px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.4s;background:radial-gradient(circle,rgba(0,212,255,0.03),transparent 70%);">
+          <svg id="ja-fp-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:64px;height:64px;color:rgba(255,255,255,0.4);transition:color 0.3s;">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" opacity="0.3"/>
+            <path d="M12 5c-3.87 0-7 3.13-7 7" opacity="0.6"/>
+            <path d="M12 7c-2.76 0-5 2.24-5 5" opacity="0.6"/>
+            <path d="M12 9c-1.66 0-3 1.34-3 3" opacity="0.6"/>
+            <circle cx="12" cy="12" r="1.5" opacity="0.7"/>
+          </svg>
+        </div>
+        <p id="ja-fp-hint" style="margin-top:20px;font-size:0.8rem;color:rgba(255,255,255,0.35);text-align:center;">Senzorə toxunmaq üçün klikləyin</p>
+        <button onclick="jaFpScan()" style="margin-top:20px;padding:12px 28px;border-radius:12px;background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(168,85,247,0.1));border:1.5px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:14px;font-weight:600;cursor:pointer;">👆 Skan et</button>
       </div>
     </div>
     <!-- Success -->
@@ -304,10 +324,60 @@
   }
 
   // security.js buraya cfg ötürür
+  // WebAuthn barmaq izi
+  window.jaFpScan = async function() {
+    const hint = document.getElementById('ja-fp-hint');
+    const ring = document.getElementById('ja-fp-ring');
+    const svg = document.getElementById('ja-fp-svg');
+    
+    if (!_cfg.biometricCredId) {
+      if (hint) hint.textContent = '❌ Barmaq izi qurulmayıb';
+      return;
+    }
+    
+    if (hint) { hint.textContent = 'Barmaq izi yoxlanılır...'; hint.style.color = '#00d4ff'; }
+    if (ring) { ring.style.borderColor = '#00d4ff'; ring.style.boxShadow = '0 0 40px rgba(0,212,255,0.25)'; }
+    if (svg) svg.style.color = '#00d4ff';
+    
+    try {
+      const credId = Uint8Array.from(atob(_cfg.biometricCredId), c => c.charCodeAt(0));
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          allowCredentials: [{ id: credId, type: 'public-key' }],
+          userVerification: 'required',
+          timeout: 30000
+        }
+      });
+      
+      if (assertion) {
+        if (ring) { ring.style.borderColor = '#22c55e'; ring.style.boxShadow = '0 0 40px rgba(34,197,94,0.3)'; }
+        if (svg) svg.style.color = '#22c55e';
+        if (hint) { hint.textContent = 'Barmaq izi tanındı! ✓'; hint.style.color = '#22c55e'; }
+        if (_setSession) _setSession('admin');
+        jaBurst(window.innerWidth/2, window.innerHeight/2, '34,197,94', 20);
+        setTimeout(() => jaSuccess('admin'), 800);
+      }
+    } catch(e) {
+      if (ring) { ring.style.borderColor = '#ef4444'; ring.style.boxShadow = '0 0 20px rgba(239,68,68,0.3)'; }
+      if (svg) svg.style.color = '#ef4444';
+      if (hint) { hint.textContent = '❌ Tanınmadı — yenidən cəhd edin'; hint.style.color = '#ef4444'; }
+      setTimeout(() => {
+        if (ring) { ring.style.borderColor = 'rgba(255,255,255,0.1)'; ring.style.boxShadow = ''; }
+        if (svg) svg.style.color = 'rgba(255,255,255,0.4)';
+        if (hint) { hint.textContent = 'Senzorə toxunmaq üçün klikləyin'; hint.style.color = 'rgba(255,255,255,0.35)'; }
+      }, 2000);
+    }
+  };
+
   window._jaSetCfg = function(cfg, setSession, applyViewer) {
     _cfg = cfg;
     _setSession = setSession;
     _applyViewer = applyViewer;
+    // Barmaq izi düyməsini göstər/gizlət (yalnız admin üçün)
+    const fpBtn = document.getElementById('ja-btn-fp');
+    if (fpBtn) fpBtn.style.display = _cfg.biometricCredId ? '' : 'none';
+
     // User kartını göstər/gizlət
     const uc = document.getElementById('ja-user-card');
     const grid = document.getElementById('ja-role-grid');
@@ -399,7 +469,7 @@
     setTimeout(()=>c.remove(),1100);
   }
 
-  window.jaMethod = function(m) { jaGo(m); };
+  window.jaMethod = function(m) { jaGo(m); if(m==='fingerprint'){setTimeout(()=>jaFpScan(),500);} };
 
   // PIN
   window.jaPin = function(d) {
