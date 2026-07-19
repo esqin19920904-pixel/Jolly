@@ -170,72 +170,53 @@
     }
   </script>
 <!-- ═══════════════════════════════════════════════════════
-     JOLLY Auth Overlay — </body>-dən əvvəl yapışdır
+<!-- ═══════════════════════════════════════════════════════
+     JOLLY Auth Overlay — sadə versiya (effektsiz)
      ═══════════════════════════════════════════════════════ -->
 <div id="jolly-auth-overlay" style="display:none; position:fixed; inset:0; z-index:999999; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
 <style>
-#jolly-auth-overlay { position:fixed;inset:0;width:100%;height:100%; --c1:#00d4ff; --c2:#6366f1; --c3:#a855f7; --c4:#ec4899; --c5:#f97316; --c6:#22c55e; --c7:#fbbf24; --c8:#ef4444; --hue:0deg; }
+#jolly-auth-overlay { --c1:#00d4ff; --c6:#22c55e; --c8:#ef4444; }
 #jolly-auth-overlay * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-.ja-bg { position:absolute; inset:0; z-index:0; overflow:hidden; background:#000; }
-.ja-aurora { position:absolute; inset:-50%; background: radial-gradient(ellipse 60% 40% at 20% 30%, rgba(0,212,255,0.18) 0%, transparent 55%), radial-gradient(ellipse 50% 50% at 80% 20%, rgba(99,102,241,0.15) 0%, transparent 50%), radial-gradient(ellipse 55% 45% at 50% 80%, rgba(168,85,247,0.14) 0%, transparent 50%), radial-gradient(ellipse 40% 60% at 70% 60%, rgba(236,72,153,0.1) 0%, transparent 45%), radial-gradient(ellipse 50% 40% at 30% 70%, rgba(249,115,22,0.08) 0%, transparent 40%); animation: jaAurora 12s ease-in-out infinite; filter:blur(40px); }
-@keyframes jaAurora { 0%,100%{transform:scale(1) translate(0,0);opacity:0.9} 25%{transform:scale(1.1) translate(-3%,2%);opacity:1} 50%{transform:scale(1.05) translate(2%,-2%);opacity:0.85} 75%{transform:scale(1.15) translate(-1%,-3%);opacity:1} }
-.ja-rays { position:absolute; inset:0; background: conic-gradient(from var(--hue) at 50% 50%, rgba(0,212,255,0.04) 0deg, rgba(99,102,241,0.04) 45deg, rgba(168,85,247,0.04) 90deg, rgba(236,72,153,0.04) 135deg, rgba(249,115,22,0.04) 180deg, rgba(251,191,36,0.04) 225deg, rgba(34,197,94,0.04) 270deg, rgba(0,212,255,0.04) 315deg, rgba(0,212,255,0.04) 360deg); animation: jaHueSpin 15s linear infinite; mix-blend-mode:screen; }
-@keyframes jaHueSpin { to { --hue: 360deg; } }
-@property --hue { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-#ja-canvas { position:absolute; inset:0; z-index:1; pointer-events:none; width:100%; height:100%; }
-.ja-content { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; padding:20px; }
-.ja-card { position:relative; width:100%; max-width:400px; background: linear-gradient(135deg, rgba(10,10,20,0.8), rgba(20,10,30,0.7)); backdrop-filter: blur(50px) saturate(200%); -webkit-backdrop-filter: blur(50px) saturate(200%); border-radius: 28px; padding: 36px 28px; overflow:hidden; animation: jaCardFloat 5s ease-in-out infinite; box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,212,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08); }
-@keyframes jaCardFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-.ja-card::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:2px; background: linear-gradient(135deg, rgba(0,212,255,0.4), rgba(168,85,247,0.3), rgba(236,72,153,0.2), rgba(34,197,94,0.2), rgba(0,212,255,0.4)); background-size:300% 300%; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: jaBorderGlow 4s ease infinite; opacity:0.7; }
-@keyframes jaBorderGlow { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-.ja-screen { display:none; opacity:0; transform:translateY(16px) scale(0.97); transition:all 0.4s cubic-bezier(0.16,1,0.3,1); }
-.ja-screen.on { display:block; opacity:1; transform:translateY(0) scale(1); }
-.ja-title { font-size:1.6rem; font-weight:700; text-align:center; margin-bottom:6px; background: linear-gradient(90deg, var(--c1), var(--c3), var(--c4)); background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; animation: jaTextGrad 3s ease infinite; }
-@keyframes jaTextGrad { 0%,100%{background-position:0% center} 50%{background-position:100% center} }
-.ja-sub { font-size:0.875rem; color:rgba(255,255,255,0.5); text-align:center; margin-bottom:24px; }
-.ja-role-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
-.ja-role-card { position:relative; background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1.5px solid rgba(255,255,255,0.08); border-radius:20px; padding:28px 10px; text-align:center; cursor:pointer; transition:all 0.35s cubic-bezier(0.16,1,0.3,1); overflow:hidden; }
-.ja-role-card:hover { border-color:rgba(0,212,255,0.4); transform:translateY(-5px) scale(1.03); box-shadow:0 16px 48px rgba(0,212,255,0.12); }
-.ja-role-card:active { transform:translateY(-2px) scale(0.98); }
-.ja-role-card.pick { border-color:var(--c1); background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(168,85,247,0.06)); box-shadow:0 0 40px rgba(0,212,255,0.2),inset 0 0 20px rgba(0,212,255,0.03); }
-.ja-role-card.pick .ja-role-icon { color:var(--c1); filter:drop-shadow(0 0 12px rgba(0,212,255,0.5)); }
-.ja-role-icon { width:44px; height:44px; margin:0 auto 12px; color:rgba(255,255,255,0.45); transition:all 0.3s; }
-.ja-role-label { font-size:0.95rem; font-weight:600; margin-bottom:3px; color:#fff; }
-.ja-role-desc { font-size:0.7rem; color:rgba(255,255,255,0.35); line-height:1.4; }
-.ja-back { display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; color:rgba(255,255,255,0.35); background:none; border:none; cursor:pointer; margin-bottom:14px; padding:4px 0; transition:color 0.2s; }
-.ja-back:hover { color:#fff; }
-.ja-back svg { width:16px; height:16px; }
-.ja-methods { display:flex; flex-direction:column; gap:8px; }
-.ja-method { display:flex; align-items:center; gap:12px; width:100%; padding:14px 16px; background:linear-gradient(90deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)); border:1.5px solid rgba(255,255,255,0.06); border-radius:14px; color:#fff; font-size:0.875rem; font-weight:500; cursor:pointer; transition:all 0.25s cubic-bezier(0.16,1,0.3,1); text-align:left; overflow:hidden; }
-.ja-method:hover { border-color:rgba(0,212,255,0.35); background:linear-gradient(90deg,rgba(0,212,255,0.06),rgba(168,85,247,0.03)); transform:translateX(5px); }
-.ja-method:active { transform:translateX(2px) scale(0.99); }
-.ja-micon { width:22px; height:22px; color:var(--c1); flex-shrink:0; }
-.ja-marrow { margin-left:auto; width:16px; height:16px; color:rgba(255,255,255,0.2); transition:all 0.2s; }
-.ja-method:hover .ja-marrow { transform:translateX(4px); color:var(--c1); }
-.ja-pin-dots { display:flex; justify-content:center; gap:18px; margin:28px 0; }
-.ja-pin-dot { width:16px; height:16px; border-radius:50%; border:2.5px solid rgba(255,255,255,0.12); background:transparent; transition:all 0.25s cubic-bezier(0.4,0,0.2,1); }
-.ja-pin-dot.fill { background:var(--c1); border-color:var(--c1); box-shadow:0 0 14px rgba(0,212,255,0.5); transform:scale(1.15); }
-.ja-pin-dot.bad { border-color:var(--c8); background:var(--c8); box-shadow:0 0 14px rgba(239,68,68,0.5); animation:jaPinShake 0.4s ease-in-out; }
-.ja-pin-dot.good { border-color:var(--c6); background:var(--c6); box-shadow:0 0 14px rgba(34,197,94,0.5); }
-@keyframes jaPinShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
-.ja-pin-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:250px; margin:0 auto; }
-.ja-pin-key { aspect-ratio:1; border-radius:50%; border:1.5px solid rgba(255,255,255,0.08); background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); color:#fff; font-size:1.2rem; font-weight:500; font-family:inherit; cursor:pointer; transition:all 0.15s cubic-bezier(0.16,1,0.3,1); display:flex; align-items:center; justify-content:center; overflow:hidden; }
-.ja-pin-key:hover { border-color:rgba(0,212,255,0.4); background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(168,85,247,0.05)); color:var(--c1); }
-.ja-pin-key:active { transform:scale(0.87); }
-.ja-success { display:flex; flex-direction:column; align-items:center; padding:32px 0; text-align:center; }
-.ja-ok-ring { width:76px; height:76px; border-radius:50%; border:3px solid var(--c6); display:flex; align-items:center; justify-content:center; margin-bottom:20px; box-shadow:0 0 30px rgba(34,197,94,0.3); animation:jaOkPop 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-@keyframes jaOkPop { 0%{transform:scale(0)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
-.ja-ok-icon { width:38px; height:38px; color:var(--c6); }
-.ja-ok-title { font-size:1.4rem; font-weight:700; margin-bottom:6px; background:linear-gradient(90deg,var(--c6),var(--c1)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-.ja-ok-sub { font-size:0.875rem; color:rgba(255,255,255,0.55); }
-.ja-hint { font-size:0.7rem; color:rgba(255,255,255,0.2); text-align:center; margin-top:14px; }
-.ja-ripple { position:absolute; border-radius:50%; background:rgba(0,212,255,0.25); transform:scale(0); animation:jaRippleOut 0.6s cubic-bezier(0.16,1,0.3,1) forwards; pointer-events:none; }
-@keyframes jaRippleOut { to{transform:scale(4);opacity:0} }
-@media (max-width:480px) { .ja-card{padding:28px 18px;border-radius:22px;} .ja-title{font-size:1.35rem;} .ja-role-grid{gap:10px;} .ja-role-card{padding:22px 8px;} .ja-pin-pad{gap:8px;max-width:220px;} .ja-pin-key{font-size:1.1rem;} }
+#jolly-auth-overlay .ja-bg { position:absolute; inset:0; background:#06070d; }
+#jolly-auth-overlay .ja-content { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:20px; }
+#jolly-auth-overlay .ja-card { position:relative; width:100%; max-width:400px; background:#12131c; border:1px solid rgba(255,255,255,0.08); border-radius:20px; padding:32px 24px; }
+#jolly-auth-overlay .ja-screen { display:none; }
+#jolly-auth-overlay .ja-screen.on { display:block; }
+#jolly-auth-overlay .ja-title { font-size:1.4rem; font-weight:700; text-align:center; margin-bottom:6px; color:#fff; }
+#jolly-auth-overlay .ja-sub { font-size:0.875rem; color:rgba(255,255,255,0.5); text-align:center; margin-bottom:22px; }
+#jolly-auth-overlay .ja-role-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+#jolly-auth-overlay .ja-role-card { background:rgba(255,255,255,0.03); border:1.5px solid rgba(255,255,255,0.1); border-radius:16px; padding:22px 8px; text-align:center; cursor:pointer; }
+#jolly-auth-overlay .ja-role-card.pick { border-color:var(--c1); background:rgba(0,212,255,0.08); }
+#jolly-auth-overlay .ja-role-icon { width:38px; height:38px; margin:0 auto 10px; color:rgba(255,255,255,0.5); }
+#jolly-auth-overlay .ja-role-card.pick .ja-role-icon { color:var(--c1); }
+#jolly-auth-overlay .ja-role-label { font-size:0.9rem; font-weight:600; margin-bottom:2px; color:#fff; }
+#jolly-auth-overlay .ja-role-desc { font-size:0.68rem; color:rgba(255,255,255,0.35); }
+#jolly-auth-overlay .ja-hint { font-size:0.7rem; color:rgba(255,255,255,0.25); text-align:center; }
+#jolly-auth-overlay .ja-back { display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; color:rgba(255,255,255,0.4); background:none; border:none; cursor:pointer; margin-bottom:12px; padding:4px 0; }
+#jolly-auth-overlay .ja-back svg { width:16px; height:16px; }
+#jolly-auth-overlay .ja-methods { display:flex; flex-direction:column; gap:8px; }
+#jolly-auth-overlay .ja-method { display:flex; align-items:center; gap:12px; width:100%; padding:14px 16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; color:#fff; font-size:0.875rem; font-weight:500; cursor:pointer; text-align:left; }
+#jolly-auth-overlay .ja-micon { width:20px; height:20px; color:var(--c1); flex-shrink:0; }
+#jolly-auth-overlay .ja-marrow { margin-left:auto; width:16px; height:16px; color:rgba(255,255,255,0.25); }
+#jolly-auth-overlay .ja-pin-dots { display:flex; justify-content:center; gap:16px; margin:24px 0; }
+#jolly-auth-overlay .ja-pin-dot { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.15); background:transparent; }
+#jolly-auth-overlay .ja-pin-dot.fill { background:var(--c1); border-color:var(--c1); }
+#jolly-auth-overlay .ja-pin-dot.bad { border-color:var(--c8); background:var(--c8); }
+#jolly-auth-overlay .ja-pin-dot.good { border-color:var(--c6); background:var(--c6); }
+#jolly-auth-overlay .ja-pin-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:240px; margin:0 auto; }
+#jolly-auth-overlay .ja-pin-key { aspect-ratio:1; border-radius:50%; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.03); color:#fff; font-size:1.1rem; font-weight:500; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+#jolly-auth-overlay .ja-success { display:flex; flex-direction:column; align-items:center; padding:24px 0; text-align:center; }
+#jolly-auth-overlay .ja-ok-ring { width:64px; height:64px; border-radius:50%; border:3px solid var(--c6); display:flex; align-items:center; justify-content:center; margin-bottom:16px; }
+#jolly-auth-overlay .ja-ok-icon { width:32px; height:32px; color:var(--c6); }
+#jolly-auth-overlay .ja-ok-title { font-size:1.2rem; font-weight:700; color:#fff; margin-bottom:4px; }
+#jolly-auth-overlay .ja-ok-sub { font-size:0.85rem; color:rgba(255,255,255,0.55); }
+#jolly-auth-overlay .ja-fp-ring { width:110px; height:110px; border-radius:50%; border:2px solid rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; margin:0 auto; cursor:pointer; }
+#jolly-auth-overlay .ja-fp-svg { width:56px; height:56px; color:rgba(255,255,255,0.4); }
+#jolly-auth-overlay .ja-fp-hint { margin-top:16px; font-size:0.8rem; color:rgba(255,255,255,0.35); text-align:center; }
+#jolly-auth-overlay .ja-fp-btn { margin-top:16px; padding:12px 24px; border-radius:12px; background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.3); color:#00d4ff; font-size:14px; font-weight:600; cursor:pointer; display:block; margin-left:auto; margin-right:auto; }
 </style>
 
-<div class="ja-bg"><div class="ja-aurora"></div><div class="ja-rays"></div></div>
-<canvas id="ja-canvas"></canvas>
+<div class="ja-bg"></div>
 
 <div class="ja-content">
   <div class="ja-card" id="ja-card">
@@ -287,9 +268,9 @@
       <button class="ja-back" onclick="jaBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Geri</button>
       <h1 class="ja-title">Barmaq izi</h1>
       <p class="ja-sub">Barmağınızı sensora toxundurun</p>
-      <div style="display:flex;flex-direction:column;align-items:center;padding:24px 0;">
-        <div id="ja-fp-ring" onclick="jaFpScan()" style="position:relative;width:130px;height:130px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.4s;background:radial-gradient(circle,rgba(0,212,255,0.03),transparent 70%);">
-          <svg id="ja-fp-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:64px;height:64px;color:rgba(255,255,255,0.4);transition:color 0.3s;">
+      <div style="padding:20px 0;">
+        <div class="ja-fp-ring" id="ja-fp-ring" onclick="jaFpScan()">
+          <svg id="ja-fp-svg" class="ja-fp-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" opacity="0.3"/>
             <path d="M12 5c-3.87 0-7 3.13-7 7" opacity="0.6"/>
             <path d="M12 7c-2.76 0-5 2.24-5 5" opacity="0.6"/>
@@ -297,8 +278,8 @@
             <circle cx="12" cy="12" r="1.5" opacity="0.7"/>
           </svg>
         </div>
-        <p id="ja-fp-hint" style="margin-top:20px;font-size:0.8rem;color:rgba(255,255,255,0.35);text-align:center;">Senzorə toxunmaq üçün klikləyin</p>
-        <button onclick="jaFpScan()" style="margin-top:20px;padding:12px 28px;border-radius:12px;background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(168,85,247,0.1));border:1.5px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:14px;font-weight:600;cursor:pointer;">👆 Skan et</button>
+        <p class="ja-fp-hint" id="ja-fp-hint">Senzorə toxunmaq üçün klikləyin</p>
+        <button class="ja-fp-btn" onclick="jaFpScan()">👆 Skan et</button>
       </div>
     </div>
     <!-- Success -->
@@ -314,7 +295,6 @@
 
 <script>
 (function() {
-  // Real PIN sistemi
   let _cfg = { pinHash: null, viewerPinHash: null, viewerEnabled: false };
   let _setSession = null;
   let _applyViewer = null;
@@ -325,22 +305,13 @@
     return h.toString(16).padStart(8, '0');
   }
 
-  // security.js buraya cfg ötürür
-  // WebAuthn barmaq izi
   window.jaFpScan = async function() {
     const hint = document.getElementById('ja-fp-hint');
-    const ring = document.getElementById('ja-fp-ring');
-    const svg = document.getElementById('ja-fp-svg');
-    
     if (!_cfg.biometricCredId) {
       if (hint) hint.textContent = '❌ Barmaq izi qurulmayıb';
       return;
     }
-    
-    if (hint) { hint.textContent = 'Barmaq izi yoxlanılır...'; hint.style.color = '#00d4ff'; }
-    if (ring) { ring.style.borderColor = '#00d4ff'; ring.style.boxShadow = '0 0 40px rgba(0,212,255,0.25)'; }
-    if (svg) svg.style.color = '#00d4ff';
-    
+    if (hint) hint.textContent = 'Barmaq izi yoxlanılır...';
     try {
       const credId = Uint8Array.from(atob(_cfg.biometricCredId), c => c.charCodeAt(0));
       const assertion = await navigator.credentials.get({
@@ -351,24 +322,13 @@
           timeout: 30000
         }
       });
-      
       if (assertion) {
-        if (ring) { ring.style.borderColor = '#22c55e'; ring.style.boxShadow = '0 0 40px rgba(34,197,94,0.3)'; }
-        if (svg) svg.style.color = '#22c55e';
-        if (hint) { hint.textContent = 'Barmaq izi tanındı! ✓'; hint.style.color = '#22c55e'; }
+        if (hint) hint.textContent = 'Barmaq izi tanındı! ✓';
         if (_setSession) _setSession('admin');
-        jaBurst(window.innerWidth/2, window.innerHeight/2, '34,197,94', 20);
-        setTimeout(() => jaSuccess('admin'), 800);
+        jaSuccess('admin');
       }
     } catch(e) {
-      if (ring) { ring.style.borderColor = '#ef4444'; ring.style.boxShadow = '0 0 20px rgba(239,68,68,0.3)'; }
-      if (svg) svg.style.color = '#ef4444';
-      if (hint) { hint.textContent = '❌ Tanınmadı — yenidən cəhd edin'; hint.style.color = '#ef4444'; }
-      setTimeout(() => {
-        if (ring) { ring.style.borderColor = 'rgba(255,255,255,0.1)'; ring.style.boxShadow = ''; }
-        if (svg) svg.style.color = 'rgba(255,255,255,0.4)';
-        if (hint) { hint.textContent = 'Senzorə toxunmaq üçün klikləyin'; hint.style.color = 'rgba(255,255,255,0.35)'; }
-      }, 2000);
+      if (hint) hint.textContent = '❌ Tanınmadı — yenidən cəhd edin';
     }
   };
 
@@ -376,11 +336,8 @@
     _cfg = cfg;
     _setSession = setSession;
     _applyViewer = applyViewer;
-    // Barmaq izi düyməsini göstər/gizlət
     const fpBtn = document.getElementById('ja-btn-fp');
     if (fpBtn) fpBtn.style.display = _cfg.biometricCredId ? '' : 'none';
-
-    // User kartını göstər/gizlət
     const uc = document.getElementById('ja-user-card');
     const grid = document.getElementById('ja-role-grid');
     if (uc && grid) {
@@ -392,15 +349,11 @@
         grid.style.gridTemplateColumns = '1fr';
       }
     }
-    // Kart ölçüsü sabit qalsın (User olub-olmamasından asılı olmasın)
-    const card = document.getElementById('ja-card');
-    if (card) card.style.maxWidth = '400px';
   };
 
-  let S = { screen: 'role', role: null, pin: '', animRunning: false };
+  let S = { screen: 'role', role: null, pin: '' };
 
   window.jollyAuthShow = function() {
-    // State tam sıfırla
     S.pin = '';
     S.role = null;
     S.screen = 'role';
@@ -409,50 +362,12 @@
       if(d) d.className='ja-pin-dot';
     }
     document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(c=>c.classList.remove('pick'));
-    // Overlay göstər
-    const ov = document.getElementById('jolly-auth-overlay');
-    ov.style.display = 'block';
-    setTimeout(resizeC, 50);
+    document.getElementById('jolly-auth-overlay').style.display = 'block';
     jaGo('role');
-    jaStartParticles();
   };
   window.jollyAuthHide = function() {
     document.getElementById('jolly-auth-overlay').style.display = 'none';
-    jaStopParticles();
   };
-
-  // Canvas particles
-  const C = document.getElementById('ja-canvas');
-  const X = C.getContext('2d', { alpha: true });
-  let P = [], O = [], animId = null;
-  function resizeC() {
-    const dpr = Math.min(window.devicePixelRatio||1,2);
-    C.width = window.innerWidth * dpr; C.height = window.innerHeight * dpr;
-    C.style.width = window.innerWidth+'px'; C.style.height = window.innerHeight+'px';
-    X.scale(dpr, dpr);
-  }
-  resizeC(); window.addEventListener('resize', resizeC);
-  function initP() {
-    P=[]; O=[];
-    const w=window.innerWidth, h=window.innerHeight;
-    const colors=['0,212,255','99,102,241','168,85,247','236,72,153','249,115,22','34,197,94'];
-    for(let i=0;i<50;i++) P.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:Math.random()*2+0.5,o:Math.random()*0.5+0.15,c:colors[Math.floor(Math.random()*colors.length)],ph:Math.random()*Math.PI*2});
-    for(let i=0;i<4;i++) O.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*80+50,vx:(Math.random()-0.5)*0.25,vy:(Math.random()-0.5)*0.25,c:colors[i%colors.length],o:Math.random()*0.07+0.02});
-  }
-  initP();
-  let F=0;
-  function animP() {
-    if(!S.animRunning) return;
-    F++;
-    const w=window.innerWidth, h=window.innerHeight, t=Date.now()*0.001;
-    X.clearRect(0,0,w,h);
-    O.forEach(o=>{o.x+=o.vx;o.y+=o.vy;if(o.x<-o.r)o.x=w+o.r;if(o.x>w+o.r)o.x=-o.r;if(o.y<-o.r)o.y=h+o.r;if(o.y>h+o.r)o.y=-o.r;const gr=X.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);gr.addColorStop(0,`rgba(${o.c},${o.o})`);gr.addColorStop(0.5,`rgba(${o.c},${o.o*0.3})`);gr.addColorStop(1,'rgba(0,0,0,0)');X.fillStyle=gr;X.fillRect(o.x-o.r,o.y-o.r,o.r*2,o.r*2);});
-    if(F%2===0){for(let i=0;i<P.length;i++){let conn=0;for(let j=i+1;j<P.length&&conn<3;j++){const dx=P[i].x-P[j].x,dy=P[i].y-P[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){X.beginPath();X.moveTo(P[i].x,P[i].y);X.lineTo(P[j].x,P[j].y);X.strokeStyle=`rgba(0,212,255,${(1-dist/100)*0.1})`;X.lineWidth=0.5;X.stroke();conn++;}}}}
-    P.forEach(p=>{p.x+=p.vx+Math.sin(t+p.ph)*0.15;p.y+=p.vy+Math.cos(t+p.ph*0.7)*0.15;p.vx*=0.99;p.vy*=0.99;if(p.x<-10)p.x=w+10;if(p.x>w+10)p.x=-10;if(p.y<-10)p.y=h+10;if(p.y>h+10)p.y=-10;X.beginPath();X.arc(p.x,p.y,p.r,0,Math.PI*2);X.fillStyle=`rgba(${p.c},${p.o})`;X.fill();});
-    requestAnimationFrame(animP);
-  }
-  function jaStartParticles(){if(!S.animRunning){S.animRunning=true;initP();animP();}}
-  function jaStopParticles(){S.animRunning=false;}
 
   window.jaGo = function(name) {
     document.querySelectorAll('#jolly-auth-overlay .ja-screen').forEach(s=>s.classList.remove('on'));
@@ -465,33 +380,22 @@
     if(prev){if(S.screen==='pin')jaPinClear();jaGo(prev);}
   };
 
-  // Rol seçimi
   document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(card=>{
-    card.addEventListener('click',function(e){
+    card.addEventListener('click',function(){
       S.role=this.dataset.role;
       document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(c=>c.classList.remove('pick'));
       this.classList.add('pick');
-      jaBurst(e.clientX,e.clientY,'0,212,255');
-      setTimeout(()=>{
-        document.getElementById('ja-m-title').textContent=S.role==='admin'?'Administrator':'User';
-        jaGo('method');
-      },350);
+      document.getElementById('ja-m-title').textContent=S.role==='admin'?'Administrator':'User';
+      jaGo('method');
     });
   });
 
-  function jaBurst(x,y,color,count=12){
-    const c=document.createElement('div');c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9999999;';document.body.appendChild(c);
-    for(let i=0;i<count;i++){const p=document.createElement('div');const a=(Math.PI*2/count)*i+(Math.random()-0.5)*0.5;const d=50+Math.random()*60;const s=3+Math.random()*3;p.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:${s}px;height:${s}px;border-radius:50%;background:rgb(${color});box-shadow:0 0 ${s*2}px rgba(${color},0.6);`;c.appendChild(p);p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) scale(0)`,opacity:0}],{duration:700+Math.random()*200,easing:'cubic-bezier(0.16,1,0.3,1)'});}
-    setTimeout(()=>c.remove(),1100);
-  }
+  window.jaMethod = function(m) { jaGo(m); if(m==='fingerprint'){setTimeout(()=>jaFpScan(),300);} };
 
-  window.jaMethod = function(m) { jaGo(m); if(m==='fingerprint'){setTimeout(()=>jaFpScan(),500);} };
-
-  // PIN
   window.jaPin = function(d) {
     if(S.pin.length>=8)return;
     S.pin+=d; jaUpdatePin();
-    if(S.pin.length>=4) setTimeout(jaCheckPin,250);
+    if(S.pin.length>=4) setTimeout(jaCheckPin,150);
   };
   window.jaPinBack = function(){S.pin=S.pin.slice(0,-1);jaUpdatePin();};
   window.jaPinClear = function(){S.pin='';jaUpdatePin();};
@@ -510,33 +414,24 @@
     if(role){
       dots.forEach(d=>{if(d)d.classList.add('good');});
       if(_setSession) _setSession(role);
-      jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',20);
-      setTimeout(()=>jaSuccess(role),400);
+      setTimeout(()=>jaSuccess(role),200);
     } else {
       dots.forEach(d=>{if(d)d.classList.add('bad');});
-      document.getElementById('ja-card').animate([{transform:'translateX(0)'},{transform:'translateX(-10px)',offset:0.2},{transform:'translateX(10px)',offset:0.4},{transform:'translateX(-6px)',offset:0.6},{transform:'translateX(6px)',offset:0.8},{transform:'translateX(0)'}],{duration:400,easing:'ease-in-out'});
-      setTimeout(()=>{S.pin='';jaUpdatePin();},600);
+      setTimeout(()=>{S.pin='';jaUpdatePin();},500);
     }
   }
 
   function jaSuccess(role){
     const name=role==='admin'?'Administrator':'User';
     document.getElementById('ja-ok-text').textContent=name+' olaraq daxil oldunuz';
-    const card=document.getElementById('ja-card');
-    card.animate([{transform:'scale(1)',filter:'blur(0px)',opacity:1},{transform:'scale(0.88)',filter:'blur(4px)',opacity:0.7}],{duration:300,easing:'cubic-bezier(0.4,0,0.2,1)'}).onfinish=()=>{
-      card.animate([{opacity:0.7,transform:'scale(0.88)'},{opacity:0,transform:'scale(1.4)'}],{duration:500,easing:'cubic-bezier(0.16,1,0.3,1)'}).onfinish=()=>{
-        jaGo('success');
-        jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',18);
-        setTimeout(()=>{
-          jollyAuthHide();
-          if(role==='user' && _applyViewer) {
-            _applyViewer();
-            // MutationObserver başlat
-            if(typeof startViewerObserver !== 'undefined') startViewerObserver();
-          }
-        },2000);
-      };
-    };
+    jaGo('success');
+    setTimeout(()=>{
+      jollyAuthHide();
+      if(role==='user' && _applyViewer) {
+        _applyViewer();
+        if(typeof startViewerObserver !== 'undefined') startViewerObserver();
+      }
+    },900);
   }
 
   document.addEventListener('keydown',e=>{
