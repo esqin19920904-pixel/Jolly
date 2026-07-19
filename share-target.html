@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JOLLY — Paylaşım</title>
+<meta name="theme-color" content="#06070d">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#06070d;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#12131c;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:32px 24px;width:100%;max-width:400px;text-align:center}
+.logo{font-size:1.4rem;font-weight:700;color:#00d4ff;margin-bottom:8px}
+.sub{color:rgba(255,255,255,0.5);font-size:0.85rem;margin-bottom:20px}
+img#preview{width:100%;border-radius:12px;margin-bottom:16px;display:none;border:1px solid rgba(255,255,255,0.1)}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;font-size:0.95rem;font-weight:600;cursor:pointer;margin-bottom:10px}
+.btn-primary{background:#00d4ff;color:#06070d}
+.btn-secondary{background:rgba(255,255,255,0.08);color:#fff}
+.status{font-size:0.8rem;color:rgba(255,255,255,0.4);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">👑 JOLLY</div>
+  <div class="sub">Paylaşılan şəkil</div>
+  <img id="preview" alt="">
+  <button class="btn btn-primary" onclick="goAdd()">Məhsula əlavə et</button>
+  <button class="btn btn-secondary" onclick="location.href='./index.html'">Ana səhifə</button>
+  <div class="status" id="status">Yüklənir...</div>
+</div>
+<script>
+async function init() {
+  const status = document.getElementById('status');
+  try {
+    // POST ilə gələn şəkli oxu
+    const formData = await (async () => {
+      if (location.search) {
+        const p = new URLSearchParams(location.search);
+        return { title: p.get('title')||'', text: p.get('text')||'' };
+      }
+      return {};
+    })();
+    status.textContent = 'Hazırdır';
+  } catch(e) {
+    status.textContent = 'Xəta: ' + e.message;
+  }
+}
+function goAdd() {
+  location.href = './index.html?action=add-product&shared=1';
+}
+init();
+</script>
+</body>
+</html>
