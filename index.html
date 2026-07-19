@@ -153,7 +153,6 @@
   <script defer src="filter-studio.js"></script>
   <script defer src="supplier-order.js"></script>
   <script defer src="bottom-dock.js"></script>
-  <script defer src="share-target.js"></script>
   <script defer src="app.js"></script>
   <script defer src="jolly-particles.js"></script>
   <script defer src="jolly-transitions.js"></script>
@@ -340,8 +339,6 @@
     return h.toString(16).padStart(8, '0');
   }
 
-  // security.js buraya cfg ötürür
-  // WebAuthn barmaq izi
   window.jaFpScan = async function() {
     const hint = document.getElementById('ja-fp-hint');
     const ring = document.getElementById('ja-fp-ring');
@@ -391,11 +388,9 @@
     _cfg = cfg;
     _setSession = setSession;
     _applyViewer = applyViewer;
-    // Barmaq izi düyməsini göstər/gizlət
     const fpBtn = document.getElementById('ja-btn-fp');
     if (fpBtn) fpBtn.style.display = _cfg.biometricCredId ? '' : 'none';
 
-    // User kartını göstər/gizlət
     const uc = document.getElementById('ja-user-card');
     const grid = document.getElementById('ja-role-grid');
     if (uc && grid) {
@@ -407,7 +402,6 @@
         grid.style.gridTemplateColumns = '1fr';
       }
     }
-    // Kart ölçüsü sabit qalsın (User olub-olmamasından asılı olmasın)
     const card = document.getElementById('ja-card');
     if (card) card.style.maxWidth = '400px';
   };
@@ -415,7 +409,6 @@
   let S = { screen: 'role', role: null, pin: '', animRunning: false };
 
   window.jollyAuthShow = function() {
-    // State tam sıfırla
     S.pin = '';
     S.role = null;
     S.screen = 'role';
@@ -424,7 +417,6 @@
       if(d) d.className='ja-pin-dot';
     }
     document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(c=>c.classList.remove('pick'));
-    // Overlay göstər
     const ov = document.getElementById('jolly-auth-overlay');
     ov.style.display = 'block';
     setTimeout(resizeC, 50);
@@ -436,7 +428,6 @@
     jaStopParticles();
   };
 
-  // Canvas particles
   const C = document.getElementById('ja-canvas');
   const X = C.getContext('2d', { alpha: true });
   let P = [], O = [], animId = null;
@@ -480,7 +471,6 @@
     if(prev){if(S.screen==='pin')jaPinClear();jaGo(prev);}
   };
 
-  // Rol seçimi
   document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(card=>{
     card.addEventListener('click',function(e){
       S.role=this.dataset.role;
@@ -502,7 +492,6 @@
 
   window.jaMethod = function(m) { jaGo(m); if(m==='fingerprint'){setTimeout(()=>jaFpScan(),500);} };
 
-  // PIN
   window.jaPin = function(d) {
     if(S.pin.length>=8)return;
     S.pin+=d; jaUpdatePin();
@@ -546,7 +535,6 @@
           jollyAuthHide();
           if(role==='user' && _applyViewer) {
             _applyViewer();
-            // MutationObserver başlat
             if(typeof startViewerObserver !== 'undefined') startViewerObserver();
           }
         },2000);
