@@ -8,7 +8,7 @@
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#06070d",
   "theme_color": "#06070d",
@@ -25,47 +25,31 @@
     { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
-  "screenshots": [
-    {
-      "src": "screenshot-dashboard.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Əsas panel"
-    },
-    {
-      "src": "screenshot-mobile.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobil görünüş"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Yeni məhsul",
       "short_name": "Yeni məhsul",
       "description": "Yeni məhsul əlavə et",
       "url": "./index.html?action=add-product",
-      "icons": [{ "src": "shortcut-add.png", "sizes": "96x96" }]
+      "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Siyahı",
       "short_name": "Siyahı",
       "description": "Məhsul siyahısına bax",
       "url": "./index.html?page=list",
-      "icons": [{ "src": "shortcut-list.png", "sizes": "96x96" }]
+      "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Skan et",
       "short_name": "Skan",
       "description": "Barkod skan et",
       "url": "./index.html?action=scan",
-      "icons": [{ "src": "shortcut-scan.png", "sizes": "96x96" }]
+      "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     }
   ],
   "share_target": {
-    "action": "./share-target",
+    "action": "./share-target.html",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -73,16 +57,13 @@
       "text": "sharedText",
       "url": "sharedUrl",
       "files": [
-        {
-          "name": "sharedImages",
-          "accept": ["image/*", "image/png", "image/jpeg", "image/webp"]
-        }
+        { "name": "sharedImages", "accept": ["image/*", "image/png", "image/jpeg", "image/webp"] }
       ]
     }
   },
   "file_handlers": [
     {
-      "action": "./import",
+      "action": "./import.html",
       "accept": {
         "application/json": [".json"],
         "text/csv": [".csv"],
@@ -90,10 +71,5 @@
       }
     }
   ],
-  "handle_links": "preferred",
-  "launch_handler": {
-    "client_mode": ["navigate-existing", "auto"]
-  },
-  "prefer_related_applications": false,
-  "related_applications": []
+  "prefer_related_applications": false
 }
