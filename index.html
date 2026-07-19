@@ -400,12 +400,16 @@
   let S = { screen: 'role', role: null, pin: '', animRunning: false };
 
   window.jollyAuthShow = function() {
-    // State-i sıfırla
+    // State tam sıfırla
     S.pin = '';
     S.role = null;
     S.screen = 'role';
-    for(let i=0;i<4;i++){const d=document.getElementById('ja-pd'+i);if(d){d.classList.remove('fill','bad','good');}}
-    
+    for(let i=0;i<4;i++){
+      const d=document.getElementById('ja-pd'+i);
+      if(d) d.className='ja-pin-dot';
+    }
+    document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(c=>c.classList.remove('pick'));
+    // Overlay göstər
     const ov = document.getElementById('jolly-auth-overlay');
     ov.style.display = 'block';
     ov.style.width = '100vw';
@@ -503,7 +507,7 @@
     const h=jaHash(S.pin);
     let role=null;
     if(S.role==='admin' && h===_cfg.pinHash) role='admin';
-    else if(S.role==='user' && _cfg.viewerEnabled && h===_cfg.viewerPinHash) role='viewer';
+    else if(S.role==='user' && _cfg.viewerEnabled && h===_cfg.viewerPinHash) role='user';
 
     if(role){
       dots.forEach(d=>{if(d)d.classList.add('good');});
@@ -527,7 +531,7 @@
         jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',18);
         setTimeout(()=>{
           jollyAuthHide();
-          if(role==='viewer' && _applyViewer) {
+          if(role==='user' && _applyViewer) {
             _applyViewer();
             // MutationObserver başlat
             if(typeof startViewerObserver !== 'undefined') startViewerObserver();
