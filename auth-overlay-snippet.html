@@ -1,0 +1,289 @@
+<!-- ═══════════════════════════════════════════════════════
+     JOLLY Auth Overlay — </body>-dən əvvəl yapışdır
+     ═══════════════════════════════════════════════════════ -->
+<div id="jolly-auth-overlay" style="display:none; position:fixed; inset:0; z-index:999999; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+<style>
+#jolly-auth-overlay { --c1:#00d4ff; --c2:#6366f1; --c3:#a855f7; --c4:#ec4899; --c5:#f97316; --c6:#22c55e; --c7:#fbbf24; --c8:#ef4444; --hue:0deg; }
+#jolly-auth-overlay * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+.ja-bg { position:absolute; inset:0; z-index:0; overflow:hidden; background:#000; }
+.ja-aurora { position:absolute; inset:-50%; background: radial-gradient(ellipse 60% 40% at 20% 30%, rgba(0,212,255,0.18) 0%, transparent 55%), radial-gradient(ellipse 50% 50% at 80% 20%, rgba(99,102,241,0.15) 0%, transparent 50%), radial-gradient(ellipse 55% 45% at 50% 80%, rgba(168,85,247,0.14) 0%, transparent 50%), radial-gradient(ellipse 40% 60% at 70% 60%, rgba(236,72,153,0.1) 0%, transparent 45%), radial-gradient(ellipse 50% 40% at 30% 70%, rgba(249,115,22,0.08) 0%, transparent 40%); animation: jaAurora 12s ease-in-out infinite; filter:blur(40px); }
+@keyframes jaAurora { 0%,100%{transform:scale(1) translate(0,0);opacity:0.9} 25%{transform:scale(1.1) translate(-3%,2%);opacity:1} 50%{transform:scale(1.05) translate(2%,-2%);opacity:0.85} 75%{transform:scale(1.15) translate(-1%,-3%);opacity:1} }
+.ja-rays { position:absolute; inset:0; background: conic-gradient(from var(--hue) at 50% 50%, rgba(0,212,255,0.04) 0deg, rgba(99,102,241,0.04) 45deg, rgba(168,85,247,0.04) 90deg, rgba(236,72,153,0.04) 135deg, rgba(249,115,22,0.04) 180deg, rgba(251,191,36,0.04) 225deg, rgba(34,197,94,0.04) 270deg, rgba(0,212,255,0.04) 315deg, rgba(0,212,255,0.04) 360deg); animation: jaHueSpin 15s linear infinite; mix-blend-mode:screen; }
+@keyframes jaHueSpin { to { --hue: 360deg; } }
+@property --hue { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+#ja-canvas { position:absolute; inset:0; z-index:1; pointer-events:none; width:100%; height:100%; }
+.ja-content { position:relative; z-index:10; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+.ja-card { position:relative; width:100%; max-width:400px; background: linear-gradient(135deg, rgba(10,10,20,0.8), rgba(20,10,30,0.7)); backdrop-filter: blur(50px) saturate(200%); -webkit-backdrop-filter: blur(50px) saturate(200%); border-radius: 28px; padding: 36px 28px; overflow:hidden; animation: jaCardFloat 5s ease-in-out infinite; box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(0,212,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08); }
+@keyframes jaCardFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.ja-card::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:2px; background: linear-gradient(135deg, rgba(0,212,255,0.4), rgba(168,85,247,0.3), rgba(236,72,153,0.2), rgba(34,197,94,0.2), rgba(0,212,255,0.4)); background-size:300% 300%; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: jaBorderGlow 4s ease infinite; opacity:0.7; }
+@keyframes jaBorderGlow { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+.ja-screen { display:none; opacity:0; transform:translateY(16px) scale(0.97); transition:all 0.4s cubic-bezier(0.16,1,0.3,1); }
+.ja-screen.on { display:block; opacity:1; transform:translateY(0) scale(1); }
+.ja-title { font-size:1.6rem; font-weight:700; text-align:center; margin-bottom:6px; background: linear-gradient(90deg, var(--c1), var(--c3), var(--c4)); background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; animation: jaTextGrad 3s ease infinite; }
+@keyframes jaTextGrad { 0%,100%{background-position:0% center} 50%{background-position:100% center} }
+.ja-sub { font-size:0.875rem; color:rgba(255,255,255,0.5); text-align:center; margin-bottom:24px; }
+.ja-role-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+.ja-role-card { position:relative; background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1.5px solid rgba(255,255,255,0.08); border-radius:20px; padding:28px 10px; text-align:center; cursor:pointer; transition:all 0.35s cubic-bezier(0.16,1,0.3,1); overflow:hidden; }
+.ja-role-card:hover { border-color:rgba(0,212,255,0.4); transform:translateY(-5px) scale(1.03); box-shadow:0 16px 48px rgba(0,212,255,0.12); }
+.ja-role-card:active { transform:translateY(-2px) scale(0.98); }
+.ja-role-card.pick { border-color:var(--c1); background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(168,85,247,0.06)); box-shadow:0 0 40px rgba(0,212,255,0.2),inset 0 0 20px rgba(0,212,255,0.03); }
+.ja-role-card.pick .ja-role-icon { color:var(--c1); filter:drop-shadow(0 0 12px rgba(0,212,255,0.5)); }
+.ja-role-icon { width:44px; height:44px; margin:0 auto 12px; color:rgba(255,255,255,0.45); transition:all 0.3s; }
+.ja-role-label { font-size:0.95rem; font-weight:600; margin-bottom:3px; color:#fff; }
+.ja-role-desc { font-size:0.7rem; color:rgba(255,255,255,0.35); line-height:1.4; }
+.ja-back { display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; color:rgba(255,255,255,0.35); background:none; border:none; cursor:pointer; margin-bottom:14px; padding:4px 0; transition:color 0.2s; }
+.ja-back:hover { color:#fff; }
+.ja-back svg { width:16px; height:16px; }
+.ja-methods { display:flex; flex-direction:column; gap:8px; }
+.ja-method { display:flex; align-items:center; gap:12px; width:100%; padding:14px 16px; background:linear-gradient(90deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)); border:1.5px solid rgba(255,255,255,0.06); border-radius:14px; color:#fff; font-size:0.875rem; font-weight:500; cursor:pointer; transition:all 0.25s cubic-bezier(0.16,1,0.3,1); text-align:left; overflow:hidden; }
+.ja-method:hover { border-color:rgba(0,212,255,0.35); background:linear-gradient(90deg,rgba(0,212,255,0.06),rgba(168,85,247,0.03)); transform:translateX(5px); }
+.ja-method:active { transform:translateX(2px) scale(0.99); }
+.ja-micon { width:22px; height:22px; color:var(--c1); flex-shrink:0; }
+.ja-marrow { margin-left:auto; width:16px; height:16px; color:rgba(255,255,255,0.2); transition:all 0.2s; }
+.ja-method:hover .ja-marrow { transform:translateX(4px); color:var(--c1); }
+.ja-pin-dots { display:flex; justify-content:center; gap:18px; margin:28px 0; }
+.ja-pin-dot { width:16px; height:16px; border-radius:50%; border:2.5px solid rgba(255,255,255,0.12); background:transparent; transition:all 0.25s cubic-bezier(0.4,0,0.2,1); }
+.ja-pin-dot.fill { background:var(--c1); border-color:var(--c1); box-shadow:0 0 14px rgba(0,212,255,0.5); transform:scale(1.15); }
+.ja-pin-dot.bad { border-color:var(--c8); background:var(--c8); box-shadow:0 0 14px rgba(239,68,68,0.5); animation:jaPinShake 0.4s ease-in-out; }
+.ja-pin-dot.good { border-color:var(--c6); background:var(--c6); box-shadow:0 0 14px rgba(34,197,94,0.5); }
+@keyframes jaPinShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+.ja-pin-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:250px; margin:0 auto; }
+.ja-pin-key { aspect-ratio:1; border-radius:50%; border:1.5px solid rgba(255,255,255,0.08); background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); color:#fff; font-size:1.2rem; font-weight:500; font-family:inherit; cursor:pointer; transition:all 0.15s cubic-bezier(0.16,1,0.3,1); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.ja-pin-key:hover { border-color:rgba(0,212,255,0.4); background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(168,85,247,0.05)); color:var(--c1); }
+.ja-pin-key:active { transform:scale(0.87); }
+.ja-success { display:flex; flex-direction:column; align-items:center; padding:32px 0; text-align:center; }
+.ja-ok-ring { width:76px; height:76px; border-radius:50%; border:3px solid var(--c6); display:flex; align-items:center; justify-content:center; margin-bottom:20px; box-shadow:0 0 30px rgba(34,197,94,0.3); animation:jaOkPop 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+@keyframes jaOkPop { 0%{transform:scale(0)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
+.ja-ok-icon { width:38px; height:38px; color:var(--c6); }
+.ja-ok-title { font-size:1.4rem; font-weight:700; margin-bottom:6px; background:linear-gradient(90deg,var(--c6),var(--c1)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.ja-ok-sub { font-size:0.875rem; color:rgba(255,255,255,0.55); }
+.ja-hint { font-size:0.7rem; color:rgba(255,255,255,0.2); text-align:center; margin-top:14px; }
+.ja-ripple { position:absolute; border-radius:50%; background:rgba(0,212,255,0.25); transform:scale(0); animation:jaRippleOut 0.6s cubic-bezier(0.16,1,0.3,1) forwards; pointer-events:none; }
+@keyframes jaRippleOut { to{transform:scale(4);opacity:0} }
+@media (max-width:480px) { .ja-card{padding:28px 18px;border-radius:22px;} .ja-title{font-size:1.35rem;} .ja-role-grid{gap:10px;} .ja-role-card{padding:22px 8px;} .ja-pin-pad{gap:8px;max-width:220px;} .ja-pin-key{font-size:1.1rem;} }
+</style>
+
+<div class="ja-bg"><div class="ja-aurora"></div><div class="ja-rays"></div></div>
+<canvas id="ja-canvas"></canvas>
+
+<div class="ja-content">
+  <div class="ja-card" id="ja-card">
+    <!-- Role -->
+    <div class="ja-screen on" id="ja-scr-role">
+      <h1 class="ja-title">Xoş gəlmisiniz</h1>
+      <p class="ja-sub">Zəhmət olmasa rolunuzu seçin</p>
+      <div class="ja-role-grid" id="ja-role-grid">
+        <div class="ja-role-card" data-role="admin" tabindex="0">
+          <div class="ja-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+          <div class="ja-role-label">Administrator</div><div class="ja-role-desc">Tam idarəetmə girişi</div>
+        </div>
+        <div class="ja-role-card" data-role="user" tabindex="0" id="ja-user-card">
+          <div class="ja-role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div class="ja-role-label">User</div><div class="ja-role-desc">Məhdud giriş imkanları</div>
+        </div>
+      </div>
+      <p class="ja-hint">Rol seçimi tələb olunur</p>
+    </div>
+    <!-- Method -->
+    <div class="ja-screen" id="ja-scr-method">
+      <button class="ja-back" onclick="jaBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Geri</button>
+      <h1 class="ja-title" id="ja-m-title">Administrator</h1>
+      <p class="ja-sub">Giriş üsulunu seçin</p>
+      <div class="ja-methods" id="ja-methods">
+        <button class="ja-method" id="ja-btn-pin" onclick="jaMethod('pin')"><span class="ja-micon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></span><span>PIN kodu ilə daxil ol</span><svg class="ja-marrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+    </div>
+    <!-- PIN -->
+    <div class="ja-screen" id="ja-scr-pin">
+      <button class="ja-back" onclick="jaBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Geri</button>
+      <h1 class="ja-title">PIN kodu</h1>
+      <p class="ja-sub">PIN-i daxil edin</p>
+      <div class="ja-pin-dots">
+        <div class="ja-pin-dot" id="ja-pd0"></div><div class="ja-pin-dot" id="ja-pd1"></div><div class="ja-pin-dot" id="ja-pd2"></div><div class="ja-pin-dot" id="ja-pd3"></div>
+      </div>
+      <div class="ja-pin-pad">
+        <button class="ja-pin-key" onclick="jaPin('1')">1</button><button class="ja-pin-key" onclick="jaPin('2')">2</button><button class="ja-pin-key" onclick="jaPin('3')">3</button>
+        <button class="ja-pin-key" onclick="jaPin('4')">4</button><button class="ja-pin-key" onclick="jaPin('5')">5</button><button class="ja-pin-key" onclick="jaPin('6')">6</button>
+        <button class="ja-pin-key" onclick="jaPin('7')">7</button><button class="ja-pin-key" onclick="jaPin('8')">8</button><button class="ja-pin-key" onclick="jaPin('9')">9</button>
+        <button class="ja-pin-key" onclick="jaPinBack()" style="font-size:0.75rem;color:rgba(255,255,255,0.5);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg></button>
+        <button class="ja-pin-key" onclick="jaPin('0')">0</button>
+        <button class="ja-pin-key" onclick="jaPinClear()" style="font-size:0.75rem;color:rgba(255,255,255,0.5);">C</button>
+      </div>
+    </div>
+    <!-- Success -->
+    <div class="ja-screen" id="ja-scr-success">
+      <div class="ja-success">
+        <div class="ja-ok-ring"><svg class="ja-ok-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <h2 class="ja-ok-title">Uğurlu giriş!</h2>
+        <p class="ja-ok-sub" id="ja-ok-text">Daxil oldunuz</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Real PIN sistemi
+  let _cfg = { pinHash: null, viewerPinHash: null, viewerEnabled: false };
+  let _setSession = null;
+  let _applyViewer = null;
+
+  function jaHash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
+
+  // security.js buraya cfg ötürür
+  window._jaSetCfg = function(cfg, setSession, applyViewer) {
+    _cfg = cfg;
+    _setSession = setSession;
+    _applyViewer = applyViewer;
+    // User kartını göstər/gizlət
+    const uc = document.getElementById('ja-user-card');
+    const grid = document.getElementById('ja-role-grid');
+    if (uc && grid) {
+      if (_cfg.viewerEnabled && _cfg.viewerPinHash) {
+        uc.style.display = '';
+        grid.style.gridTemplateColumns = '1fr 1fr';
+      } else {
+        uc.style.display = 'none';
+        grid.style.gridTemplateColumns = '1fr';
+      }
+    }
+  };
+
+  let S = { screen: 'role', role: null, pin: '', animRunning: false };
+
+  window.jollyAuthShow = function() {
+    document.getElementById('jolly-auth-overlay').style.display = 'block';
+    jaGo('role');
+    jaStartParticles();
+  };
+  window.jollyAuthHide = function() {
+    document.getElementById('jolly-auth-overlay').style.display = 'none';
+    jaStopParticles();
+  };
+
+  // Canvas particles
+  const C = document.getElementById('ja-canvas');
+  const X = C.getContext('2d', { alpha: true });
+  let P = [], O = [], animId = null;
+  function resizeC() {
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    C.width = window.innerWidth * dpr; C.height = window.innerHeight * dpr;
+    C.style.width = window.innerWidth+'px'; C.style.height = window.innerHeight+'px';
+    X.scale(dpr, dpr);
+  }
+  resizeC(); window.addEventListener('resize', resizeC);
+  function initP() {
+    P=[]; O=[];
+    const w=window.innerWidth, h=window.innerHeight;
+    const colors=['0,212,255','99,102,241','168,85,247','236,72,153','249,115,22','34,197,94'];
+    for(let i=0;i<50;i++) P.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:Math.random()*2+0.5,o:Math.random()*0.5+0.15,c:colors[Math.floor(Math.random()*colors.length)],ph:Math.random()*Math.PI*2});
+    for(let i=0;i<4;i++) O.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*80+50,vx:(Math.random()-0.5)*0.25,vy:(Math.random()-0.5)*0.25,c:colors[i%colors.length],o:Math.random()*0.07+0.02});
+  }
+  initP();
+  let F=0;
+  function animP() {
+    if(!S.animRunning) return;
+    F++;
+    const w=window.innerWidth, h=window.innerHeight, t=Date.now()*0.001;
+    X.clearRect(0,0,w,h);
+    O.forEach(o=>{o.x+=o.vx;o.y+=o.vy;if(o.x<-o.r)o.x=w+o.r;if(o.x>w+o.r)o.x=-o.r;if(o.y<-o.r)o.y=h+o.r;if(o.y>h+o.r)o.y=-o.r;const gr=X.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);gr.addColorStop(0,`rgba(${o.c},${o.o})`);gr.addColorStop(0.5,`rgba(${o.c},${o.o*0.3})`);gr.addColorStop(1,'rgba(0,0,0,0)');X.fillStyle=gr;X.fillRect(o.x-o.r,o.y-o.r,o.r*2,o.r*2);});
+    if(F%2===0){for(let i=0;i<P.length;i++){let conn=0;for(let j=i+1;j<P.length&&conn<3;j++){const dx=P[i].x-P[j].x,dy=P[i].y-P[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){X.beginPath();X.moveTo(P[i].x,P[i].y);X.lineTo(P[j].x,P[j].y);X.strokeStyle=`rgba(0,212,255,${(1-dist/100)*0.1})`;X.lineWidth=0.5;X.stroke();conn++;}}}}
+    P.forEach(p=>{p.x+=p.vx+Math.sin(t+p.ph)*0.15;p.y+=p.vy+Math.cos(t+p.ph*0.7)*0.15;p.vx*=0.99;p.vy*=0.99;if(p.x<-10)p.x=w+10;if(p.x>w+10)p.x=-10;if(p.y<-10)p.y=h+10;if(p.y>h+10)p.y=-10;X.beginPath();X.arc(p.x,p.y,p.r,0,Math.PI*2);X.fillStyle=`rgba(${p.c},${p.o})`;X.fill();});
+    requestAnimationFrame(animP);
+  }
+  function jaStartParticles(){if(!S.animRunning){S.animRunning=true;initP();animP();}}
+  function jaStopParticles(){S.animRunning=false;}
+
+  window.jaGo = function(name) {
+    document.querySelectorAll('#jolly-auth-overlay .ja-screen').forEach(s=>s.classList.remove('on'));
+    const el=document.getElementById('ja-scr-'+name);
+    if(el){el.classList.add('on');S.screen=name;}
+  };
+  window.jaBack = function() {
+    const map={method:'role',pin:'method'};
+    const prev=map[S.screen];
+    if(prev){if(S.screen==='pin')jaPinClear();jaGo(prev);}
+  };
+
+  // Rol seçimi
+  document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(card=>{
+    card.addEventListener('click',function(e){
+      S.role=this.dataset.role;
+      document.querySelectorAll('#jolly-auth-overlay .ja-role-card').forEach(c=>c.classList.remove('pick'));
+      this.classList.add('pick');
+      jaBurst(e.clientX,e.clientY,'0,212,255');
+      setTimeout(()=>{
+        document.getElementById('ja-m-title').textContent=S.role==='admin'?'Administrator':'User';
+        jaGo('method');
+      },350);
+    });
+  });
+
+  function jaBurst(x,y,color,count=12){
+    const c=document.createElement('div');c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9999999;';document.body.appendChild(c);
+    for(let i=0;i<count;i++){const p=document.createElement('div');const a=(Math.PI*2/count)*i+(Math.random()-0.5)*0.5;const d=50+Math.random()*60;const s=3+Math.random()*3;p.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:${s}px;height:${s}px;border-radius:50%;background:rgb(${color});box-shadow:0 0 ${s*2}px rgba(${color},0.6);`;c.appendChild(p);p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) scale(0)`,opacity:0}],{duration:700+Math.random()*200,easing:'cubic-bezier(0.16,1,0.3,1)'});}
+    setTimeout(()=>c.remove(),1100);
+  }
+
+  window.jaMethod = function(m) { jaGo(m); };
+
+  // PIN
+  window.jaPin = function(d) {
+    if(S.pin.length>=8)return;
+    S.pin+=d; jaUpdatePin();
+    if(S.pin.length>=4) setTimeout(jaCheckPin,250);
+  };
+  window.jaPinBack = function(){S.pin=S.pin.slice(0,-1);jaUpdatePin();};
+  window.jaPinClear = function(){S.pin='';jaUpdatePin();};
+
+  function jaUpdatePin(){
+    for(let i=0;i<4;i++){const d=document.getElementById('ja-pd'+i);if(d){d.classList.toggle('fill',i<S.pin.length);d.classList.remove('bad','good');}}
+  }
+
+  function jaCheckPin(){
+    const dots=[0,1,2,3].map(i=>document.getElementById('ja-pd'+i));
+    const h=jaHash(S.pin);
+    let role=null;
+    if(S.role==='admin' && h===_cfg.pinHash) role='admin';
+    else if(S.role==='user' && _cfg.viewerEnabled && h===_cfg.viewerPinHash) role='viewer';
+
+    if(role){
+      dots.forEach(d=>{if(d)d.classList.add('good');});
+      if(_setSession) _setSession(role);
+      jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',20);
+      setTimeout(()=>jaSuccess(role),400);
+    } else {
+      dots.forEach(d=>{if(d)d.classList.add('bad');});
+      document.getElementById('ja-card').animate([{transform:'translateX(0)'},{transform:'translateX(-10px)',offset:0.2},{transform:'translateX(10px)',offset:0.4},{transform:'translateX(-6px)',offset:0.6},{transform:'translateX(6px)',offset:0.8},{transform:'translateX(0)'}],{duration:400,easing:'ease-in-out'});
+      setTimeout(()=>{S.pin='';jaUpdatePin();},600);
+    }
+  }
+
+  function jaSuccess(role){
+    const name=role==='admin'?'Administrator':'User';
+    document.getElementById('ja-ok-text').textContent=name+' olaraq daxil oldunuz';
+    const card=document.getElementById('ja-card');
+    card.animate([{transform:'scale(1)',filter:'blur(0px)',opacity:1},{transform:'scale(0.88)',filter:'blur(4px)',opacity:0.7}],{duration:300,easing:'cubic-bezier(0.4,0,0.2,1)'}).onfinish=()=>{
+      card.animate([{opacity:0.7,transform:'scale(0.88)'},{opacity:0,transform:'scale(1.4)'}],{duration:500,easing:'cubic-bezier(0.16,1,0.3,1)'}).onfinish=()=>{
+        jaGo('success');
+        jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',18);
+        setTimeout(()=>{
+          jollyAuthHide();
+          if(role==='viewer' && _applyViewer) _applyViewer();
+        },2000);
+      };
+    };
+  }
+
+  document.addEventListener('keydown',e=>{
+    if(document.getElementById('jolly-auth-overlay').style.display==='none')return;
+    if(S.screen==='pin'){if(e.key>='0'&&e.key<='9')jaPin(e.key);if(e.key==='Backspace')jaPinBack();}
+  });
+})();
+</script>
+</div>
+<!-- ═══ /JOLLY Auth Overlay ═══ -->
