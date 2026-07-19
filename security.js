@@ -186,12 +186,14 @@ const JollySecurity = (() => {
     // Studios düyməsini gizlət
     try { document.querySelectorAll(HIDE_SELECTORS).forEach(el => el.style.display = 'none'); } catch(e){}
 
-    // Badge
+    // Badge — sol üstdə, klikləyib dəyişmək olur
     if (!document.getElementById('viewerBadge')) {
       const b = document.createElement('div');
       b.id = 'viewerBadge';
-      b.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9998;background:rgba(255,184,77,0.15);border:1px solid rgba(255,184,77,0.4);color:#fbbf24;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;pointer-events:none;';
-      b.textContent = '👁️ ' + (ROLES.user.name) + ' rejimi';
+      b.style.cssText = 'position:fixed;top:10px;left:12px;z-index:9998;background:rgba(10,10,20,0.85);border:1px solid rgba(255,184,77,0.5);color:#fbbf24;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.3);';
+      b.innerHTML = '👤 User <span style="opacity:0.6;font-size:10px;">| 🔄</span>';
+      b.title = 'İstifadəçi dəyiş';
+      b.onclick = () => JollySecurity.switchUser();
       document.body.appendChild(b);
     }
 
@@ -326,7 +328,16 @@ const JollySecurity = (() => {
         <div class="muted" style="padding:12px;font-size:12px;">Yüklənir...</div>
       </div>
       <button class="btn btn-ghost btn-sm btn-block" onclick="JollySecurity.clearActivityLog()">🗑️ Jurnalı təmizlə</button>
-      <button class="btn btn-ghost btn-block" style="margin-top:14px;color:var(--accent-danger);" onclick="JollySecurity.disableAll()">🗑️ Bütün qorumanı sil</button>
+      <div class="section-title" style="margin-top:14px;">🔄 Sessiya</div>
+      <div class="glass" style="padding:4px 14px;margin-bottom:14px;">
+        <div class="list-row" style="cursor:pointer;" onclick="JollySecurity.switchUser()">
+          <span>🔄 İstifadəçi dəyiş</span><span style="color:var(--accent-1);">›</span>
+        </div>
+        <div class="list-row" style="cursor:pointer;" onclick="JollySecurity.lockNow()">
+          <span>🔒 Kilid</span><span style="color:var(--accent-1);">›</span>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-block" style="margin-top:4px;color:var(--accent-danger);" onclick="JollySecurity.disableAll()">🗑️ Bütün qorumanı sil</button>
       ` : `
       <div class="glass" style="padding:16px;text-align:center;">
         <div style="font-size:36px;margin-bottom:8px;">🔓</div>
@@ -440,6 +451,22 @@ const JollySecurity = (() => {
     alert(`🗝️ Yeni bərpa kodunuz:\n\n${code}\n\nBu kodu yazıb saxlayın!`);
   }
 
+  function switchUser() {
+    clearSession();
+    setTimeout(() => {
+      pushCfgToOverlay();
+      if (window.jollyAuthShow) jollyAuthShow();
+    }, 100);
+  }
+
+  function lockNow() {
+    clearSession();
+    setTimeout(() => {
+      pushCfgToOverlay();
+      if (window.jollyAuthShow) jollyAuthShow();
+    }, 100);
+  }
+
   function disableAll() {
     if (!confirm('Bütün giriş qorumasını silmək istəyirsiniz?')) return;
     JollyDB.write(KEY, { enabled: false });
@@ -464,7 +491,7 @@ const JollySecurity = (() => {
   }
 
   return {
-    init, can, isViewer, isAdmin, isUnlocked,
+    init, can, isViewer, isAdmin, isUnlocked, switchUser, lockNow,
     clearSession, applyViewerMode, startViewerObserver,
     toggleEnabled, toggleViewer, setupPin, confirmSetupPin,
     setupBiometric, genNewRecovery, disableAll, clearActivityLog,
