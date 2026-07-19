@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>İdxal — JOLLY</title>
+<meta name="theme-color" content="#06070d">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#06070d;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#12131c;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:32px 24px;width:100%;max-width:420px}
+  .logo{font-size:1.5rem;font-weight:700;margin-bottom:8px;color:#00d4ff;text-align:center}
+  .sub{color:rgba(255,255,255,0.5);font-size:0.875rem;margin-bottom:24px;text-align:center}
+  .dropzone{border:2px dashed rgba(255,255,255,0.15);border-radius:16px;padding:32px 20px;text-align:center;margin-bottom:20px}
+  .dropzone.active{border-color:#00d4ff;background:rgba(0,212,255,0.05)}
+  .dropzone-icon{font-size:2.5rem;margin-bottom:12px;opacity:0.5}
+  .dropzone-text{font-size:0.9rem;color:rgba(255,255,255,0.6);margin-bottom:8px}
+  .dropzone-hint{font-size:0.75rem;color:rgba(255,255,255,0.3)}
+  .file-input{display:none}
+  .btn{width:100%;padding:14px;border-radius:12px;border:none;font-size:0.95rem;font-weight:600;cursor:pointer;margin-bottom:10px}
+  .btn-primary{background:#00d4ff;color:#06070d}
+  .btn-secondary{background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15)}
+  .btn:disabled{opacity:0.4;cursor:not-allowed}
+  .preview{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:16px;max-height:200px;overflow:auto;display:none}
+  .preview-title{font-size:0.8rem;color:rgba(255,255,255,0.4);margin-bottom:8px;text-transform:uppercase}
+  .preview-content{font-family:monospace;font-size:0.75rem;color:rgba(255,255,255,0.6);white-space:pre-wrap;word-break:break-all}
+  .status{font-size:0.8rem;color:rgba(255,255,255,0.4);text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">👑 JOLLY</div>
+  <div class="sub">Məhsul idxalı (CSV / Excel / JSON)</div>
+
+  <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+    <div class="dropzone-icon">📁</div>
+    <div class="dropzone-text">Faylı buraya atın və ya klikləyin</div>
+    <div class="dropzone-hint">CSV, Excel və ya JSON faylları dəstəklənir</div>
+  </div>
+  <input type="file" class="file-input" id="fileInput" accept=".csv,.xlsx,.json" onchange="handleFile(this.files[0])">
+
+  <div class="preview" id="preview">
+    <div class="preview-title">Fayl önizləməsi</div>
+    <div class="preview-content" id="previewContent"></div>
+  </div>
+
+  <button class="btn btn-primary" id="importBtn" disabled onclick="startImport()">İdxal et</button>
+  <button class="btn btn-secondary" onclick="goHome()">Ana səhifəyə qayıt</button>
+  <div class="status" id="status">Fayl seçməyinizi gözləyirəm...</div>
+</div>
+
+<script>
+  // QEYD: bu səhifə hələ JollyDB-yə birbaşa yazmır — yalnız faylı oxuyub göstərir.
+  // Real inteqrasiya üçün fayl məzmununu parse edib JollyDB.addProduct(...) ilə
+  // əlavə etmək lazımdır (app.js-dəki mövcud idxal məntiqinə qoşularaq).
+
+  let currentFile = null;
+  let fileContent = null;
+  const dropzone = document.getElementById('dropzone');
+
+  ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); });
+  });
+  ['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, () => dropzone.classList.add('active')));
+  ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, () => dropzone.classList.remove('active')));
+  dropzone.addEventListener('drop', (e) => {
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file) return;
+    currentFile = file;
+    document.getElementById('status').textContent = 'Fayl oxunur: ' + file.name;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      fileContent = e.target.result;
+      showPreview(file.name, fileContent);
+      document.getElementById('importBtn').disabled = false;
+      document.getElementById('status').textContent = 'Fayl hazırdır — idxal edə bilərsiniz';
+    };
+    reader.onerror = () => {
+      document.getElementById('status').textContent = '❌ Fayl oxunarkən xəta baş verdi';
+    };
+    if (file.name.endsWith('.xlsx')) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
+  }
+
+  function showPreview(filename, content) {
+    const preview = document.getElementById('preview');
+    const contentDiv = document.getElementById('previewContent');
+    preview.style.display = 'block';
+    if (filename.endsWith('.json')) {
+      try {
+        contentDiv.textContent = JSON.stringify(JSON.parse(content), null, 2).slice(0, 2000);
+      } catch { contentDiv.textContent = String(content).slice(0, 2000); }
+    } else if (filename.endsWith('.xlsx')) {
+      contentDiv.textContent = '[Excel faylı — ' + (content.byteLength / 1024).toFixed(1) + ' KB]';
+    } else {
+      contentDiv.textContent = String(content).slice(0, 2000);
+    }
+  }
+
+  function startImport() {
+    document.getElementById('importBtn').disabled = true;
+    document.getElementById('status').textContent = 'İdxal funksiyası hələ hazırlanır — bu fayl app-a ötürülmür.';
+  }
+
+  function goHome() {
+    window.location.href = './index.html';
+  }
+</script>
+</body>
+</html>
