@@ -36,7 +36,8 @@ const JollySecurity = (() => {
     if (!isViewer()) return;
     document.querySelectorAll(
       '.btn-primary,.rfab-main,#jbdTab,[onclick*="product/new"],[onclick*="submitForm"],' +
-      '[onclick*="deleteProduct"],[onclick*="quickAdd"],[onclick*="addBarcodeField"],.edit-btn,.delete-btn'
+      '[onclick*="deleteProduct"],[onclick*="quickAdd"],[onclick*="addBarcodeField"],.edit-btn,.delete-btn,' +
+      '#topStudiosBtn,[onclick*="studios"],[href*="studios"],.studios-btn'
     ).forEach(el => { el.style.display = 'none'; });
     if (!document.getElementById('viewerBadge')) {
       const b = document.createElement('div');
@@ -257,7 +258,13 @@ const JollySecurity = (() => {
     ModuleRegistry.register({
       id: 'security', name: 'Security Studio', icon: '🔐',
       route: '#/studios/security', group: 'Sistem', enabled: true,
-      render() { return renderStudio(); },
+      render() {
+        if (JollySecurity.isViewer()) {
+          JollyRouter.go('#/home');
+          return '';
+        }
+        return renderStudio();
+      },
       afterRender() { afterRenderStudio(); },
     });
   }
