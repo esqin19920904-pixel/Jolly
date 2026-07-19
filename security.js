@@ -208,18 +208,6 @@ const JollySecurity = (() => {
 
   // ── İnit ─────────────────────────────────────────────────
   function init() {
-    // ── MÜVƏQQƏTİ SIFIRLAMA QAPISI — işlədikdən sonra bu bloku SİL ──
-    if (location.search.includes('resetauth')) {
-      JollyDB.write(CFG_KEY, {
-        enabled: false, pinHash: null, viewerPinHash: null,
-        biometricCredId: null, viewerEnabled: false, recoveryHash: null,
-      });
-      sessionStorage.removeItem(SESSION_KEY);
-      alert('🔓 Kilid sıfırlandı! İndi "?resetauth" olmadan səhifəni aç.');
-      return;
-    }
-    // ── /MÜVƏQQƏTİ SIFIRLAMA QAPISI ──
-
     const cfg = getCfg();
     if (!cfg.enabled) return;
 
