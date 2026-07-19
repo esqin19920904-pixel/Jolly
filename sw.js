@@ -21,7 +21,7 @@
    JollyShareTarget modulu tərəfindən edilir.
    ========================================================================== */
 
-const CACHE_NAME = "jolly-cache-v3";
+const CACHE_NAME = "jolly-cache-v4";
 const SHARE_CACHE = "jolly-share-cache";
 const APP_SHELL = ["./", "./index.html", "./manifest.json"];
 
