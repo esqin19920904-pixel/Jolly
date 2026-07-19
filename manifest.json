@@ -5,7 +5,7 @@
   "description": "JOLLY — mağaza məhsullarının ağıllı idarəetmə sistemi",
   "lang": "az",
   "dir": "ltr",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
@@ -30,21 +30,21 @@
       "name": "Yeni məhsul",
       "short_name": "Yeni məhsul",
       "description": "Yeni məhsul əlavə et",
-      "url": "./index.html?action=add-product",
+      "url": "./?action=add-product",
       "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Siyahı",
       "short_name": "Siyahı",
       "description": "Məhsul siyahısına bax",
-      "url": "./index.html?page=list",
+      "url": "./?page=list",
       "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Skan et",
       "short_name": "Skan",
       "description": "Barkod skan et",
-      "url": "./index.html?action=scan",
+      "url": "./?action=scan",
       "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     }
   ],
