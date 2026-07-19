@@ -392,9 +392,9 @@
         grid.style.gridTemplateColumns = '1fr';
       }
     }
-    // Kart tam ekranda görünsün
+    // Kart ölçüsü sabit qalsın (User olub-olmamasından asılı olmasın)
     const card = document.getElementById('ja-card');
-    if (card) card.style.maxWidth = (_cfg.viewerEnabled && _cfg.viewerPinHash) ? '400px' : '320px';
+    if (card) card.style.maxWidth = '400px';
   };
 
   let S = { screen: 'role', role: null, pin: '', animRunning: false };
