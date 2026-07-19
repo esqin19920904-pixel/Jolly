@@ -513,7 +513,11 @@
         jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',18);
         setTimeout(()=>{
           jollyAuthHide();
-          if(role==='viewer' && _applyViewer) _applyViewer();
+          if(role==='viewer' && _applyViewer) {
+            _applyViewer();
+            // MutationObserver başlat
+            if(typeof startViewerObserver !== 'undefined') startViewerObserver();
+          }
         },2000);
       };
     };
