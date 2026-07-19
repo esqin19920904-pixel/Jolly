@@ -400,6 +400,12 @@
   let S = { screen: 'role', role: null, pin: '', animRunning: false };
 
   window.jollyAuthShow = function() {
+    // State-i sıfırla
+    S.pin = '';
+    S.role = null;
+    S.screen = 'role';
+    for(let i=0;i<4;i++){const d=document.getElementById('ja-pd'+i);if(d){d.classList.remove('fill','bad','good');}}
+    
     const ov = document.getElementById('jolly-auth-overlay');
     ov.style.display = 'block';
     ov.style.width = '100vw';
