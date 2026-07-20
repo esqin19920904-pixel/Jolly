@@ -28,7 +28,11 @@ const JollyUsers = (() => {
     catch (e) { return []; }
   }
   function _write(list) {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); return true; }
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(list));
+      if (window.JollyCloud && JollyCloud.scheduleSync) JollyCloud.scheduleSync();
+      return true;
+    }
     catch (e) { return false; }
   }
 
