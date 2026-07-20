@@ -653,6 +653,33 @@ const JollyApp = (() => {
     if (repaired > 0 && typeof Toast !== 'undefined') {
       setTimeout(() => Toast.success(`${repaired} məhsul bərpa olundu ✓`), 800);
     }
+
+    // ── Yeni cihaz kilidi problemi ──
+    // Tamam təzə telefonda (heç bir işçi/PIN yaddaşda yoxdur) kilid ekranı
+    // özü də görünmür, çünki İstifadəçilər siyahısı yalnız GİRİŞDƏN SONRA
+    // buluddan gəlir — toyuq-yumurta. Ona görə, kilid ekranını göstərməzdən
+    // əvvəl, cihaz tam təzədirsə (heç bir işçi/PIN yoxdur) və bulud
+    // qoşulubsa, sakitcə buluddan bərpa edirik (məhsullar daxil, çünki
+    // cihazda itiriləcək heç nə yoxdur).
+    const noUsers = !(window.JollyUsers && JollyUsers.list().length > 0);
+    const noPin = !(JollyDB.getSettings().pin);
+    const looksFresh = noUsers && noPin && JollyDB.Products.all().length === 0;
+    if (looksFresh && typeof JollyCloud !== 'undefined' && JollyCloud.enabled() && navigator.onLine) {
+      showLoader();
+      JollyCloud.pull().then(payload => {
+        if (payload && payload.data) {
+          try { JollyDB.importAll(payload.data); } catch (e) {}
+        }
+      }).catch(() => {}).finally(() => {
+        hideLoader();
+        continueBoot();
+      });
+      return;
+    }
+    continueBoot();
+  }
+
+  function continueBoot() {
     if (!checkPinLock()) return;
     renderIdentityBadge();
     JollyStudios.applySavedTheme();
