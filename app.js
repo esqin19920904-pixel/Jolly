@@ -655,36 +655,33 @@ const JollyApp = (() => {
     }
 
     // ── Yeni cihaz kilidi problemi ──
-    // Tamam təzə telefonda (heç bir işçi/PIN yaddaşda yoxdur) kilid ekranı
-    // özü də görünmür, çünki İstifadəçilər siyahısı yalnız GİRİŞDƏN SONRA
-    // buluddan gəlir — toyuq-yumurta. Ona görə, kilid ekranını göstərməzdən
-    // əvvəl, cihaz tam təzədirsə (heç bir işçi/PIN yoxdur) və bulud
-    // qoşulubsa, sakitcə buluddan bərpa edirik (məhsullar daxil, çünki
-    // cihazda itiriləcək heç nə yoxdur).
+    // İşçi siyahısı yalnız GİRİŞDƏN SONRA buluddan gəlir — toyuq-yumurta.
+    // Cihazda artıq başqa məlumat (PIN, məhsul) ola bilər, amma İstifadəçilər
+    // siyahısı hələ heç sinxronlaşmayıbsa, "Kimsən?" ekranında yalnız Admin
+    // görünür. Ona görə, kilid ekranını göstərməzdən əvvəl, YALNIZ işçi
+    // siyahısı boşdursa, onu (təhlükəsiz şəkildə, başqa heç nəyə toxunmadan)
+    // buluddan çəkirik.
     const noUsers = !(window.JollyUsers && JollyUsers.list().length > 0);
     const noPin = !(JollyDB.getSettings().pin);
-    const looksFresh = noUsers && noPin && JollyDB.Products.all().length === 0;
-    if (looksFresh && typeof JollyCloud !== 'undefined' && JollyCloud.enabled() && navigator.onLine) {
-      alert('🔧 debug: təzə cihaz aşkarlandı, buluddan çəkilir...');
-      showLoader();
+    if ((noUsers || noPin) && typeof JollyCloud !== 'undefined' && JollyCloud.enabled() && navigator.onLine) {
       JollyCloud.pull().then(payload => {
-        if (payload && payload.data) {
-          const uCount = Array.isArray(payload.data.users) ? payload.data.users.length : 0;
-          alert('🔧 debug: bulud cavab verdi — ' + uCount + ' işçi tapıldı, pin var: ' + !!(payload.data.settings && payload.data.settings.pin));
-          try { JollyDB.importAll(payload.data); } catch (e) { alert('🔧 debug: importAll xətası: ' + e.message); }
-        } else {
-          alert('🔧 debug: buluddan boş cavab gəldi (payload yoxdur)');
+        if (!payload || !payload.data) return;
+        if (noUsers && Array.isArray(payload.data.users) && payload.data.users.length > 0) {
+          try { JollyDB.write('jolly_users_v1', payload.data.users); } catch (e) {}
         }
-      }).catch((e) => {
-        alert('🔧 debug: bulud xətası: ' + (e && e.message));
-      }).finally(() => {
-        hideLoader();
+        if (noPin && payload.data.settings && payload.data.settings.pin) {
+          try {
+            const local = JollyDB.getSettings();
+            local.pin = payload.data.settings.pin;
+            local.pinEnabled = payload.data.settings.pinEnabled;
+            local.pinRecovery = payload.data.settings.pinRecovery;
+            JollyDB.saveSettings ? JollyDB.saveSettings(local) : JollyDB.write('jolly_settings', local);
+          } catch (e) {}
+        }
+      }).catch(() => {}).finally(() => {
         continueBoot();
       });
       return;
-    }
-    if (!looksFresh) {
-      alert('🔧 debug: cihaz "təzə" sayılmadı — noUsers:' + noUsers + ' noPin:' + noPin + ' products:' + JollyDB.Products.all().length);
     }
     continueBoot();
   }
