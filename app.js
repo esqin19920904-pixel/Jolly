@@ -400,7 +400,7 @@ const JollyApp = (() => {
           <div class="lock-logo" style="font-size:1.1rem;">${isAdmin ? 'Admin' : identity.name}</div>
           <div class="lock-title">PIN daxil et</div>
           <div class="lock-dots" id="lockDots">
-            ${Array(isAdmin ? correctPin.length : 7).fill('<span></span>').join('')}
+            ${Array(isAdmin ? (isHashedPin(correctPin) ? 7 : correctPin.length) : 7).fill('<span></span>').join('')}
           </div>
           <div class="lock-err" id="lockErr"></div>
           <div class="lock-pad">
@@ -422,17 +422,40 @@ const JollyApp = (() => {
       dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
     }
 
+    function hashPin(s) {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < String(s).length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+      return h.toString(16).padStart(8, '0');
+    }
+    function isHashedPin(v) { return /^[0-9a-f]{8}$/.test(String(v)); }
+
     function check() {
-      const expectedLen = identity.type === 'admin' ? correctPin.length : 7;
+      const adminIsHashed = identity.type === 'admin' && isHashedPin(correctPin);
+      const expectedLen = identity.type === 'admin' ? (adminIsHashed ? 7 : correctPin.length) : 7;
       if (entered.length !== expectedLen) return;
 
       let matchedUser = null;
       let ok = false;
+      let needsMigration = false;
       if (identity.type === 'admin') {
-        ok = (entered === correctPin);
+        if (adminIsHashed) {
+          ok = (hashPin(entered) === correctPin);
+        } else {
+          // Köhnə, hash-lənməmiş PIN — uyğun gəlirsə keçir və dərhal hash-a köçür
+          ok = (entered === correctPin);
+          needsMigration = ok;
+        }
       } else if (window.JollyUsers) {
         matchedUser = JollyUsers.verifyUserPin(identity.id, entered);
         ok = !!matchedUser;
+      }
+
+      if (ok && needsMigration) {
+        try {
+          const ns = JollyDB.getSettings();
+          ns.pin = hashPin(entered);
+          JollyDB.setSettings ? JollyDB.setSettings(ns) : JollyDB.write('settings', ns);
+        } catch (e) {}
       }
 
       if (ok) {
@@ -483,7 +506,7 @@ const JollyApp = (() => {
         const key = e.target.closest('.lock-key');
         if (!key) return;
         if (typeof JollySound !== 'undefined') JollySound.tap();
-        const maxLen2 = identity.type === 'admin' ? correctPin.length : 7;
+        const maxLen2 = identity.type === 'admin' ? (isHashedPin(correctPin) ? 7 : correctPin.length) : 7;
         if (key.dataset.del) { entered = entered.slice(0, -1); updateDots(); return; }
         if (key.dataset.n == null) return;
         if (entered.length < maxLen2) { entered += key.dataset.n; updateDots(); check(); }
