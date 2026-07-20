@@ -1722,13 +1722,13 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
     radial-gradient(circle at 25% 30%, rgba(99,102,241,0.35) 0%, transparent 40%),
     radial-gradient(circle at 75% 70%, rgba(168,85,247,0.3) 0%, transparent 40%),
     radial-gradient(circle at 60% 20%, rgba(255,95,162,0.2) 0%, transparent 35%);
-  animation: lockAurora 16s ease-in-out infinite alternate;
+  animation: lockAurora 8s ease-in-out infinite alternate;
   filter: blur(2px);
   pointer-events: none;
 }
 @keyframes lockAurora {
-  0%   { transform: rotate(0deg) scale(1); }
-  100% { transform: rotate(20deg) scale(1.3); }
+  0%   { transform: rotate(0deg) scale(1) translate(0,0); }
+  100% { transform: rotate(25deg) scale(1.4) translate(4%,-4%); }
 }
 
 /* Sayrışan ulduzlar (JS ilə əlavə olunur, .lock-star sinifli) */
@@ -1739,7 +1739,7 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .lock-comet {
   position: absolute; top: 10%; left: -10%; width: 3px; height: 3px; border-radius: 50%;
   background: #fff; box-shadow: 0 0 6px 2px #fff;
-  animation: lockCometFly 7s linear infinite;
+  animation: lockCometFly 4.5s linear infinite;
   pointer-events: none;
 }
 .lock-comet::before {
@@ -1773,20 +1773,27 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
   border: 1.5px solid rgba(168,85,247,0.5);
   border-radius: 50%;
   transform: translate(-50%,-50%) rotateX(75deg);
-  animation: lockRingRotate 6s linear infinite;
   box-shadow: 0 0 12px rgba(168,85,247,0.3);
 }
-@keyframes lockRingRotate { to { transform: translate(-50%,-50%) rotateX(75deg) rotate(360deg); } }
+.lock-ring::before, .lock-ring::after {
+  content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 10px 3px #fff, 0 0 18px 6px rgba(168,85,247,0.8);
+  offset-path: path('M 50,1 A 49,14 0 1,1 49.9,1');
+  offset-rotate: 0deg;
+  animation: lockRingOrbit 3.5s linear infinite;
+}
+.lock-ring::after { animation-delay: -1.75s; background: #4ee6f5; box-shadow: 0 0 10px 3px #4ee6f5; }
+@keyframes lockRingOrbit { to { offset-distance: 100%; } }
 
 .lock-crown {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 40px;
   filter: drop-shadow(0 0 16px rgba(168,85,247,0.7));
-  animation: lockCrownFloat 4s ease-in-out infinite;
+  animation: lockCrownFloat 3s ease-in-out infinite;
 }
 @keyframes lockCrownFloat {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(-10px) rotate(8deg); }
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  50%      { transform: translateY(-14px) rotate(10deg) scale(1.05); }
 }
 .lock-logo { font-family: var(--font-display, sans-serif); font-size: 36px; font-weight: 900; letter-spacing: 4px; color: #fff;
   text-shadow: 0 0 10px rgba(168,85,247,0.8), 0 0 24px rgba(99,102,241,0.6); position: relative; }
@@ -1853,13 +1860,4 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .lock-bio-zone.scanning .lock-bio-svg { animation: lockBioScanning 0.6s ease-in-out infinite; }
 @keyframes lockBioScanning { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
 .lock-bio-zone:active { transform: scale(0.96); }
-.lock-forgot:active { color: #f5c563; }
-
-/* Kimsən? — istifadəçi kartları: sırayla görünmə + toxunma effekti */
-.lock-user-card {
-  position: relative; overflow: hidden;
-  animation: lockCardIn .45s cubic-bezier(0.16,1,0.3,1) backwards;
-  transition: transform .12s ease, box-shadow .12s ease, border-color .15s ease, background .15s ease;
-  box-shadow: 0 3px 0 rgba(245,197,99,0.12), 0 6px 14px rgba(0,0,0,0.25);
-}
-.lock-use
+.lock-forgot:active { co
