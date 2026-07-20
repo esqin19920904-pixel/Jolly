@@ -44,12 +44,8 @@ const JollySecurity = (() => {
       return s;
     } catch(e) { return null; }
   }
-  function setSession(role, user) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-      role, at: Date.now(),
-      userId: user ? user.id : null,
-      userName: user ? user.name : null,
-    }));
+  function setSession(role) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role, at: Date.now() }));
   }
   function clearSession() {
     sessionStorage.removeItem(SESSION_KEY);
@@ -75,12 +71,11 @@ const JollySecurity = (() => {
     });
   }
 
-  function _showBadge(role, user) {
+  function _showBadge(role) {
     _removeBadges();
     const b = document.createElement('div');
     b.id = role === 'admin' ? 'adminBadge' : 'viewerBadge';
     const isAdm = role === 'admin';
-    const label = isAdm ? 'Admin' : (user ? user.name : 'User');
     b.style.cssText = `position:fixed;top:10px;left:12px;z-index:9998;
       background:rgba(10,10,20,0.88);
       border:1px solid ${isAdm ? 'rgba(0,212,255,0.5)' : 'rgba(255,184,77,0.5)'};
@@ -90,7 +85,7 @@ const JollySecurity = (() => {
       backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.3);`;
     b.innerHTML = isAdm
       ? '👑 Admin <span style="opacity:0.55;font-size:10px;">| 🔒</span>'
-      : `👤 ${label} <span style="opacity:0.55;font-size:10px;">| 🔄</span>`;
+      : '👤 User <span style="opacity:0.55;font-size:10px;">| 🔄</span>';
     b.title = isAdm ? 'Kilid' : 'İstifadəçi dəyiş';
     b.onclick = () => switchUser();
     document.body.appendChild(b);
@@ -198,9 +193,9 @@ const JollySecurity = (() => {
   function _pushToOverlay() {
     const cfg = getCfg();
     if (window._jaSetCfg) {
-      window._jaSetCfg(cfg, (role, user) => {
-        setSession(role, user);
-        _showBadge(role, user);
+      window._jaSetCfg(cfg, (role) => {
+        setSession(role);
+        _showBadge(role);
         if (role === 'user') {
           applyViewerMode();
         } else {
@@ -218,8 +213,7 @@ const JollySecurity = (() => {
 
     const session = getSession();
     if (session) {
-      const u = (session.userId && window.JollyUsers) ? JollyUsers.get(session.userId) : null;
-      _showBadge(session.role, u);
+      _showBadge(session.role);
       if (session.role === 'user') {
         setTimeout(() => applyViewerMode(), 300);
       } else if (window.POS) {
@@ -490,18 +484,22 @@ const JollySecurity = (() => {
   }
 
   // ── Modul qeydiyyatı ──────────────────────────────────────
-  if (typeof ModuleRegistry !== 'undefined') {
-    ModuleRegistry.register({
-      id: 'security',
-      name: 'Security Studio',
-      icon: '🔐',
-      route: '#/studios/security',
-      group: 'Sistem',
-      enabled: true,
-      render()      { return renderStudio(); },
-      afterRender() { afterRenderStudio(); },
-    });
-  }
+  // NOT: Security Studio artıq deaktivdir — giriş indi app.js-in
+  // qızıl PIN ekranı + jolly-users.js (fərdi işçilər) vasitəsilə
+  // idarə olunur. Qarışıqlıq yaratmasın deyə bu köhnə panel
+  // Studiolar siyahısında göstərilmir.
+  // if (typeof ModuleRegistry !== 'undefined') {
+  //   ModuleRegistry.register({
+  //     id: 'security',
+  //     name: 'Security Studio',
+  //     icon: '🔐',
+  //     route: '#/studios/security',
+  //     group: 'Sistem',
+  //     enabled: true,
+  //     render()      { return renderStudio(); },
+  //     afterRender() { afterRenderStudio(); },
+  //   });
+  // }
 
   // ── Başlanğıc ─────────────────────────────────────────────
   if (document.readyState === 'loading') {
