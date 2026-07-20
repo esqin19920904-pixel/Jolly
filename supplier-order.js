@@ -30,6 +30,10 @@ const JollySupplierOrder = (() => {
      ƏSAS SƏHİFƏ
      ============================================================ */
   function render(rest) {
+    if (window.JollyAuth && !JollyAuth.can('supplier.order')) {
+      if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+      return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+    }
     if (rest === 'history') return renderHistory();
     if (rest && rest.indexOf('history/') === 0) return renderOrderDetail(rest.slice(8));
 
