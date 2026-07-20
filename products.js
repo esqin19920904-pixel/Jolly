@@ -479,6 +479,10 @@ const JollyProducts = (() => {
   }
 
   function toggleFav(id) {
+    if (window.JollyAuth && !JollyAuth.can('favorites.use')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Sevimlilər icazən yoxdur');
+      return;
+    }
     const on = JollyDB.toggleFavorite(id);
     if (typeof JollySound !== 'undefined') JollySound.tap();
     Toast.success(on ? '⭐ Favorilərə əlavə olundu' : 'Favorilərdən çıxarıldı');
