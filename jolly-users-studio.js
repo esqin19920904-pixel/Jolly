@@ -101,7 +101,7 @@
     formWrap.innerHTML = `
       <div class="ju-add-form">
         <input id="ju-name" type="text" placeholder="Ad (məs. Zülfü)">
-        <input id="ju-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="PIN (4 rəqəm)">
+        <input id="ju-pin" type="tel" inputmode="numeric" maxlength="7" placeholder="PIN (7 rəqəm)">
         <button onclick="JollyUsersUI.create()"
           style="width:100%;padding:10px;border-radius:9px;background:var(--accent-1,#00d4ff);color:#06070d;font-weight:600;font-size:13px;border:none;">
           Əlavə et
@@ -133,9 +133,9 @@
     },
     editPin(id) {
       _menuOpenId = null;
-      const pin = prompt('Yeni PIN daxil et (4 rəqəm):');
+      const pin = prompt('Yeni PIN daxil et (7 rəqəm):');
       if (!pin) { _draw(); return; }
-      if (!/^\d{4}$/.test(pin)) { alert('PIN düz 4 rəqəm olmalıdır'); _draw(); return; }
+      if (!/^\d{7}$/.test(pin)) { alert('PIN düz 7 rəqəm olmalıdır'); _draw(); return; }
       JollyUsers.update(id, { pin });
       _draw();
     },
