@@ -338,6 +338,12 @@
     setTimeout(checkDailySummaryNotify, 4500);
 
     // İşçi girişi bildirişi — yalnız User daxil olanda (Admin özünə bildiriş almır)
+    // JollyEvents hələ yüklənməyibsə, hazır olana qədər gözlə (skript sırası fərq etməsin)
+    registerLoginListener();
+  }
+
+  function registerLoginListener(attempt) {
+    attempt = attempt || 0;
     if (window.JollyEvents) {
       JollyEvents.on('user.login', (payload) => {
         if (!payload || payload.role !== 'user') return;
@@ -345,7 +351,10 @@
         const time = new Date().toLocaleString('az-AZ');
         sendMessage(`👤 <b>${payload.name}</b> daxil oldu\n🕐 ${time}`);
       });
+      return;
     }
+    if (attempt > 20) return; // ~10 saniyədən sonra vaz keç (JollyEvents ümumiyyətlə yoxdursa)
+    setTimeout(() => registerLoginListener(attempt + 1), 500);
   }
 
   if (document.readyState === "loading") {
