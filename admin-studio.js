@@ -12,6 +12,13 @@ const JollyAdminStudio = (() => {
   };
 
   function renderHome() {
+    try {
+      const s = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      if (s && s.role !== 'admin') {
+        if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+        return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+      }
+    } catch (e) {}
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 16px;font-size:19px;">🛠️ Admin Studio</h2>
       <div class="studio-grid">
@@ -36,6 +43,13 @@ const JollyAdminStudio = (() => {
   }
 
   function renderList(key) {
+    try {
+      const s = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      if (s && s.role !== 'admin') {
+        if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+        return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+      }
+    } catch (e) {}
     const cfg = STORE_MAP[key];
     if (!cfg) return `<div class="empty-state"><h3>Tapılmadı</h3></div>`;
     const items = cfg.store.all();
