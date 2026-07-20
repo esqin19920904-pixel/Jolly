@@ -97,6 +97,7 @@ const JollyDashboard = (() => {
     { icon: 'scancenter', label: 'Skan ilə Qəbul', neon: 'gold', route: '#/scan-receiving' },
     { icon: 'shield', label: 'SKT bitir', neon: 'red', route: '#/products?filter=expiring' },
     { icon: 'boxplus', label: 'Sürətli Menyu', neon: 'purple', route: '#/studios/quickmenu' },
+    { icon: 'camera', label: 'Şəkillə axtar', sub: 'Bazadan tap', neon: 'blue', action: "JollyProducts.photoSearch()" },
   ];
 
   function weeklyActivity() {
