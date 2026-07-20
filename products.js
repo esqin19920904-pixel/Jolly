@@ -504,6 +504,7 @@ const JollyProducts = (() => {
     JollyDB.Trash.moveToTrash(id);
     if (typeof JollySound !== 'undefined') JollySound.warn();
     Toast.success('Səbətə atıldı — Dashboard → Səbətdən bərpa edə bilərsən');
+    if (window.JollyEvents) JollyEvents.emit('product.deleted', { id });
     JollyRouter.go('#/home');
   }
 
@@ -1213,10 +1214,12 @@ const JollyProducts = (() => {
     if (formState.id) {
       JollyDB.Products.update(formState.id, payload);
       Toast.success('Məhsul yeniləndi');
+      if (window.JollyEvents) JollyEvents.emit('product.saved', { id: formState.id, product: payload, isNew: false });
     } else {
       JollyDB.Products.add(payload);
       Toast.success('Məhsul əlavə olundu');
       if (typeof JollyApp !== 'undefined' && JollyApp.celebrate) JollyApp.celebrate();
+      if (window.JollyEvents) JollyEvents.emit('product.saved', { id: payload.id, product: payload, isNew: true });
     }
     if (formState._draftId) JollyDB.Drafts.remove(formState._draftId);
     if (!keepOpen) JollyRouter.go('#/home');
