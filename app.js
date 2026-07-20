@@ -128,11 +128,19 @@ const JollyApp = (() => {
     } else if (segments[0] === 'drafts') {
       html = JollyProducts.renderDraftsPage();
     } else if (segments[0] === 'product' && segments[1] === 'new') {
-      html = JollyProducts.renderFormPage(null, params.draft || null);
-      afterRender = JollyProducts.afterFormRender;
+      if (window.JollyAuth && !JollyAuth.can('products.create')) {
+        html = `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3><p class="muted" style="font-size:12px;">Məhsul əlavə etmək icazən yoxdur. Admin-dən soruş.</p></div>`;
+      } else {
+        html = JollyProducts.renderFormPage(null, params.draft || null);
+        afterRender = JollyProducts.afterFormRender;
+      }
     } else if (segments[0] === 'product' && segments[2] === 'edit') {
-      html = JollyProducts.renderFormPage(segments[1], null);
-      afterRender = JollyProducts.afterFormRender;
+      if (window.JollyAuth && !JollyAuth.can('products.edit')) {
+        html = `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3><p class="muted" style="font-size:12px;">Məhsul redaktə etmək icazən yoxdur. Admin-dən soruş.</p></div>`;
+      } else {
+        html = JollyProducts.renderFormPage(segments[1], null);
+        afterRender = JollyProducts.afterFormRender;
+      }
     } else if (segments[0] === 'product') {
       html = JollyProducts.renderDetailPage(segments[1]);
     } else if (segments[0] === 'studios' && segments.length === 1) {
@@ -338,93 +346,151 @@ const JollyApp = (() => {
 
   function showLockScreen(correctPin) {
     let entered = '';
+    let identity = null; // { type:'admin' } və ya { type:'user', id, name }
     const overlay = document.createElement('div');
     overlay.id = 'jollyLock';
-    overlay.innerHTML = `
-      <div class="lock-inner">
-        <div class="lock-crown">👑</div>
-        <div class="lock-logo">JOLLY</div>
-        <div class="lock-sub">Kodsuz Mallar Pro</div>
-        <div class="lock-title">PIN daxil et</div>
-        <div class="lock-dots" id="lockDots">
-          <span></span><span></span><span></span><span></span>
-        </div>
-        <div class="lock-err" id="lockErr"></div>
-        <div class="lock-pad">
-          ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="lock-key" data-n="${n}">${n}</button>`).join('')}
-          <button class="lock-key lock-empty"></button>
-          <button class="lock-key" data-n="0">0</button>
-          <button class="lock-key lock-del" data-del="1">⌫</button>
-        </div>
-        <div class="lock-forgot" id="lockForgot">PIN-i unutmusan?</div>
-      </div>
-    `;
     document.body.appendChild(overlay);
+
+    function initials(name) { return (name || '?').trim().charAt(0).toUpperCase(); }
+
+    function renderNameScreen() {
+      const users = (window.JollyUsers ? JollyUsers.list() : []).filter(u => u.status === 'active');
+      overlay.innerHTML = `
+        <div class="lock-inner">
+          <div class="lock-crown">👑</div>
+          <div class="lock-logo">JOLLY</div>
+          <div class="lock-sub">Kodsuz Mallar Pro</div>
+          <div class="lock-title" style="margin-bottom:18px;">Kimsən?</div>
+          <div id="lockUserList" style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto;">
+            <div class="lock-user-card" data-type="admin" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,184,77,0.25);cursor:pointer;">
+              <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f97316);display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;">👑</div>
+              <div style="font-weight:600;color:#fff;">Admin</div>
+            </div>
+            ${users.map(u => `
+              <div class="lock-user-card" data-type="user" data-id="${u.id}" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);cursor:pointer;">
+                <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#6366f1);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;">${initials(u.name)}</div>
+                <div style="font-weight:600;color:#fff;">${u.name}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      overlay.querySelectorAll('.lock-user-card').forEach(card => {
+        card.addEventListener('click', () => {
+          if (typeof JollySound !== 'undefined') JollySound.tap();
+          const type = card.dataset.type;
+          if (type === 'admin') {
+            identity = { type: 'admin' };
+          } else {
+            const u = JollyUsers.get(card.dataset.id);
+            identity = { type: 'user', id: card.dataset.id, name: u ? u.name : 'İstifadəçi' };
+          }
+          entered = '';
+          renderPinScreen();
+        });
+      });
+    }
+
+    function renderPinScreen() {
+      const isAdmin = identity.type === 'admin';
+      overlay.innerHTML = `
+        <div class="lock-inner">
+          <div class="lock-back" id="lockBackBtn" style="text-align:left;color:rgba(255,255,255,0.4);font-size:13px;cursor:pointer;margin-bottom:10px;">‹ Geri</div>
+          <div style="width:56px;height:56px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.3rem;color:${isAdmin ? '#000' : '#fff'};background:${isAdmin ? 'linear-gradient(135deg,#fbbf24,#f97316)' : 'linear-gradient(135deg,#00d4ff,#6366f1)'};">${isAdmin ? '👑' : initials(identity.name)}</div>
+          <div class="lock-logo" style="font-size:1.1rem;">${isAdmin ? 'Admin' : identity.name}</div>
+          <div class="lock-title">PIN daxil et</div>
+          <div class="lock-dots" id="lockDots">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="lock-err" id="lockErr"></div>
+          <div class="lock-pad">
+            ${[1,2,3,4,5,6,7,8,9].map(n => `<button class="lock-key" data-n="${n}">${n}</button>`).join('')}
+            <button class="lock-key lock-empty"></button>
+            <button class="lock-key" data-n="0">0</button>
+            <button class="lock-key lock-del" data-del="1">⌫</button>
+          </div>
+          ${isAdmin ? `<div class="lock-forgot" id="lockForgot">PIN-i unutmusan?</div>` : `<div class="lock-forgot" style="opacity:0.5;cursor:default;">PIN-i unutmusansa, Admin-dən istə</div>`}
+        </div>
+      `;
+      const backBtn = document.getElementById('lockBackBtn');
+      if (backBtn) backBtn.addEventListener('click', renderNameScreen);
+      bindPinEvents();
+    }
 
     function updateDots() {
       const dots = overlay.querySelectorAll('#lockDots span');
       dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
     }
+
     function check() {
-      if (entered.length === correctPin.length) {
-        let matchedUser = null;
-        let ok = (entered === correctPin);
-        if (!ok && window.JollyUsers) {
-          matchedUser = JollyUsers.verifyPin(entered);
-          if (matchedUser) ok = true;
-        }
-        if (ok) {
-          try {
-            sessionStorage.setItem('jolly_sec_session', JSON.stringify({
-              role: matchedUser ? 'user' : 'admin',
-              at: Date.now(),
-              userId: matchedUser ? matchedUser.id : null,
-              userName: matchedUser ? matchedUser.name : null,
-            }));
-          } catch (e) {}
-          overlay.classList.add('unlocked');
-          setTimeout(() => { overlay.remove(); continueInit(); }, 350);
-        } else {
-          const err = overlay.querySelector('#lockErr');
-          err.textContent = 'PIN yanlışdır';
-          overlay.querySelector('.lock-inner').classList.add('shake');
-          if (typeof JollySound !== 'undefined') JollySound.error();
-          setTimeout(() => { entered = ''; updateDots(); err.textContent = ''; overlay.querySelector('.lock-inner').classList.remove('shake'); }, 700);
-        }
+      const expectedLen = identity.type === 'admin' ? correctPin.length : 4;
+      if (entered.length !== expectedLen) return;
+
+      let matchedUser = null;
+      let ok = false;
+      if (identity.type === 'admin') {
+        ok = (entered === correctPin);
+      } else if (window.JollyUsers) {
+        matchedUser = JollyUsers.verifyUserPin(identity.id, entered);
+        ok = !!matchedUser;
+      }
+
+      if (ok) {
+        try {
+          sessionStorage.setItem('jolly_sec_session', JSON.stringify({
+            role: matchedUser ? 'user' : 'admin',
+            at: Date.now(),
+            userId: matchedUser ? matchedUser.id : null,
+            userName: matchedUser ? matchedUser.name : null,
+          }));
+        } catch (e) {}
+        overlay.classList.add('unlocked');
+        setTimeout(() => { overlay.remove(); continueInit(); }, 350);
+      } else {
+        const err = overlay.querySelector('#lockErr');
+        err.textContent = 'PIN yanlışdır';
+        overlay.querySelector('.lock-inner').classList.add('shake');
+        if (typeof JollySound !== 'undefined') JollySound.error();
+        setTimeout(() => { entered = ''; updateDots(); if (err) err.textContent = ''; const li = overlay.querySelector('.lock-inner'); if (li) li.classList.remove('shake'); }, 700);
       }
     }
-    overlay.addEventListener('click', (e) => {
-      const forgot = e.target.closest('#lockForgot');
-      if (forgot) {
-        const settings = JollyDB.getSettings();
-        const rec = settings.pinRecovery;
-        if (rec && rec.q) {
-          const ans = prompt('Təhlükəsizlik sualı:\n' + rec.q);
-          if (ans != null && ans.trim().toLowerCase() === String(rec.a).trim().toLowerCase()) {
-            const ns = JollyDB.getSettings(); ns.pinEnabled = false; ns.pin = ''; JollyDB.saveSettings ? JollyDB.saveSettings(ns) : JollyDB.write('settings', ns);
-            alert('PIN sıfırlandı. Ayarlardan yeni PIN təyin edə bilərsən.');
-            try { sessionStorage.setItem('jolly_pin_ok', '1'); } catch (er) {}
-            location.reload();
+
+    function bindPinEvents() {
+      overlay.onclick = function(e) {
+        const forgot = e.target.closest('#lockForgot');
+        if (forgot && identity && identity.type === 'admin') {
+          const settings = JollyDB.getSettings();
+          const rec = settings.pinRecovery;
+          if (rec && rec.q) {
+            const ans = prompt('Təhlükəsizlik sualı:\n' + rec.q);
+            if (ans != null && ans.trim().toLowerCase() === String(rec.a).trim().toLowerCase()) {
+              const ns = JollyDB.getSettings(); ns.pinEnabled = false; ns.pin = ''; JollyDB.saveSettings ? JollyDB.saveSettings(ns) : JollyDB.write('settings', ns);
+              alert('PIN sıfırlandı. Ayarlardan yeni PIN təyin edə bilərsən.');
+              try { sessionStorage.setItem('jolly_pin_ok', '1'); } catch (er) {}
+              location.reload();
+            } else {
+              alert('Cavab yanlışdır.');
+            }
           } else {
-            alert('Cavab yanlışdır.');
+            if (confirm('Bərpa sualı təyin edilməyib. PIN-i sıfırlamaq üçün "OK" bas (məhsullarına toxunulmur, yalnız PIN silinir).')) {
+              const ns = JollyDB.getSettings(); ns.pinEnabled = false; ns.pin = ''; JollyDB.saveSettings ? JollyDB.saveSettings(ns) : JollyDB.write('settings', ns);
+              try { sessionStorage.setItem('jolly_pin_ok', '1'); } catch (er) {}
+              location.reload();
+            }
           }
-        } else {
-          // Recovery təyin olunmayıbsa: məlumatı qorumaqla sıfırlama üçün xəbərdarlıq
-          if (confirm('Bərpa sualı təyin edilməyib. PIN-i sıfırlamaq üçün "OK" bas (məhsullarına toxunulmur, yalnız PIN silinir).')) {
-            const ns = JollyDB.getSettings(); ns.pinEnabled = false; ns.pin = ''; JollyDB.saveSettings ? JollyDB.saveSettings(ns) : JollyDB.write('settings', ns);
-            try { sessionStorage.setItem('jolly_pin_ok', '1'); } catch (er) {}
-            location.reload();
-          }
+          return;
         }
-        return;
-      }
-      const key = e.target.closest('.lock-key');
-      if (!key) return;
-      if (typeof JollySound !== 'undefined') JollySound.tap();
-      if (key.dataset.del) { entered = entered.slice(0, -1); updateDots(); return; }
-      if (key.dataset.n == null) return;
-      if (entered.length < correctPin.length) { entered += key.dataset.n; updateDots(); check(); }
-    });
+        const key = e.target.closest('.lock-key');
+        if (!key) return;
+        if (typeof JollySound !== 'undefined') JollySound.tap();
+        const maxLen2 = identity.type === 'admin' ? correctPin.length : 4;
+        if (key.dataset.del) { entered = entered.slice(0, -1); updateDots(); return; }
+        if (key.dataset.n == null) return;
+        if (entered.length < maxLen2) { entered += key.dataset.n; updateDots(); check(); }
+      };
+    }
+
+    renderNameScreen();
   }
 
   function renderIdentityBadge() {
