@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jolly-v6';
+const CACHE_NAME = 'jolly-v7';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -36,23 +36,36 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (['document', 'style', 'script', 'image', 'font'].includes(request.destination)) {
+  // Şəkil/font — nadir dəyişir, sürət üçün keşdən (varsa) göstər
+  if (['image', 'font'].includes(request.destination)) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        if (cached) {
-          fetch(request).then((resp) => {
-            if (resp && resp.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, resp.clone()));
-            }
-          }).catch(() => {});
-          return cached;
-        }
+        if (cached) return cached;
         return fetch(request).then((resp) => {
           if (resp && resp.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(request, resp.clone()));
           }
           return resp;
-        }).catch(() => {
+        });
+      })
+    );
+    return;
+  }
+
+  // Kod/HTML (document, script, style) — HƏMİŞƏ əvvəlcə şəbəkədən ən son
+  // versiyanı gətir. Yalnız internet yoxdursa (offline), keşdəkini göstər.
+  // Bu sayədə yeni kod yükləyəndən sonra tətbiqi bağlayıb-açmaq kifayətdir —
+  // storage/keş əl ilə təmizlənməli olmur.
+  if (['document', 'style', 'script'].includes(request.destination)) {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' }).then((resp) => {
+        if (resp && resp.status === 200) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, resp.clone()));
+        }
+        return resp;
+      }).catch(() => {
+        return caches.match(request).then((cached) => {
+          if (cached) return cached;
           if (request.destination === 'document') return caches.match('./index.html');
           return new Response('Offline', { status: 503 });
         });
