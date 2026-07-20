@@ -467,6 +467,13 @@ const JollyApp = (() => {
             userName: matchedUser ? matchedUser.name : null,
           }));
         } catch (e) {}
+        if (window.JollyEvents) {
+          JollyEvents.emit('user.login', {
+            role: matchedUser ? 'user' : 'admin',
+            name: matchedUser ? matchedUser.name : 'Admin',
+            userId: matchedUser ? matchedUser.id : null,
+          });
+        }
         overlay.classList.add('unlocked');
         setTimeout(() => { overlay.remove(); continueInit(); }, 350);
       } else {
