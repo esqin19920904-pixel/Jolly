@@ -174,7 +174,7 @@ const JollyDashboard = (() => {
     };
 
     const moreCard = (c) => `
-      <div class="more-card neon-${c.neon}" onclick="JollyRouter.go('${c.route}')">
+      <div class="more-card neon-${c.neon}" onclick="${c.action ? c.action : `JollyRouter.go('${c.route}')`}">
         <div class="mc-icon">${JollyIcons.get(c.icon)}</div>
         <div class="mc-label">${c.label}</div>
       </div>`;
