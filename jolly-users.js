@@ -123,6 +123,15 @@ const JollyUsers = (() => {
     return user;
   }
 
+  // Ad artıq seçilibsə — yalnız həmin şəxsin PIN-inə uyğun gəlirmi yoxla
+  function verifyUserPin(id, pin) {
+    const h = hashPin(pin);
+    const user = _read().find(u => u.id === id && u.status === 'active');
+    if (!user || user.pinHash !== h) return null;
+    touchLogin(user.id);
+    return user;
+  }
+
   function touchLogin(id) {
     update(id, { lastLogin: Date.now() });
     const u = get(id);
@@ -140,7 +149,7 @@ const JollyUsers = (() => {
   return {
     list, get, getByName,
     add, update, setStatus, remove,
-    verifyPin, touchLogin, touchActivity,
+    verifyPin, verifyUserPin, touchLogin, touchActivity,
   };
 })();
 
