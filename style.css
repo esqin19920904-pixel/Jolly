@@ -1714,43 +1714,45 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 #jollyLock.unlocked { opacity: 0; transform: scale(1.1); pointer-events: none; }
 
 /* Aurora — yavaş hərəkət edən işıq buludları */
+#jollyLock { background: #04030a; }
 #jollyLock::before {
   content: '';
-  position: absolute; inset: -20%;
+  position: absolute; inset: -30%;
   background:
-    radial-gradient(circle at 15% 20%, rgba(245,197,99,0.32) 0%, transparent 45%),
-    radial-gradient(circle at 85% 15%, rgba(168,85,247,0.28) 0%, transparent 45%),
-    radial-gradient(circle at 20% 85%, rgba(6,220,240,0.22) 0%, transparent 45%),
-    radial-gradient(circle at 85% 80%, rgba(255,95,162,0.22) 0%, transparent 45%);
-  animation: lockAurora 8s ease-in-out infinite alternate;
+    radial-gradient(circle at 25% 30%, rgba(99,102,241,0.35) 0%, transparent 40%),
+    radial-gradient(circle at 75% 70%, rgba(168,85,247,0.3) 0%, transparent 40%),
+    radial-gradient(circle at 60% 20%, rgba(255,95,162,0.2) 0%, transparent 35%);
+  animation: lockAurora 16s ease-in-out infinite alternate;
+  filter: blur(2px);
   pointer-events: none;
 }
 @keyframes lockAurora {
   0%   { transform: rotate(0deg) scale(1); }
-  50%  { transform: rotate(14deg) scale(1.25); }
-  100% { transform: rotate(-10deg) scale(1.15); }
+  100% { transform: rotate(20deg) scale(1.3); }
 }
 
-/* Üzən kiçik hissəciklər */
-#jollyLock::after {
-  content: '';
-  position: absolute; inset: 0;
-  background-image:
-    radial-gradient(3px 3px at 15% 30%, rgba(245,197,99,0.9), transparent),
-    radial-gradient(3px 3px at 75% 15%, rgba(255,255,255,0.7), transparent),
-    radial-gradient(2.5px 2.5px at 40% 70%, rgba(245,197,99,0.8), transparent),
-    radial-gradient(3px 3px at 90% 60%, rgba(99,102,241,0.8), transparent),
-    radial-gradient(2.5px 2.5px at 60% 90%, rgba(255,255,255,0.6), transparent),
-    radial-gradient(2.5px 2.5px at 25% 85%, rgba(245,197,99,0.7), transparent),
-    radial-gradient(2px 2px at 10% 55%, rgba(168,85,247,0.7), transparent),
-    radial-gradient(2px 2px at 55% 10%, rgba(245,197,99,0.6), transparent),
-    radial-gradient(2.5px 2.5px at 92% 35%, rgba(255,255,255,0.5), transparent);
-  animation: lockFloat 5s ease-in-out infinite;
+/* Sayrışan ulduzlar (JS ilə əlavə olunur, .lock-star sinifli) */
+.lock-star { position: absolute; background: #fff; border-radius: 50%; animation: lockTwinkle 2.5s ease-in-out infinite; pointer-events: none; }
+@keyframes lockTwinkle { 0%,100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+/* Kometa */
+.lock-comet {
+  position: absolute; top: 10%; left: -10%; width: 3px; height: 3px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 6px 2px #fff;
+  animation: lockCometFly 7s linear infinite;
   pointer-events: none;
 }
-@keyframes lockFloat {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 0.75; }
-  50%      { transform: translateY(-28px) scale(1.08); opacity: 1; }
+.lock-comet::before {
+  content: ''; position: absolute; top: 50%; right: 100%; width: 90px; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7));
+  transform: translateY(-50%);
+}
+@keyframes lockCometFly {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  5%   { opacity: 1; }
+  45%  { opacity: 1; }
+  50%  { transform: translate(140vw, 60vh); opacity: 0; }
+  100% { transform: translate(140vw, 60vh); opacity: 0; }
 }
 
 .lock-inner {
@@ -1765,35 +1767,30 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .lock-inner.shake { animation: lockShake .4s; }
 @keyframes lockShake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-10px)} 40%,80%{transform:translateX(10px)} }
 
-.lock-crown-zone { position: relative; width: 74px; height: 74px; margin: 0 auto 4px; }
+.lock-crown-zone { position: relative; width: 90px; height: 90px; margin: 0 auto 4px; }
 .lock-ring {
-  position: absolute; inset: 0; border-radius: 50%;
-  border: 2px solid transparent;
-  background: conic-gradient(from 0deg, #f5c563, #a855f7, #06dcf0, #ff5fa2, #f5c563) border-box;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: lockRingSpin 3s linear infinite;
-  opacity: 0.85;
+  position: absolute; top: 50%; left: 50%; width: 100px; height: 30px;
+  border: 1.5px solid rgba(168,85,247,0.5);
+  border-radius: 50%;
+  transform: translate(-50%,-50%) rotateX(75deg);
+  animation: lockRingRotate 6s linear infinite;
+  box-shadow: 0 0 12px rgba(168,85,247,0.3);
 }
-@keyframes lockRingSpin { to { transform: rotate(360deg); } }
+@keyframes lockRingRotate { to { transform: translate(-50%,-50%) rotateX(75deg) rotate(360deg); } }
 
 .lock-crown {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 40px;
-  filter: drop-shadow(0 0 18px rgba(245,197,99,0.7));
-  animation: lockCrownPulse 2s ease-in-out infinite, lockCrownFloat 3s ease-in-out infinite;
-}
-@keyframes lockCrownPulse {
-  0%, 100% { filter: drop-shadow(0 0 12px rgba(245,197,99,0.5)); }
-  50%      { filter: drop-shadow(0 0 30px rgba(245,197,99,0.95)); }
+  filter: drop-shadow(0 0 16px rgba(168,85,247,0.7));
+  animation: lockCrownFloat 4s ease-in-out infinite;
 }
 @keyframes lockCrownFloat {
   0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(-8px) rotate(-3deg); }
+  50%      { transform: translateY(-10px) rotate(8deg); }
 }
-.lock-logo { font-family: var(--font-display, sans-serif); font-size: 38px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(90deg,#f5c563,#ff5fa2,#a855f7,#06dcf0); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; position: relative; animation: lockLogoHue 6s ease-in-out infinite; }
-@keyframes lockLogoHue { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
-.lock-logo[data-text] { color: transparent; }
+.lock-logo { font-family: var(--font-display, sans-serif); font-size: 36px; font-weight: 900; letter-spacing: 4px; color: #fff;
+  text-shadow: 0 0 10px rgba(168,85,247,0.8), 0 0 24px rgba(99,102,241,0.6); position: relative; }
+.lock-logo[data-text] { color: #fff; text-shadow: 0 0 10px rgba(168,85,247,0.8), 0 0 24px rgba(99,102,241,0.6); }
 .lock-logo[data-text]::after {
   content: attr(data-text);
   position: absolute; left: 0; top: 0; width: 100%;
@@ -1807,11 +1804,11 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
   45%  { background-position: -50% 0; }
   100% { background-position: -50% 0; }
 }
-.lock-sub { font-size: 12px; color: rgba(220,200,150,0.6); margin-bottom: 30px; }
+.lock-sub { font-size: 12px; color: rgba(200,190,255,0.6); margin-bottom: 30px; }
 .lock-title { font-size: 15px; color: #e8e0c8; margin-bottom: 18px; }
 .lock-dots { display: flex; justify-content: center; gap: 16px; margin-bottom: 12px; }
-.lock-dots span { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(245,197,99,0.5); transition: all .2s; }
-.lock-dots span.filled { background: #f5c563; border-color: #f5c563; box-shadow: 0 0 12px rgba(245,197,99,0.7); animation: lockDotPop .25s ease; }
+.lock-dots span { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(168,85,247,0.5); transition: all .2s; }
+.lock-dots span.filled { background: #a855f7; border-color: #a855f7; box-shadow: 0 0 12px rgba(168,85,247,0.7); animation: lockDotPop .25s ease; }
 @keyframes lockDotPop { 0% { transform: scale(0.6); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
 .lock-err { color: #ff6b7d; font-size: 13px; height: 20px; margin-bottom: 10px; }
 .lock-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 260px; margin: 0 auto; }
@@ -1825,6 +1822,37 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .lock-empty { border: none; background: none; pointer-events: none; }
 .lock-del { font-size: 20px; border-color: transparent; background: none; }
 .lock-forgot { margin-top: 22px; font-size: 13px; color: rgba(245,197,99,0.7); cursor: pointer; text-decoration: underline; }
+
+/* Barmaq izi illüstrasiyası — PIN ekranında */
+.lock-bio-zone { position: relative; width: 120px; height: 120px; margin: 18px auto 0; cursor: pointer; }
+.lock-bio-ripples span {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1px solid rgba(6,220,240,0.35);
+  animation: lockBioRippleOut 2.4s ease-out infinite;
+}
+.lock-bio-ripples span:nth-child(2) { animation-delay: 0.8s; }
+.lock-bio-ripples span:nth-child(3) { animation-delay: 1.6s; }
+@keyframes lockBioRippleOut { 0% { transform: scale(0.6); opacity: 0.8; } 100% { transform: scale(1.15); opacity: 0; } }
+.lock-bio-svg {
+  position: relative; z-index: 1; width: 100%; height: 100%;
+  filter: drop-shadow(0 0 14px rgba(6,220,240,0.7));
+}
+.lock-bio-svg path {
+  fill: none; stroke: #4ee6f5; stroke-width: 2.2; stroke-linecap: round;
+  animation: lockBioDraw 3s ease-in-out infinite;
+}
+@keyframes lockBioDraw { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+.lock-bio-beam {
+  position: absolute; left: 20%; right: 20%; height: 3px; z-index: 2;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  box-shadow: 0 0 14px #4ee6f5;
+  animation: lockBioScan 2.2s ease-in-out infinite;
+}
+@keyframes lockBioScan { 0% { top: 85%; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { top: 10%; opacity: 0; } }
+.lock-bio-caption { margin-top: 10px; font-size: 11px; color: rgba(78,230,245,0.8); letter-spacing: 1.5px; text-align: center; }
+.lock-bio-zone.scanning .lock-bio-svg { animation: lockBioScanning 0.6s ease-in-out infinite; }
+@keyframes lockBioScanning { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+.lock-bio-zone:active { transform: scale(0.96); }
 .lock-forgot:active { color: #f5c563; }
 
 /* Kimsən? — istifadəçi kartları: sırayla görünmə + toxunma effekti */
@@ -1834,27 +1862,4 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
   transition: transform .12s ease, box-shadow .12s ease, border-color .15s ease, background .15s ease;
   box-shadow: 0 3px 0 rgba(245,197,99,0.12), 0 6px 14px rgba(0,0,0,0.25);
 }
-.lock-user-card:nth-child(1) { animation-delay: .05s; }
-.lock-user-card:nth-child(2) { animation-delay: .12s; }
-.lock-user-card:nth-child(3) { animation-delay: .19s; }
-.lock-user-card:nth-child(4) { animation-delay: .26s; }
-.lock-user-card:nth-child(5) { animation-delay: .33s; }
-.lock-user-card:nth-child(6) { animation-delay: .40s; }
-@keyframes lockCardIn {
-  from { opacity: 0; transform: translateY(14px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.lock-user-card::before {
-  content: ''; position: absolute; inset: -1px; border-radius: 15px; z-index: -1;
-  background: linear-gradient(120deg, rgba(245,197,99,0.5), rgba(168,85,247,0.4), rgba(6,220,240,0.4));
-  opacity: 0; transition: opacity .2s;
-}
-.lock-user-card:active::before { opacity: 1; }
-.lock-user-card:active {
-  transform: translateY(3px) scale(0.98);
-  box-shadow: 0 0 0 rgba(245,197,99,0.12), 0 2px 6px rgba(0,0,0,0.25);
-  border-color: transparent !important;
-  background: rgba(245,197,99,0.06) !important;
-}
-.lock-ripple {
-  position: absolute; border-ra
+.lock-use
