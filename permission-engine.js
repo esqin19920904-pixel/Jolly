@@ -599,6 +599,7 @@ document.addEventListener('DOMContentLoaded', function() {
     { key:'search.use',  label:'Axtarış et',   tag:'view', default:true },
     { key:'search.ai',   label:'AI Axtarış',   tag:'ai',   default:false },
     { key:'search.color',label:'Rəng axtarışı',tag:'view', default:true  },
+    { key:'search.photo',label:'Şəkillə axtar',tag:'ai',   default:false },
   ]});
 
   POS.register({ id:'barcode', name:'Barkod', icon:'📷', permissions:[
