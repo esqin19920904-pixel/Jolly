@@ -851,6 +851,13 @@ const JollyStudios = (() => {
   }
 
   function renderData() {
+    try {
+      const s = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      if (s && s.role !== 'admin') {
+        if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+        return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+      }
+    } catch (e) {}
     const activity = JollyDB.getActivity().slice(0, 8);
     const settings = JollyDB.getSettings();
     const lastBackup = settings.lastBackup;
@@ -1040,6 +1047,13 @@ const JollyStudios = (() => {
   }
 
   function renderSecurity() {
+    try {
+      const s = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      if (s && s.role !== 'admin') {
+        if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+        return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+      }
+    } catch (e) {}
     const settings = JollyDB.getSettings();
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 16px;font-size:19px;">🔐 Security Studio</h2>
