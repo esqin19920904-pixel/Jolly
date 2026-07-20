@@ -396,7 +396,8 @@
     const uc = document.getElementById('ja-user-card');
     const grid = document.getElementById('ja-role-grid');
     if (uc && grid) {
-      if (_cfg.viewerEnabled && _cfg.viewerPinHash) {
+      const hasIndividualUsers = window.JollyUsers && JollyUsers.list().some(u => u.status === 'active');
+      if ((_cfg.viewerEnabled && _cfg.viewerPinHash) || hasIndividualUsers) {
         uc.style.display = '';
         grid.style.gridTemplateColumns = '1fr 1fr';
       } else {
@@ -510,14 +511,21 @@
     const dots=[0,1,2,3].map(i=>document.getElementById('ja-pd'+i));
     const h=jaHash(S.pin);
     let role=null;
+    let matchedUser=null;
     if(S.role==='admin' && h===_cfg.pinHash) role='admin';
-    else if(S.role==='user' && _cfg.viewerEnabled && h===_cfg.viewerPinHash) role='user';
+    else if(S.role==='user'){
+      if(window.JollyUsers){
+        matchedUser=JollyUsers.verifyPin(S.pin);
+        if(matchedUser) role='user';
+      }
+      if(!role && _cfg.viewerEnabled && h===_cfg.viewerPinHash) role='user';
+    }
 
     if(role){
       dots.forEach(d=>{if(d)d.classList.add('good');});
-      if(_setSession) _setSession(role);
+      if(_setSession) _setSession(role, matchedUser);
       jaBurst(window.innerWidth/2,window.innerHeight/2,'34,197,94',20);
-      setTimeout(()=>jaSuccess(role),400);
+      setTimeout(()=>jaSuccess(role,matchedUser),400);
     } else {
       dots.forEach(d=>{if(d)d.classList.add('bad');});
       document.getElementById('ja-card').animate([{transform:'translateX(0)'},{transform:'translateX(-10px)',offset:0.2},{transform:'translateX(10px)',offset:0.4},{transform:'translateX(-6px)',offset:0.6},{transform:'translateX(6px)',offset:0.8},{transform:'translateX(0)'}],{duration:400,easing:'ease-in-out'});
@@ -525,8 +533,8 @@
     }
   }
 
-  function jaSuccess(role){
-    const name=role==='admin'?'Administrator':'User';
+  function jaSuccess(role, matchedUser){
+    const name=role==='admin'?'Administrator':(matchedUser?matchedUser.name:'User');
     document.getElementById('ja-ok-text').textContent=name+' olaraq daxil oldunuz';
     const card=document.getElementById('ja-card');
     card.animate([{transform:'scale(1)',filter:'blur(0px)',opacity:1},{transform:'scale(0.88)',filter:'blur(4px)',opacity:0.7}],{duration:300,easing:'cubic-bezier(0.4,0,0.2,1)'}).onfinish=()=>{
