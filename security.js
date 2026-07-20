@@ -58,8 +58,18 @@ const JollySecurity = (() => {
 
   function can(perm) {
     if (isAdmin()) return true;
-    if (window.POS) return POS.can(perm);
-    return false;
+    const allowed = window.POS ? POS.can(perm) : false;
+    if (!allowed && window.JollyEvents) {
+      let session = null;
+      try { session = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null'); } catch (e) {}
+      JollyEvents.emit('permission.denied', {
+        key: perm,
+        userId: session ? session.userId : null,
+        userName: session ? session.userName : null,
+        at: Date.now(),
+      });
+    }
+    return allowed;
   }
   window.JollyAuth = { can };
 
