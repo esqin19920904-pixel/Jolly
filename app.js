@@ -296,6 +296,11 @@ const JollyApp = (() => {
       mergeArray(JollyDB.KEYS.groups, payload.data.groups);
       mergeArray(JollyDB.KEYS.locations, payload.data.locations);
       mergeArray(JollyDB.KEYS.statuses, payload.data.statuses);
+      // İcazələr — Admin mənbədir, birbaşa yenisi ilə əvəz edilir (əlavə
+      // deyil), ona görə ayrıca (ID əsaslı deyil).
+      if (payload.data.permissions) {
+        try { JollyDB.write(JollyDB.KEYS.permissions, payload.data.permissions); } catch (e) {}
+      }
       if (addedProducts > 0) {
         if (typeof Toast !== 'undefined') Toast.info(`🔄 ${addedProducts} yeni məhsul sinxronlaşdı`);
         render();
@@ -706,6 +711,9 @@ const JollyApp = (() => {
             local.pinRecovery = payload.data.settings.pinRecovery;
             JollyDB.saveSettings ? JollyDB.saveSettings(local) : JollyDB.write('jolly_settings', local);
           } catch (e) {}
+        }
+        if (payload.data.permissions) {
+          try { JollyDB.write('jolly_perm_os_v2', payload.data.permissions); } catch (e) {}
         }
       }).catch(() => {}).finally(() => {
         continueBoot();
