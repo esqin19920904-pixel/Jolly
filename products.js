@@ -187,7 +187,7 @@ const JollyProducts = (() => {
   }
 
   function photoSearch() {
-    if (window.JollyAuth && !JollyAuth.can('search.ai')) {
+    if (window.JollyAuth && !JollyAuth.can('search.photo')) {
       Toast.error('İcazə yoxdur');
       return;
     }
