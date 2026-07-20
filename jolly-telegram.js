@@ -345,17 +345,17 @@
   function registerLoginListener(attempt) {
     attempt = attempt || 0;
     if (window.JollyEvents) {
-      if (typeof Toast !== 'undefined') Toast.info('🔧 debug: telegram dinləyicisi qeydiyyatdan keçdi');
+      alert('🔧 debug: telegram dinləyicisi qeydiyyatdan keçdi');
       JollyEvents.on('user.login', (payload) => {
-        if (typeof Toast !== 'undefined') Toast.info('🔧 debug: telegram dinləyicisi tetikləndi (' + JSON.stringify(payload) + ')');
+        alert('🔧 debug: telegram dinləyicisi tetikləndi (' + JSON.stringify(payload) + ')');
         if (!payload || payload.role !== 'user') return;
         if (!isConfigured()) {
-          if (typeof Toast !== 'undefined') Toast.error('🔧 debug: Telegram konfiqurasiya olunmayıb (Token/Chat ID boşdur)');
+          alert('🔧 debug: Telegram konfiqurasiya olunmayıb (Token/Chat ID boşdur)');
           return;
         }
         const time = new Date().toLocaleString('az-AZ');
         sendMessage(`👤 <b>${payload.name}</b> daxil oldu\n🕐 ${time}`).then(res => {
-          if (typeof Toast !== 'undefined') Toast.info('🔧 debug: sendMessage nəticəsi: ' + JSON.stringify(res));
+          alert('🔧 debug: sendMessage nəticəsi: ' + JSON.stringify(res));
         });
       });
       return;
