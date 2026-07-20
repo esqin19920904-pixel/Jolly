@@ -24,6 +24,35 @@ const JollyCloud = (() => {
   const BASE = firebaseConfig.databaseURL;
   const NODE = 'jolly'; // bulud düyünü: /jolly
 
+  // ── Anonim giriş (Firebase Auth) ──────────────────────────
+  // Rules "auth != null" tələb etdiyi üçün, hər sorğudan əvvəl
+  // etibarlı bir ID token lazımdır. Token 1 saat etibarlıdır,
+  // localStorage-da keşlənir ki, hər dəfə yenidən giriş etməsin.
+  let _idToken = null;
+  let _tokenExpiry = 0;
+
+  async function _getIdToken() {
+    if (_idToken && Date.now() < _tokenExpiry) return _idToken;
+    try {
+      const cached = JollyDB.read('jolly_fb_auth', null);
+      if (cached && cached.idToken && Date.now() < cached.expiry) {
+        _idToken = cached.idToken; _tokenExpiry = cached.expiry;
+        return _idToken;
+      }
+    } catch (e) {}
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ returnSecureToken: true }),
+    });
+    if (!res.ok) throw new Error('Bulud girişi uğursuz: ' + res.status);
+    const data = await res.json();
+    _idToken = data.idToken;
+    _tokenExpiry = Date.now() + (parseInt(data.expiresIn, 10) * 1000) - 60000;
+    try { JollyDB.write('jolly_fb_auth', { idToken: _idToken, expiry: _tokenExpiry }); } catch (e) {}
+    return _idToken;
+  }
+
   function enabled() {
     const s = JollyDB.getSettings();
     return s.cloudEnabled !== false; // standart açıq
@@ -112,7 +141,8 @@ const JollyCloud = (() => {
       device: navigator.userAgent.slice(0, 60),
       syncedAt: Date.now(),
     };
-    const res = await fetch(`${BASE}/${NODE}.json`, {
+    const token = await _getIdToken();
+    const res = await fetch(`${BASE}/${NODE}.json?auth=${token}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
@@ -123,7 +153,8 @@ const JollyCloud = (() => {
 
   async function pull() {
     if (!online()) throw new Error('İnternet yoxdur');
-    const res = await fetch(`${BASE}/${NODE}.json`);
+    const token = await _getIdToken();
+    const res = await fetch(`${BASE}/${NODE}.json?auth=${token}`);
     if (!res.ok) throw new Error('Buluddan oxuna bilmədi: ' + res.status);
     const payload = await res.json();
     if (!payload || !payload.data) return null;
