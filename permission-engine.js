@@ -62,12 +62,29 @@ class Store {
     Object.getPrototypeOf(localStorage).setItem.call(localStorage, SIG_KEY, _sig(str));
   }
 
-  _def() { return { v: 2, overrides: {}, ts: Date.now() }; }
+  _def() { return { v: 2, overrides: {}, userOverrides: {}, ts: Date.now() }; }
 
   getOverride(k)     { return this.load().overrides[k]; }
   setOverride(k, v)  { const d=this.load(); d.overrides[k]=v; this.save(d); }
   setOverrides(obj)  { const d=this.load(); d.overrides={...d.overrides,...obj}; this.save(d); }
   resetOverrides()   { const d=this.load(); d.overrides={}; this.save(d); }
+
+  getUserOverride(uid, k) {
+    const d = this.load();
+    return d.userOverrides[uid] ? d.userOverrides[uid][k] : undefined;
+  }
+  setUserOverrides(uid, obj) {
+    const d = this.load();
+    if (!d.userOverrides[uid]) d.userOverrides[uid] = {};
+    d.userOverrides[uid] = { ...d.userOverrides[uid], ...obj };
+    this.save(d);
+  }
+  resetUserOverrides(uid) {
+    const d = this.load();
+    delete d.userOverrides[uid];
+    this.save(d);
+  }
+
   reset()            { this._c=null; localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(SIG_KEY); }
 }
 
@@ -108,12 +125,29 @@ class Engine {
     } catch(e) { return false; }
   }
 
-  can(key) {
-    if (this._isAdmin()) return true;
+  _currentUserId() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session')||'null');
+      return (sess && sess.userId) || null;
+    } catch(e) { return null; }
+  }
+
+  // Xam nəticə — admin qısayolu YOXDUR. Admin panelindən konkret
+  // istifadəçi üçün "əslində nə görəcək" göstərmək üçün istifadə olunur.
+  resolveFor(userId, key) {
+    if (userId) {
+      const uov = this.s.getUserOverride(userId, key);
+      if (typeof uov === 'boolean') return uov;
+    }
     const ov = this.s.getOverride(key);
     if (typeof ov === 'boolean') return ov;
     const p = this.r.allPerms().find(x => x.key === key);
     return p ? p.default : false;
+  }
+
+  can(key) {
+    if (this._isAdmin()) return true;
+    return this.resolveFor(this._currentUserId(), key);
   }
 
   canModule(id) {
@@ -130,7 +164,7 @@ class Engine {
 class Profiles {
   constructor(reg, store) { this.r=reg; this.s=store; }
 
-  apply(name) {
+  apply(name, userId) {
     const all = this.r.allPerms();
     const ov  = {};
     switch(name) {
@@ -148,30 +182,53 @@ class Profiles {
         all.forEach(p => ov[p.key] = p.default);
         break;
     }
-    this.s.setOverrides(ov);
-    _audit('profile_applied', { profile: name });
+    if (userId) this.s.setUserOverrides(userId, ov);
+    else this.s.setOverrides(ov);
+    _audit('profile_applied', { profile: name, userId: userId || null });
     return ov;
   }
 }
 
 // ── Admin UI ─────────────────────────────────────────────
 class AdminUI {
-  constructor(os) { this.os = os; }
+  constructor(os) { this.os = os; this._selectedUserId = null; }
 
   render(el) {
     if (typeof el === 'string') el = document.querySelector(el);
     if (!el) return;
     this._el = el;
+    const users = (window.JollyUsers ? JollyUsers.list() : []).filter(u => u.status === 'active');
+    if (!this._selectedUserId && users.length) this._selectedUserId = users[0].id;
     this._draw();
   }
 
   _draw() {
     const all = this.os.reg.allPerms();
+    const users = (window.JollyUsers ? JollyUsers.list() : []).filter(u => u.status === 'active');
+
+    if (!users.length) {
+      this._el.innerHTML = `
+        <div style="margin-bottom:20px;">
+          <h2 style="font-family:var(--font-display,inherit);font-size:19px;margin:0 0 4px;">🛡️ İcazə Mərkəzi</h2>
+          <p style="font-size:12px;color:var(--text-3,#64748b);">
+            Hələ heç bir işçi yoxdur. Əvvəlcə "İstifadəçilər" bölməsindən bir işçi əlavə et,
+            sonra bura qayıdıb ona icazə təyin edə bilərsən.
+          </p>
+        </div>`;
+      return;
+    }
 
     this._el.innerHTML = `
       <div style="margin-bottom:20px;">
         <h2 style="font-family:var(--font-display,inherit);font-size:19px;margin:0 0 4px;">🛡️ İcazə Mərkəzi</h2>
-        <p style="font-size:12px;color:var(--text-3,#64748b);margin:0 0 16px;">User-in nə edə biləcəyini burada təyin edin</p>
+        <p style="font-size:12px;color:var(--text-3,#64748b);margin:0 0 12px;">Hər işçi üçün ayrıca təyin edilir</p>
+
+        <!-- İşçi seçimi -->
+        <div class="section-title">👤 Kimin üçün?</div>
+        <select id="pos-user-select" onchange="POS.admin._selectUser(this.value)"
+          style="width:100%;padding:11px 13px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-1,#fff);font-size:14px;font-weight:600;margin-bottom:14px;">
+          ${users.map(u => `<option value="${u.id}" ${u.id === this._selectedUserId ? 'selected' : ''}>${u.name}</option>`).join('')}
+        </select>
 
         <!-- Statistika -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
@@ -193,7 +250,7 @@ class AdminUI {
         <div class="section-title">📋 Şablonlar</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
           ${Object.entries(PROFILE_DEFS).filter(([k])=>k!=='admin').map(([k,v])=>`
-            <button onclick="POS.applyProfile('${k}');POS.syncUI();this.closest('[id]') && POS.renderAdmin('[id=pos-admin-wrap]')"
+            <button onclick="POS.applyProfile('${k}', POS.admin._selectedUserId);POS.syncUI();POS.admin._draw();"
               title="${v.desc}"
               style="padding:7px 13px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text-1,#fff);font-size:12px;cursor:pointer;">
               ${v.name}
@@ -275,6 +332,11 @@ class AdminUI {
     this._bindTagFilter();
   }
 
+  _selectUser(uid) {
+    this._selectedUserId = uid;
+    this._draw();
+  }
+
   _buildList(perms) {
     // Modul üzrə qruplaşdır
     const groups = {};
@@ -296,7 +358,7 @@ class AdminUI {
         <div id="pos-gb-${mid}" class="glass" style="border-radius:0 0 10px 10px;padding:4px 14px;border-top:none;">
           ${g.items.map(p => {
             const tag = TAGS[p.tag]||TAGS.view;
-            const checked = this.os.engine.can(p.key);
+            const checked = this.os.engine.resolveFor(this._selectedUserId, p.key);
             return `<div class="pos-row list-row" data-key="${p.key}" data-tag="${p.tag}" data-label="${p.label.toLowerCase()}" style="gap:10px;">
               <label style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer;padding:4px 0;">
                 <input type="checkbox" class="pos-cb" data-key="${p.key}" ${checked?'checked':''}
@@ -385,10 +447,11 @@ class AdminUI {
     document.querySelectorAll('.pos-cb').forEach(cb => {
       overrides[cb.dataset.key] = cb.checked;
     });
-    this.os.store.setOverrides(overrides);
-    _audit('permissions_saved', { count: Object.keys(overrides).length });
+    this.os.store.setUserOverrides(this._selectedUserId, overrides);
+    const uname = (window.JollyUsers && JollyUsers.get(this._selectedUserId)) ? JollyUsers.get(this._selectedUserId).name : this._selectedUserId;
+    _audit('permissions_saved', { user: uname, count: Object.keys(overrides).length });
     this.os.syncUI();
-    if (window.Toast) Toast.success('✅ İcazələr saxlanıldı');
+    if (window.Toast) Toast.success(`✅ ${uname} üçün icazələr saxlanıldı`);
     this._updateStats();
     this._updateGroupCounts();
   }
@@ -468,7 +531,7 @@ class PermissionOS {
   canAll(keys)   { return this.engine.canAll(keys); }
 
   // Profil tətbiqi
-  applyProfile(name) { return this.profiles.apply(name); }
+  applyProfile(name, userId) { return this.profiles.apply(name, userId); }
 
   // Admin UI render
   renderAdmin(el) { this.admin.render(el); }
