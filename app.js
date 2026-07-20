@@ -473,9 +473,6 @@ const JollyApp = (() => {
             name: matchedUser ? matchedUser.name : 'Admin',
             userId: matchedUser ? matchedUser.id : null,
           });
-          alert('🔧 debug: user.login yayımlandı (' + (matchedUser ? matchedUser.name : 'Admin') + ')');
-        } else {
-          alert('🔧 debug: JollyEvents tapılmadı!');
         }
         overlay.classList.add('unlocked');
         setTimeout(() => { overlay.remove(); continueInit(); }, 350);
