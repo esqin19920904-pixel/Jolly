@@ -665,16 +665,26 @@ const JollyApp = (() => {
     const noPin = !(JollyDB.getSettings().pin);
     const looksFresh = noUsers && noPin && JollyDB.Products.all().length === 0;
     if (looksFresh && typeof JollyCloud !== 'undefined' && JollyCloud.enabled() && navigator.onLine) {
+      alert('🔧 debug: təzə cihaz aşkarlandı, buluddan çəkilir...');
       showLoader();
       JollyCloud.pull().then(payload => {
         if (payload && payload.data) {
-          try { JollyDB.importAll(payload.data); } catch (e) {}
+          const uCount = Array.isArray(payload.data.users) ? payload.data.users.length : 0;
+          alert('🔧 debug: bulud cavab verdi — ' + uCount + ' işçi tapıldı, pin var: ' + !!(payload.data.settings && payload.data.settings.pin));
+          try { JollyDB.importAll(payload.data); } catch (e) { alert('🔧 debug: importAll xətası: ' + e.message); }
+        } else {
+          alert('🔧 debug: buluddan boş cavab gəldi (payload yoxdur)');
         }
-      }).catch(() => {}).finally(() => {
+      }).catch((e) => {
+        alert('🔧 debug: bulud xətası: ' + (e && e.message));
+      }).finally(() => {
         hideLoader();
         continueBoot();
       });
       return;
+    }
+    if (!looksFresh) {
+      alert('🔧 debug: cihaz "təzə" sayılmadı — noUsers:' + noUsers + ' noPin:' + noPin + ' products:' + JollyDB.Products.all().length);
     }
     continueBoot();
   }
