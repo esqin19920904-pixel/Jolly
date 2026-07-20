@@ -1072,11 +1072,17 @@ const JollyStudios = (() => {
     `;
   }
 
+  function hashPin(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < String(s).length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
+
   function togglePinLock(enabled) {
     if (enabled) {
-      const pin = prompt('4 rəqəmli PIN təyin et:');
-      if (!pin || !/^\d{4}$/.test(pin)) { Toast.error('PIN 4 rəqəm olmalıdır'); return; }
-      JollyDB.setSettings({ pinEnabled: true, pin });
+      const pin = prompt('7 rəqəmli PIN təyin et:');
+      if (!pin || !/^\d{7}$/.test(pin)) { Toast.error('PIN 7 rəqəm olmalıdır'); return; }
+      JollyDB.setSettings({ pinEnabled: true, pin: hashPin(pin) });
       Toast.success('PIN qoruması aktivləşdi');
     } else {
       JollyDB.setSettings({ pinEnabled: false });
