@@ -224,6 +224,18 @@ const JollyOTA = (() => {
     }
   }
 
+  /* ---------------- Hər dəfə göndərilə bilən toast (versiyadan asılı deyil) ---------------- */
+  async function runBroadcastToast() {
+    const toast = showOtaToast();
+    bumpOtaToast(20);
+    // arxa planda əsl yeniləməni sakit yoxla/tətbiq et (versiya artıbsa) —
+    // amma toast-un görünməsi bundan asılı deyil, hər halda göstərilir
+    try { await checkAndApply(true); } catch (e) {}
+    bumpOtaToast(100);
+    finishOtaToast();
+    setTimeout(() => location.reload(), 5000);
+  }
+
   let _pollTimer = null;
   async function pollForBroadcast() {
     try {
@@ -234,7 +246,7 @@ const JollyOTA = (() => {
       if (!val || !val.ts) return;
       if (val.ts > getLastSignal()) {
         setLastSignal(val.ts);
-        checkAndApply(false);
+        runBroadcastToast();
       }
     } catch (e) {}
   }
