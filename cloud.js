@@ -191,6 +191,13 @@ const JollyCloud = (() => {
 
   /* ---------- Cloud Studio UI ---------- */
   function renderStudio() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      if (sess && sess.role !== 'admin') {
+        if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+        return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+      }
+    } catch (e) {}
     const s = JollyDB.getSettings();
     const last = s.lastCloudSync;
     const lastText = last ? new Date(last).toLocaleString('az-AZ') : 'Heç vaxt';
