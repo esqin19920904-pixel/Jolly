@@ -1702,38 +1702,123 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .dna-actions { display: flex; gap: 10px; }
 
 /* ============================================================
-   Qızıl PIN Kilid Ekranı
+   Qızıl PIN Kilid Ekranı — Aurora fon + zərif keçidlər
    ============================================================ */
 #jollyLock {
   position: fixed; inset: 0; z-index: 100000;
-  background: radial-gradient(ellipse at 50% 30%, #1a1408 0%, #05050a 70%);
+  overflow: hidden;
+  background: #05050a;
   display: flex; align-items: center; justify-content: center;
   transition: opacity .35s ease, transform .35s ease;
 }
 #jollyLock.unlocked { opacity: 0; transform: scale(1.1); pointer-events: none; }
-.lock-inner { text-align: center; padding: 24px; width: 100%; max-width: 340px; }
+
+/* Aurora — yavaş hərəkət edən işıq buludları */
+#jollyLock::before {
+  content: '';
+  position: absolute; inset: -20%;
+  background:
+    radial-gradient(circle at 20% 25%, rgba(245,197,99,0.16) 0%, transparent 45%),
+    radial-gradient(circle at 80% 20%, rgba(99,102,241,0.14) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(245,197,99,0.10) 0%, transparent 50%),
+    radial-gradient(circle at 85% 75%, rgba(168,85,247,0.10) 0%, transparent 45%);
+  animation: lockAurora 14s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes lockAurora {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(8deg) scale(1.12); }
+  100% { transform: rotate(-6deg) scale(1.05); }
+}
+
+/* Üzən kiçik hissəciklər */
+#jollyLock::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 15% 30%, rgba(245,197,99,0.5), transparent),
+    radial-gradient(2px 2px at 75% 15%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(1.5px 1.5px at 40% 70%, rgba(245,197,99,0.4), transparent),
+    radial-gradient(2px 2px at 90% 60%, rgba(99,102,241,0.4), transparent),
+    radial-gradient(1.5px 1.5px at 60% 90%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1.5px 1.5px at 25% 85%, rgba(245,197,99,0.35), transparent);
+  animation: lockFloat 9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes lockFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50%      { transform: translateY(-18px); opacity: 1; }
+}
+
+.lock-inner {
+  position: relative; z-index: 1;
+  text-align: center; padding: 24px; width: 100%; max-width: 340px;
+  animation: lockInnerIn .5s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes lockInnerIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 .lock-inner.shake { animation: lockShake .4s; }
 @keyframes lockShake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-10px)} 40%,80%{transform:translateX(10px)} }
-.lock-crown { font-size: 40px; margin-bottom: 6px; }
+
+.lock-crown {
+  font-size: 40px; margin-bottom: 6px;
+  filter: drop-shadow(0 0 14px rgba(245,197,99,0.55));
+  animation: lockCrownPulse 2.6s ease-in-out infinite;
+}
+@keyframes lockCrownPulse {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(245,197,99,0.4)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 22px rgba(245,197,99,0.75)); transform: scale(1.06); }
+}
 .lock-logo { font-family: var(--font-display, sans-serif); font-size: 38px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(90deg,#f5c563,#ffe9a8,#e0a72e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .lock-sub { font-size: 12px; color: rgba(220,200,150,0.6); margin-bottom: 30px; }
 .lock-title { font-size: 15px; color: #e8e0c8; margin-bottom: 18px; }
 .lock-dots { display: flex; justify-content: center; gap: 16px; margin-bottom: 12px; }
 .lock-dots span { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(245,197,99,0.5); transition: all .2s; }
-.lock-dots span.filled { background: #f5c563; border-color: #f5c563; box-shadow: 0 0 12px rgba(245,197,99,0.7); }
+.lock-dots span.filled { background: #f5c563; border-color: #f5c563; box-shadow: 0 0 12px rgba(245,197,99,0.7); animation: lockDotPop .25s ease; }
+@keyframes lockDotPop { 0% { transform: scale(0.6); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
 .lock-err { color: #ff6b7d; font-size: 13px; height: 20px; margin-bottom: 10px; }
 .lock-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 260px; margin: 0 auto; }
 .lock-key {
   aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(245,197,99,0.25);
   background: rgba(245,197,99,0.06); color: #f5e3b8; font-size: 26px; font-weight: 600;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: transform .1s, background .15s;
+  transition: transform .12s, background .18s, box-shadow .18s;
 }
-.lock-key:active { transform: scale(0.92); background: rgba(245,197,99,0.2); }
+.lock-key:active { transform: scale(0.9); background: rgba(245,197,99,0.22); box-shadow: 0 0 16px rgba(245,197,99,0.35); }
 .lock-empty { border: none; background: none; pointer-events: none; }
 .lock-del { font-size: 20px; border-color: transparent; background: none; }
 .lock-forgot { margin-top: 22px; font-size: 13px; color: rgba(245,197,99,0.7); cursor: pointer; text-decoration: underline; }
 .lock-forgot:active { color: #f5c563; }
+
+/* Kimsən? — istifadəçi kartları: sırayla görünmə + toxunma effekti */
+.lock-user-card {
+  animation: lockCardIn .45s cubic-bezier(0.16,1,0.3,1) backwards;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.lock-user-card:nth-child(1) { animation-delay: .05s; }
+.lock-user-card:nth-child(2) { animation-delay: .12s; }
+.lock-user-card:nth-child(3) { animation-delay: .19s; }
+.lock-user-card:nth-child(4) { animation-delay: .26s; }
+.lock-user-card:nth-child(5) { animation-delay: .33s; }
+.lock-user-card:nth-child(6) { animation-delay: .40s; }
+@keyframes lockCardIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.lock-user-card:active { transform: scale(0.97); border-color: rgba(245,197,99,0.5) !important; background: rgba(245,197,99,0.06) !important; }
+
+/* Fərdi avatarların yumşaq parıltısı */
+.lock-user-card > div:first-child {
+  box-shadow: 0 0 14px rgba(0,0,0,0.3), 0 0 0 rgba(255,255,255,0);
+  transition: box-shadow .2s ease;
+}
+.lock-user-card:active > div:first-child {
+  box-shadow: 0 0 18px rgba(245,197,99,0.5);
+}
+
+
 
 /* ============================================================
    NEON JOLLY STORE OS Splash — parlayan halqa + işıq yanma
@@ -1776,26 +1861,4 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 @keyframes splashCoreIn { from { opacity: 0; transform: translate(-50%,-50%) scale(0.7); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
 .splash-crown { font-size: 30px; margin-bottom: 2px; filter: drop-shadow(0 0 10px rgba(245,197,99,0.8)); }
 .splash-logo {
-  font-family: var(--font-display, serif); font-size: 46px; font-weight: 900; letter-spacing: 3px;
-  background: linear-gradient(180deg, #ffe9a8, #f5c563, #d98f2e);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-  filter: drop-shadow(0 0 14px rgba(245,197,99,0.6));
-  line-height: 1;
-}
-.splash-os {
-  font-size: 13px; font-weight: 700; letter-spacing: 6px; margin-top: 4px;
-  color: #a855f7; text-shadow: 0 0 12px rgba(168,85,247,0.8);
-}
-.splash-diamond { font-size: 12px; color: #06dcf0; margin-top: 6px; text-shadow: 0 0 10px rgba(6,220,240,0.9); animation: splashDiamond 1.2s ease-in-out infinite alternate; }
-@keyframes splashDiamond { from { opacity: 0.4; } to { opacity: 1; } }
-
-/* WELCOME yazısı (sonda çıxır) */
-.splash-welcome {
-  position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
-  font-size: 16px; font-weight: 700; letter-spacing: 8px; color: #06dcf0;
-  text-shadow: 0 0 16px rgba(6,220,240,0.8);
-  opacity: 0; animation: splashWelcome 1s ease 1.4s forwards;
-}
-@keyframes splashWelcome { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-
-body.fx-off .splash-ring, body.fx-off #jollySplash::before { animation: none; }
+  font-family: var(--font-display, 
