@@ -403,8 +403,11 @@ const JollyApp = (() => {
       });
     }
 
+    function bioKey() { return identity.type === 'admin' ? 'admin' : ('user:' + identity.id); }
+
     function renderPinScreen() {
       const isAdmin = identity.type === 'admin';
+      const bioAvailable = window.JollyBiometric && JollyBiometric.isRegistered(bioKey());
       overlay.innerHTML = `
         <div class="lock-inner">
           <div class="lock-back" id="lockBackBtn" style="text-align:left;color:rgba(255,255,255,0.4);font-size:13px;cursor:pointer;margin-bottom:10px;">‹ Geri</div>
@@ -421,11 +424,27 @@ const JollyApp = (() => {
             <button class="lock-key" data-n="0">0</button>
             <button class="lock-key lock-del" data-del="1">⌫</button>
           </div>
+          ${bioAvailable ? `<div class="lock-bio" id="lockBioBtn" style="margin-top:16px;font-size:28px;cursor:pointer;">🔒</div><div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">Barmaq izi ilə aç</div>` : ''}
           ${isAdmin ? `<div class="lock-forgot" id="lockForgot">PIN-i unutmusan?</div>` : `<div class="lock-forgot" style="opacity:0.5;cursor:default;">PIN-i unutmusansa, Admin-dən istə</div>`}
         </div>
       `;
       const backBtn = document.getElementById('lockBackBtn');
       if (backBtn) backBtn.addEventListener('click', renderNameScreen);
+      const bioBtn = document.getElementById('lockBioBtn');
+      if (bioBtn) {
+        bioBtn.addEventListener('click', async () => {
+          bioBtn.textContent = '⏳';
+          const matchedUser = identity.type === 'user' ? (window.JollyUsers ? JollyUsers.get(identity.id) : null) : null;
+          const okBio = await JollyBiometric.authenticate(bioKey());
+          if (okBio) {
+            unlockSuccess(matchedUser);
+          } else {
+            bioBtn.textContent = '🔒';
+            const err = overlay.querySelector('#lockErr');
+            if (err) err.textContent = 'Barmaq izi tanınmadı';
+          }
+        });
+      }
       bindPinEvents();
     }
 
@@ -440,6 +459,26 @@ const JollyApp = (() => {
       return h.toString(16).padStart(8, '0');
     }
     function isHashedPin(v) { return /^[0-9a-f]{8}$/.test(String(v)); }
+
+    function unlockSuccess(matchedUser) {
+      try {
+        sessionStorage.setItem('jolly_sec_session', JSON.stringify({
+          role: matchedUser ? 'user' : 'admin',
+          at: Date.now(),
+          userId: matchedUser ? matchedUser.id : null,
+          userName: matchedUser ? matchedUser.name : null,
+        }));
+      } catch (e) {}
+      if (window.JollyEvents) {
+        JollyEvents.emit('user.login', {
+          role: matchedUser ? 'user' : 'admin',
+          name: matchedUser ? matchedUser.name : 'Admin',
+          userId: matchedUser ? matchedUser.id : null,
+        });
+      }
+      overlay.classList.add('unlocked');
+      setTimeout(() => { overlay.remove(); continueInit(); }, 350);
+    }
 
     function check() {
       const adminIsHashed = identity.type === 'admin' && isHashedPin(correctPin);
@@ -471,23 +510,11 @@ const JollyApp = (() => {
       }
 
       if (ok) {
-        try {
-          sessionStorage.setItem('jolly_sec_session', JSON.stringify({
-            role: matchedUser ? 'user' : 'admin',
-            at: Date.now(),
-            userId: matchedUser ? matchedUser.id : null,
-            userName: matchedUser ? matchedUser.name : null,
-          }));
-        } catch (e) {}
-        if (window.JollyEvents) {
-          JollyEvents.emit('user.login', {
-            role: matchedUser ? 'user' : 'admin',
-            name: matchedUser ? matchedUser.name : 'Admin',
-            userId: matchedUser ? matchedUser.id : null,
-          });
+        if (window.JollyBiometric && JollyBiometric.isSupported() && !JollyBiometric.isRegistered(bioKey())) {
+          JollyBiometric.offerRegister(bioKey(), () => unlockSuccess(matchedUser));
+        } else {
+          unlockSuccess(matchedUser);
         }
-        overlay.classList.add('unlocked');
-        setTimeout(() => { overlay.remove(); continueInit(); }, 350);
       } else {
         const err = overlay.querySelector('#lockErr');
         err.textContent = 'PIN yanlışdır';
