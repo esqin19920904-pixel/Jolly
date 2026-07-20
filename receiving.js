@@ -32,6 +32,10 @@ const JollyReceiving = (() => {
      ============================================================ */
   function getDocs() { return JollyDB.read(DOCS_KEY, []); }
   function saveDoc(doc) {
+    if (window.JollyAuth && !JollyAuth.can('receiving.create')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Qəbul sənədi yaratmaq icazən yoxdur');
+      return;
+    }
     const docs = getDocs();
     docs.unshift(doc);
     JollyDB.write(DOCS_KEY, docs);
@@ -673,6 +677,11 @@ const JollyReceiving = (() => {
     const basket = getBasket();
     const receivedIds = Object.keys(basket.received || {});
     if (receivedIds.length) {
+      if (window.JollyAuth && !JollyAuth.can('receiving.create')) {
+        if (typeof Toast !== 'undefined') Toast.error('🔒 Qəbul sənədi yaratmaq icazən yoxdur');
+        JollyRouter.go('#/receiving');
+        return;
+      }
       const items = receivedIds.map(id => {
         const p = JollyDB.Products.get(id);
         return { productId: id, name: p ? (p.name || 'Adsız') : 'Silinmiş məhsul', receivedAt: basket.received[id] };
@@ -745,10 +754,6 @@ const JollyReceiving = (() => {
       group: 'Anbar',
       enabled: true,
       render(rest) {
-        if (window.JollyAuth && !JollyAuth.can('receiving.view')) {
-          if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
-          return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
-        }
         if (rest === 'scan') return renderScanMode();
         if (rest === 'sheet') return renderConfirmSheet();
         if (rest === 'docs') return renderDocsList();
