@@ -454,7 +454,7 @@ const JollyApp = (() => {
         try {
           const ns = JollyDB.getSettings();
           ns.pin = hashPin(entered);
-          JollyDB.setSettings ? JollyDB.setSettings(ns) : JollyDB.write('settings', ns);
+          JollyDB.saveSettings ? JollyDB.saveSettings(ns) : JollyDB.write('settings', ns);
         } catch (e) {}
       }
 
@@ -608,11 +608,13 @@ const JollyApp = (() => {
       if (!snap || (Date.now() - snap.ts) > dayMs) {
         if (typeof JollyStudios !== 'undefined' && JollyStudios.saveSnapshot) JollyStudios.saveSnapshot();
       }
-      // Backup xatırlatması
+      // Backup xatırlatması — həm əl ilə export, həm avtomatik bulud sinxronu nəzərə alınır
       const s = JollyDB.getSettings();
       if (s.backupReminder !== false && JollyDB.Products.all().length > 0) {
-        const last = s.lastBackup || 0;
-        if ((Date.now() - last) > 7 * dayMs && typeof JollyWorkflow !== 'undefined') {
+        const lastManual = s.lastBackup || 0;
+        const lastCloud = s.lastCloudSync || 0;
+        const lastProtected = Math.max(lastManual, lastCloud);
+        if ((Date.now() - lastProtected) > 7 * dayMs && typeof JollyWorkflow !== 'undefined') {
           const notifs = JollyDB.read('jolly_notifications', []);
           if (!notifs.some(n => n.text && n.text.includes('Backup vaxtıdır') && !n.read)) {
             notifs.unshift({ id: JollyDB.uid('ntf'), text: '💾 Backup vaxtıdır — məlumatlarını qoru', route: '#/studios/data', ts: Date.now(), read: false });
