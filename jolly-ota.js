@@ -2,11 +2,19 @@
    JOLLY OTA — İçəridən Yeniləmə Sistemi
    Uzaqdakı bir JSON faylından yeni kod/snippet/ayar çəkir.
    Studios → "Yeniləmələr" bölməsindən idarə olunur.
+
+   YENİ: admin "Hamıya Göndər"ə basanda Firebase-ə anlıq siqnal
+   yazılır, açıq olan bütün tətbiqlər dərhal (24 saat gözləmədən)
+   yoxlayıb tətbiq edir — çirkin alert() yerinə qızılı toast göstərir.
    ============================================================ */
 const JollyOTA = (() => {
-  // Yeniləmə mənbəyi — Netlify-da bir jolly-update.json faylı
-  // Sən öz linkini bura yazırsan (Ayarlardan da dəyişmək olar)
   const DEFAULT_URL = 'https://jolly-store.esqin19920904.workers.dev/jolly-update.json';
+
+  // ---- Firebase siqnal yolu — sənin cloud.js-də istifadə etdiyin
+  // eyni `firebase` obyektini istifadə edir. Path adı toqquşmasın
+  // deyə "system/otaSignal" seçdim, cloud.js-də başqa strukturun
+  // varsa mənə de, uyğunlaşdıraram.
+  const SIGNAL_PATH = 'system/otaSignal';
 
   function getUrl() {
     try { return localStorage.getItem('jolly_ota_url') || DEFAULT_URL; } catch (e) { return DEFAULT_URL; }
@@ -16,26 +24,103 @@ const JollyOTA = (() => {
     try { return parseInt(localStorage.getItem('jolly_ota_version') || '0', 10); } catch (e) { return 0; }
   }
   function setInstalledVersion(v) { try { localStorage.setItem('jolly_ota_version', String(v)); } catch (e) {} }
+  function getLastSignal() {
+    try { return parseInt(localStorage.getItem('jolly_ota_last_signal') || '0', 10); } catch (e) { return 0; }
+  }
+  function setLastSignal(ts) { try { localStorage.setItem('jolly_ota_last_signal', String(ts)); } catch (e) {} }
 
-  // Yeniləməni yoxla və tətbiq et
+  /* ---------------- Qızılı toast UI ---------------- */
+  function ensureToastStyles() {
+    if (document.getElementById('jollyOtaToastStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'jollyOtaToastStyle';
+    style.textContent = `
+      #jollyOtaToast{position:fixed;left:14px;right:14px;bottom:22px;z-index:99999;
+        display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;
+        background:linear-gradient(135deg, rgba(18,22,42,.97), rgba(11,13,23,.97));
+        border:1px solid rgba(212,175,55,.45);
+        box-shadow:0 8px 24px rgba(0,0,0,.5), 0 0 18px rgba(212,175,55,.12);
+        backdrop-filter:blur(6px);transform:translateY(140%);opacity:0;
+        transition:transform .45s cubic-bezier(.2,.9,.25,1),opacity .35s ease;
+        font-family:inherit;max-width:420px;margin:0 auto;}
+      #jollyOtaToast.show{transform:translateY(0);opacity:1;}
+      #jollyOtaToast.done{border-color:rgba(53,208,127,.5);box-shadow:0 8px 24px rgba(0,0,0,.5),0 0 18px rgba(53,208,127,.18);}
+      #jollyOtaToast .ota-spin{width:22px;height:22px;border-radius:50%;flex-shrink:0;
+        border:2.5px solid rgba(212,175,55,.25);border-top-color:#f4d777;animation:jollyOtaSpin .8s linear infinite;
+        display:flex;align-items:center;justify-content:center;font-size:14px;}
+      #jollyOtaToast.done .ota-spin{border:none;animation:none;}
+      @keyframes jollyOtaSpin{to{transform:rotate(360deg);}}
+      #jollyOtaToast .ota-text{flex:1;min-width:0;}
+      #jollyOtaToast .ota-title{font-size:13px;font-weight:600;color:#f2e9c9;}
+      #jollyOtaToast .ota-sub{font-size:11px;color:#8a8fb0;margin-top:2px;}
+      #jollyOtaToast .ota-track{height:4px;border-radius:4px;background:rgba(255,255,255,.06);margin-top:7px;overflow:hidden;}
+      #jollyOtaToast .ota-fill{height:100%;width:0%;border-radius:4px;background:linear-gradient(90deg,#d4af37,#f4d777);transition:width .25s ease;}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function showOtaToast() {
+    ensureToastStyles();
+    let el = document.getElementById('jollyOtaToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'jollyOtaToast';
+      el.innerHTML = `
+        <div class="ota-spin" id="jollyOtaSpin"></div>
+        <div class="ota-text">
+          <div class="ota-title" id="jollyOtaTitle">Gör indi qaqan nağarajax 😅😅😅</div>
+          <div class="ota-sub" id="jollyOtaSub">Yüklənir, bağlamayın</div>
+          <div class="ota-track"><div class="ota-fill" id="jollyOtaFill"></div></div>
+        </div>`;
+      document.body.appendChild(el);
+    }
+    el.classList.remove('done');
+    document.getElementById('jollyOtaFill').style.width = '0%';
+    document.getElementById('jollyOtaTitle').textContent = 'Gör indi qaqan nağarajax 😅😅😅';
+    document.getElementById('jollyOtaSub').textContent = 'Yüklənir, bağlamayın';
+    document.getElementById('jollyOtaSpin').innerHTML = '';
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+    return el;
+  }
+
+  function bumpOtaToast(pct) {
+    const fill = document.getElementById('jollyOtaFill');
+    if (fill) fill.style.width = Math.min(pct, 100) + '%';
+  }
+
+  function finishOtaToast(appliedList) {
+    const el = document.getElementById('jollyOtaToast');
+    if (!el) return;
+    bumpOtaToast(100);
+    setTimeout(() => {
+      el.classList.add('done');
+      document.getElementById('jollyOtaSpin').innerHTML = '✅';
+      document.getElementById('jollyOtaTitle').textContent = 'Yeniləndi';
+      document.getElementById('jollyOtaSub').textContent = appliedList && appliedList.length ? appliedList.join(', ') : 'Tətbiq güncəlləndi, davam edin';
+    }, 200);
+  }
+
+  /* ---------------- Əsas yoxlama/tətbiq məntiqi ---------------- */
   async function checkAndApply(silent) {
     const url = getUrl();
+    const toast = !silent ? showOtaToast() : null;
     try {
+      if (toast) bumpOtaToast(15);
       const res = await fetch(url + '?t=' + Date.now(), { cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (toast) bumpOtaToast(45);
       const data = await res.json();
       const remoteV = data.version || 0;
       const localV = getInstalledVersion();
 
       if (remoteV <= localV) {
+        if (toast) toast.remove();
         if (!silent) Toast.info('Ən son versiyadasan (v' + localV + ')');
         return { updated: false, version: localV };
       }
 
-      // Yeniləmələri tətbiq et
       let applied = [];
 
-      // 1) Snippetlər (JavaScript kod parçaları) — Code Studio-ya əlavə
       if (Array.isArray(data.snippets) && typeof JollyCodeStudio !== 'undefined') {
         data.snippets.forEach(sn => {
           try {
@@ -48,8 +133,8 @@ const JollyOTA = (() => {
           } catch (e) {}
         });
       }
+      if (toast) bumpOtaToast(65);
 
-      // 2) Custom Fields (məhsul sahələri)
       if (Array.isArray(data.fields) && typeof JollyCodeStudio !== 'undefined') {
         data.fields.forEach(f => {
           try {
@@ -63,7 +148,6 @@ const JollyOTA = (() => {
         });
       }
 
-      // 3) Ayarlar (məsələn yeni tema, bayraq)
       if (data.settings && typeof data.settings === 'object') {
         const s = JollyDB.getSettings();
         Object.assign(s, data.settings);
@@ -71,29 +155,66 @@ const JollyOTA = (() => {
         applied.push('ayarlar');
       }
 
-      // 4) Xüsusi mesaj / elan
       if (data.message) {
         try { localStorage.setItem('jolly_ota_message', data.message); } catch (e) {}
       }
 
       setInstalledVersion(remoteV);
+      if (toast) bumpOtaToast(90);
 
-      if (!silent) {
-        alert('✓ Yeniləndi (v' + remoteV + ')!\n\n' + (applied.length ? applied.join('\n') : 'Dəyişikliklər tətbiq edildi') + '\n\nProqram yenidən başladılacaq.');
-        location.reload();
-      }
+      finishOtaToast(applied);
+      setTimeout(() => location.reload(), 1800);
+
       return { updated: true, version: remoteV, applied };
     } catch (e) {
+      if (toast) toast.remove();
       if (!silent) Toast.error('Yoxlama alınmadı: ' + (e.message || e));
       return { updated: false, error: String(e.message || e) };
     }
   }
 
-  // Studios səhifəsi
+  /* ---------------- Admin: Hamıya Göndər ---------------- */
+  function broadcastUpdate() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.database) {
+        Toast.error('Firebase tapılmadı — siqnal göndərilə bilmədi');
+        return;
+      }
+      const ts = Date.now();
+      firebase.database().ref(SIGNAL_PATH).set({ ts: ts, by: (typeof JollyAuth !== 'undefined' && JollyAuth.getCurrentUserName ? JollyAuth.getCurrentUserName() : 'admin') })
+        .then(() => Toast.success('Yeniləmə siqnalı göndərildi'))
+        .catch(err => Toast.error('Göndərilmədi: ' + err.message));
+    } catch (e) {
+      Toast.error('Xəta: ' + (e.message || e));
+    }
+  }
+
+  function listenForBroadcast() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.database) return;
+      firebase.database().ref(SIGNAL_PATH).on('value', snap => {
+        const val = snap.val();
+        if (!val || !val.ts) return;
+        if (val.ts > getLastSignal()) {
+          setLastSignal(val.ts);
+          // ilk yükləmədə köhnə siqnala görə özünü yeniləməsin
+          if (getLastSignal() === val.ts && document.readyState === 'complete') {
+            checkAndApply(false);
+          }
+        }
+      });
+    } catch (e) {}
+  }
+
+  /* ---------------- Studios səhifəsi ---------------- */
   function render() {
     const localV = getInstalledVersion();
     const url = getUrl();
     const msg = (() => { try { return localStorage.getItem('jolly_ota_message') || ''; } catch (e) { return ''; } })();
+    // Admin yoxlaması — sənin JollyAuth-da fərqli funksiya adı varsa
+    // bu sətri ona uyğun dəyiş: məsələn JollyAuth.role === 'admin'
+    const isAdmin = (typeof JollyAuth !== 'undefined' && JollyAuth.isAdmin ? JollyAuth.isAdmin() : true);
+
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">🔄 Yeniləmələr</h2>
       <p class="muted" style="font-size:12px;margin:0 0 16px;">İçəridən yeni funksiyalar əlavə et — APK yenidən qurmadan.</p>
@@ -104,6 +225,7 @@ const JollyOTA = (() => {
         <div style="font-size:34px;font-family:var(--font-display);font-weight:800;color:#f5c563;">v${localV}</div>
         <div class="muted" style="font-size:12px;margin-bottom:14px;">Quraşdırılmış versiya</div>
         <button class="btn btn-primary btn-block" onclick="JollyOTA.check()">🔄 Yeniləmələri yoxla</button>
+        ${isAdmin ? `<button class="btn btn-block" style="margin-top:8px;background:linear-gradient(135deg,#d4af37,#b8912b);color:#1a1206;font-weight:700;" onclick="JollyOTA.broadcastUpdate()">📤 Hamıya Göndər</button>` : ''}
       </div>
 
       <div class="section-title">Mənbə linki</div>
@@ -122,7 +244,6 @@ const JollyOTA = (() => {
     if (el && el.value.trim()) { setUrl(el.value); Toast.success('Link saxlanıldı'); }
   }
 
-  // Başlanğıcda sakit yoxlama (gündə bir dəfə)
   function autoCheck() {
     try {
       const last = parseInt(localStorage.getItem('jolly_ota_last') || '0', 10);
@@ -131,7 +252,9 @@ const JollyOTA = (() => {
         setTimeout(() => checkAndApply(true), 3000);
       }
     } catch (e) {}
+    // siqnal dinləyicisini də başlat
+    setTimeout(listenForBroadcast, 2000);
   }
 
-  return { render, check, checkAndApply, saveUrlFromInput, getInstalledVersion, autoCheck };
+  return { render, check, checkAndApply, saveUrlFromInput, getInstalledVersion, autoCheck, broadcastUpdate, listenForBroadcast };
 })();
