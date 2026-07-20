@@ -357,8 +357,8 @@ const JollyApp = (() => {
       const users = (window.JollyUsers ? JollyUsers.list() : []).filter(u => u.status === 'active');
       overlay.innerHTML = `
         <div class="lock-inner">
-          <div class="lock-crown">👑</div>
-          <div class="lock-logo">JOLLY</div>
+          <div class="lock-crown-zone"><div class="lock-ring"></div><div class="lock-crown">👑</div></div>
+          <div class="lock-logo" data-text="JOLLY">JOLLY</div>
           <div class="lock-sub">Kodsuz Mallar Pro</div>
           <div class="lock-title" style="margin-bottom:18px;">Kimsən?</div>
           <div id="lockUserList" style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto;">
@@ -376,8 +376,20 @@ const JollyApp = (() => {
         </div>
       `;
       overlay.querySelectorAll('.lock-user-card').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
           if (typeof JollySound !== 'undefined') JollySound.tap();
+          const rect = card.getBoundingClientRect();
+          const size = Math.max(rect.width, rect.height) * 1.4;
+          const ripple = document.createElement('span');
+          ripple.className = 'lock-ripple';
+          ripple.style.width = ripple.style.height = size + 'px';
+          const rx = (e.clientX || rect.left + rect.width / 2) - rect.left - size / 2;
+          const ry = (e.clientY || rect.top + rect.height / 2) - rect.top - size / 2;
+          ripple.style.left = rx + 'px';
+          ripple.style.top = ry + 'px';
+          card.appendChild(ripple);
+          setTimeout(() => ripple.remove(), 650);
+
           const type = card.dataset.type;
           if (type === 'admin') {
             identity = { type: 'admin' };
@@ -386,7 +398,7 @@ const JollyApp = (() => {
             identity = { type: 'user', id: card.dataset.id, name: u ? u.name : 'İstifadəçi' };
           }
           entered = '';
-          renderPinScreen();
+          setTimeout(() => renderPinScreen(), 140);
         });
       });
     }
