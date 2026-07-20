@@ -367,7 +367,21 @@ const JollyApp = (() => {
     }
     function check() {
       if (entered.length === correctPin.length) {
-        if (entered === correctPin) {
+        let matchedUser = null;
+        let ok = (entered === correctPin);
+        if (!ok && window.JollyUsers) {
+          matchedUser = JollyUsers.verifyPin(entered);
+          if (matchedUser) ok = true;
+        }
+        if (ok) {
+          try {
+            sessionStorage.setItem('jolly_sec_session', JSON.stringify({
+              role: matchedUser ? 'user' : 'admin',
+              at: Date.now(),
+              userId: matchedUser ? matchedUser.id : null,
+              userName: matchedUser ? matchedUser.name : null,
+            }));
+          } catch (e) {}
           overlay.classList.add('unlocked');
           setTimeout(() => { overlay.remove(); continueInit(); }, 350);
         } else {
