@@ -336,6 +336,16 @@
     wrapProductAdd();
     setTimeout(checkArchiveNotify, 4000);
     setTimeout(checkDailySummaryNotify, 4500);
+
+    // İşçi girişi bildirişi — yalnız User daxil olanda (Admin özünə bildiriş almır)
+    if (window.JollyEvents) {
+      JollyEvents.on('user.login', (payload) => {
+        if (!payload || payload.role !== 'user') return;
+        if (!isConfigured()) return;
+        const time = new Date().toLocaleString('az-AZ');
+        sendMessage(`👤 <b>${payload.name}</b> daxil oldu\n🕐 ${time}`);
+      });
+    }
   }
 
   if (document.readyState === "loading") {
