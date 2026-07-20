@@ -657,4 +657,8 @@ document.addEventListener('DOMContentLoaded', function() {
     { key:'print.use', label:'Çap et', tag:'view', default:true },
   ]});
 
+  POS.register({ id:'storemap', name:'Mağaza Xəritəsi', icon:'🗺️', permissions:[
+    { key:'storemap.view', label:'Xəritəyə bax', tag:'view', default:true },
+  ]});
+
 });
