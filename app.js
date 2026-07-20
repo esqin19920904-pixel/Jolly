@@ -473,6 +473,9 @@ const JollyApp = (() => {
             name: matchedUser ? matchedUser.name : 'Admin',
             userId: matchedUser ? matchedUser.id : null,
           });
+          if (typeof Toast !== 'undefined') Toast.info('🔧 debug: user.login yayımlandı (' + (matchedUser ? matchedUser.name : 'Admin') + ')');
+        } else {
+          if (typeof Toast !== 'undefined') Toast.error('🔧 debug: JollyEvents tapılmadı!');
         }
         overlay.classList.add('unlocked');
         setTimeout(() => { overlay.remove(); continueInit(); }, 350);
