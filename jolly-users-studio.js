@@ -65,7 +65,7 @@
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;">➕ Yeni işçi əlavə et</div>
         <input id="ju-name" type="text" placeholder="Ad (məs. Zülfü)"
           style="width:100%;padding:9px 12px;border-radius:9px;margin-bottom:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#fff;font-size:13px;box-sizing:border-box;">
-        <input id="ju-pin" type="tel" inputmode="numeric" maxlength="6" placeholder="PIN (min. 4 rəqəm)"
+        <input id="ju-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="PIN (4 rəqəm)"
           style="width:100%;padding:9px 12px;border-radius:9px;margin-bottom:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#fff;font-size:13px;box-sizing:border-box;">
         <button onclick="JollyUsersUI.create()"
           style="width:100%;padding:10px;border-radius:9px;background:var(--accent-1,#00d4ff);color:#06070d;font-weight:600;font-size:13px;">
@@ -95,7 +95,7 @@
     editPin(id) {
       const pin = prompt('Yeni PIN daxil et (min. 4 rəqəm):');
       if (!pin) return;
-      if (pin.length < 4) { alert('PIN ən azı 4 rəqəm olmalıdır'); return; }
+      if (!/^\d{4}$/.test(pin)) { alert('PIN düz 4 rəqəm olmalıdır'); return; }
       JollyUsers.update(id, { pin });
       _draw();
     },
