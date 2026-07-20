@@ -1718,10 +1718,10 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
   content: '';
   position: absolute; inset: -20%;
   background:
-    radial-gradient(circle at 20% 25%, rgba(245,197,99,0.32) 0%, transparent 45%),
-    radial-gradient(circle at 80% 20%, rgba(99,102,241,0.28) 0%, transparent 45%),
-    radial-gradient(circle at 50% 80%, rgba(245,197,99,0.22) 0%, transparent 50%),
-    radial-gradient(circle at 85% 75%, rgba(168,85,247,0.24) 0%, transparent 45%);
+    radial-gradient(circle at 15% 20%, rgba(245,197,99,0.32) 0%, transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(168,85,247,0.28) 0%, transparent 45%),
+    radial-gradient(circle at 20% 85%, rgba(6,220,240,0.22) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(255,95,162,0.22) 0%, transparent 45%);
   animation: lockAurora 8s ease-in-out infinite alternate;
   pointer-events: none;
 }
@@ -1765,16 +1765,48 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .lock-inner.shake { animation: lockShake .4s; }
 @keyframes lockShake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-10px)} 40%,80%{transform:translateX(10px)} }
 
+.lock-crown-zone { position: relative; width: 74px; height: 74px; margin: 0 auto 4px; }
+.lock-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid transparent;
+  background: conic-gradient(from 0deg, #f5c563, #a855f7, #06dcf0, #ff5fa2, #f5c563) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: lockRingSpin 3s linear infinite;
+  opacity: 0.85;
+}
+@keyframes lockRingSpin { to { transform: rotate(360deg); } }
+
 .lock-crown {
-  font-size: 40px; margin-bottom: 6px;
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 40px;
   filter: drop-shadow(0 0 18px rgba(245,197,99,0.7));
-  animation: lockCrownPulse 2s ease-in-out infinite;
+  animation: lockCrownPulse 2s ease-in-out infinite, lockCrownFloat 3s ease-in-out infinite;
 }
 @keyframes lockCrownPulse {
-  0%, 100% { filter: drop-shadow(0 0 12px rgba(245,197,99,0.5)); transform: scale(1); }
-  50%      { filter: drop-shadow(0 0 30px rgba(245,197,99,0.95)); transform: scale(1.1); }
+  0%, 100% { filter: drop-shadow(0 0 12px rgba(245,197,99,0.5)); }
+  50%      { filter: drop-shadow(0 0 30px rgba(245,197,99,0.95)); }
 }
-.lock-logo { font-family: var(--font-display, sans-serif); font-size: 38px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(90deg,#f5c563,#ffe9a8,#e0a72e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+@keyframes lockCrownFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-8px) rotate(-3deg); }
+}
+.lock-logo { font-family: var(--font-display, sans-serif); font-size: 38px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(90deg,#f5c563,#ff5fa2,#a855f7,#06dcf0); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; position: relative; animation: lockLogoHue 6s ease-in-out infinite; }
+@keyframes lockLogoHue { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
+.lock-logo[data-text] { color: transparent; }
+.lock-logo[data-text]::after {
+  content: attr(data-text);
+  position: absolute; left: 0; top: 0; width: 100%;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.9) 48%, rgba(255,255,255,0.9) 52%, transparent 70%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: lockShine 3.4s ease-in-out infinite;
+}
+@keyframes lockShine {
+  0%   { background-position: 200% 0; }
+  45%  { background-position: -50% 0; }
+  100% { background-position: -50% 0; }
+}
 .lock-sub { font-size: 12px; color: rgba(220,200,150,0.6); margin-bottom: 30px; }
 .lock-title { font-size: 15px; color: #e8e0c8; margin-bottom: 18px; }
 .lock-dots { display: flex; justify-content: center; gap: 16px; margin-bottom: 12px; }
@@ -1797,8 +1829,10 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 
 /* Kimsən? — istifadəçi kartları: sırayla görünmə + toxunma effekti */
 .lock-user-card {
+  position: relative; overflow: hidden;
   animation: lockCardIn .45s cubic-bezier(0.16,1,0.3,1) backwards;
-  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .15s ease, background .15s ease;
+  box-shadow: 0 3px 0 rgba(245,197,99,0.12), 0 6px 14px rgba(0,0,0,0.25);
 }
 .lock-user-card:nth-child(1) { animation-delay: .05s; }
 .lock-user-card:nth-child(2) { animation-delay: .12s; }
@@ -1810,55 +1844,17 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
   from { opacity: 0; transform: translateY(14px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.lock-user-card:active { transform: scale(0.97); border-color: rgba(245,197,99,0.5) !important; background: rgba(245,197,99,0.06) !important; }
-
-/* Fərdi avatarların yumşaq parıltısı */
-.lock-user-card > div:first-child {
-  box-shadow: 0 0 14px rgba(0,0,0,0.3), 0 0 0 rgba(255,255,255,0);
-  transition: box-shadow .2s ease;
+.lock-user-card::before {
+  content: ''; position: absolute; inset: -1px; border-radius: 15px; z-index: -1;
+  background: linear-gradient(120deg, rgba(245,197,99,0.5), rgba(168,85,247,0.4), rgba(6,220,240,0.4));
+  opacity: 0; transition: opacity .2s;
 }
-.lock-user-card:active > div:first-child {
-  box-shadow: 0 0 18px rgba(245,197,99,0.5);
+.lock-user-card:active::before { opacity: 1; }
+.lock-user-card:active {
+  transform: translateY(3px) scale(0.98);
+  box-shadow: 0 0 0 rgba(245,197,99,0.12), 0 2px 6px rgba(0,0,0,0.25);
+  border-color: transparent !important;
+  background: rgba(245,197,99,0.06) !important;
 }
-
-
-
-/* ============================================================
-   NEON JOLLY STORE OS Splash — parlayan halqa + işıq yanma
-   ============================================================ */
-#jollySplash {
-  background: radial-gradient(ellipse at 50% 45%, #1a0d2e 0%, #0a0518 55%, #05050a 100%);
-  overflow: hidden;
-}
-#jollySplash::before {
-  content: ''; position: absolute; inset: 0;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(124,92,255,0.15), transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(6,220,240,0.12), transparent 40%);
-  animation: splashAmbient 4s ease-in-out infinite alternate;
-}
-@keyframes splashAmbient { from { opacity: 0.5; } to { opacity: 1; } }
-
-/* Parlayan neon halqa */
-.splash-ring {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 260px; height: 260px; border-radius: 50%;
-  border: 3px solid transparent;
-  background: linear-gradient(#0a0518, #0a0518) padding-box,
-             conic-gradient(from 0deg, #f5c563, #a855f7, #06dcf0, #a855f7, #f5c563) border-box;
-  box-shadow: 0 0 40px rgba(168,85,247,0.5), 0 0 80px rgba(6,220,240,0.3), inset 0 0 40px rgba(124,92,255,0.2);
-  animation: splashRingSpin 3s linear infinite, splashRingPulse 1.6s ease-in-out infinite alternate;
-}
-@keyframes splashRingSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-@keyframes splashRingPulse {
-  from { box-shadow: 0 0 30px rgba(168,85,247,0.4), 0 0 60px rgba(6,220,240,0.2); }
-  to   { box-shadow: 0 0 60px rgba(245,197,99,0.7), 0 0 120px rgba(6,220,240,0.45); }
-}
-
-/* Mərkəz — logo (halqa ilə fırlanmasın deyə ayrı) */
-.splash-core {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  text-align: center; z-index: 2;
-  animation: splashCoreIn 0.8s cubic-bezier(.2,1.2,.3,1) both;
-}
-@keyframes splashCoreIn { from { opacity: 0; transform: trans
+.lock-ripple {
+  position: absolute; border-ra
