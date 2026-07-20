@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PIN Sıfırlama — JOLLY</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#06070d;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#12131c;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:32px 24px;width:100%;max-width:420px;text-align:center}
+  h1{font-size:1.3rem;margin-bottom:10px;color:#00d4ff}
+  p{color:rgba(255,255,255,0.6);font-size:0.9rem;margin-bottom:20px;line-height:1.5}
+  button{width:100%;padding:14px;border-radius:12px;border:none;font-size:0.95rem;font-weight:600;cursor:pointer;margin-bottom:10px}
+  .btn-danger{background:#ef4444;color:#fff}
+  .btn-back{background:rgba(255,255,255,0.08);color:#fff}
+  #status{margin-top:16px;font-size:0.85rem;color:#22c55e;display:none}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔓 PIN Kilidini Sıfırla</h1>
+    <p>
+      Bu, yalnız PIN/giriş kilidini təmizləyir.<br>
+      Məhsullar, şəkillər və digər bütün məlumatlar toxunulmaz qalır.<br><br>
+      Sıfırladıqdan sonra JOLLY-yə kilidsiz girəcəksən və Ayarlar bölməsindən yeni PIN quraşdıra biləcəksən.
+    </p>
+    <button class="btn-danger" onclick="doReset()">PIN Kilidini Sıfırla</button>
+    <button class="btn-back" onclick="location.href='index.html'">Ləğv et, geri qayıt</button>
+    <div id="status">✅ Sıfırlandı! 2 saniyə sonra JOLLY-yə yönləndirilirsən...</div>
+  </div>
+
+<script>
+function doReset(){
+  try {
+    localStorage.removeItem('jolly_security_cfg');
+    sessionStorage.removeItem('jolly_sec_session');
+    document.getElementById('status').style.display = 'block';
+    setTimeout(() => { location.href = 'index.html'; }, 2000);
+  } catch(e) {
+    alert('Xəta baş verdi: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>
