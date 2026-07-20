@@ -10,11 +10,35 @@
 const JollyOTA = (() => {
   const DEFAULT_URL = 'https://jolly-store.esqin19920904.workers.dev/jolly-update.json';
 
-  // ---- Firebase siqnal yolu — sənin cloud.js-də istifadə etdiyin
-  // eyni `firebase` obyektini istifadə edir. Path adı toqquşmasın
-  // deyə "system/otaSignal" seçdim, cloud.js-də başqa strukturun
-  // varsa mənə de, uyğunlaşdıraram.
-  const SIGNAL_PATH = 'system/otaSignal';
+  // ---- Siqnal REST-lə "jolly" node-un yanında ayrıca node-da
+  // saxlanır (cloud.js-dəki eyni Firebase layihəsi, eyni REST üsulu,
+  // SDK yoxdur — ona görə firebase.database() işləmir)
+  const OTA_DB_URL = "https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app";
+  const OTA_API_KEY = "AIzaSyAhv-ZFTTNeyoXIDjn3VrVcknPKor4kZvw";
+  const SIGNAL_NODE = 'jolly_ota_signal';
+  const POLL_MS = 20000; // 20 saniyədə bir yoxla (SDK olmadığı üçün real-time push əvəzi)
+
+  let _otaToken = null, _otaTokenExpiry = 0;
+  async function _getOtaToken() {
+    if (_otaToken && Date.now() < _otaTokenExpiry) return _otaToken;
+    try {
+      const cached = JollyDB.read('jolly_fb_auth', null);
+      if (cached && cached.idToken && Date.now() < cached.expiry) {
+        _otaToken = cached.idToken; _otaTokenExpiry = cached.expiry;
+        return _otaToken;
+      }
+    } catch (e) {}
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${OTA_API_KEY}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ returnSecureToken: true }),
+    });
+    if (!res.ok) throw new Error('Bulud girişi uğursuz: ' + res.status);
+    const data = await res.json();
+    _otaToken = data.idToken;
+    _otaTokenExpiry = Date.now() + (parseInt(data.expiresIn, 10) * 1000) - 60000;
+    try { JollyDB.write('jolly_fb_auth', { idToken: _otaToken, expiry: _otaTokenExpiry }); } catch (e) {}
+    return _otaToken;
+  }
 
   function getUrl() {
     try { return localStorage.getItem('jolly_ota_url') || DEFAULT_URL; } catch (e) { return DEFAULT_URL; }
@@ -174,36 +198,58 @@ const JollyOTA = (() => {
   }
 
   /* ---------------- Admin: Hamıya Göndər ---------------- */
-  function broadcastUpdate() {
+  function _isAdminSession() {
     try {
-      if (typeof firebase === 'undefined' || !firebase.database) {
-        Toast.error('Firebase tapılmadı — siqnal göndərilə bilmədi');
-        return;
-      }
+      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      return !sess || sess.role === 'admin';
+    } catch (e) { return true; }
+  }
+
+  async function broadcastUpdate() {
+    try {
       const ts = Date.now();
-      firebase.database().ref(SIGNAL_PATH).set({ ts: ts, by: (typeof JollyAuth !== 'undefined' && JollyAuth.getCurrentUserName ? JollyAuth.getCurrentUserName() : 'admin') })
-        .then(() => Toast.success('Yeniləmə siqnalı göndərildi'))
-        .catch(err => Toast.error('Göndərilmədi: ' + err.message));
+      const token = await _getOtaToken();
+      const res = await fetch(`${OTA_DB_URL}/${SIGNAL_NODE}.json?auth=${token}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ts: ts, by: 'admin' }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      Toast.success('Yeniləmə siqnalı göndərildi');
     } catch (e) {
-      Toast.error('Xəta: ' + (e.message || e));
+      Toast.error('Göndərilmədi: ' + (e.message || e));
     }
   }
 
-  function listenForBroadcast() {
+  let _pollTimer = null;
+  async function pollForBroadcast() {
     try {
-      if (typeof firebase === 'undefined' || !firebase.database) return;
-      firebase.database().ref(SIGNAL_PATH).on('value', snap => {
-        const val = snap.val();
-        if (!val || !val.ts) return;
-        if (val.ts > getLastSignal()) {
-          setLastSignal(val.ts);
-          // ilk yükləmədə köhnə siqnala görə özünü yeniləməsin
-          if (getLastSignal() === val.ts && document.readyState === 'complete') {
-            checkAndApply(false);
-          }
-        }
-      });
+      const token = await _getOtaToken();
+      const res = await fetch(`${OTA_DB_URL}/${SIGNAL_NODE}.json?auth=${token}`);
+      if (!res.ok) return;
+      const val = await res.json();
+      if (!val || !val.ts) return;
+      if (val.ts > getLastSignal()) {
+        setLastSignal(val.ts);
+        checkAndApply(false);
+      }
     } catch (e) {}
+  }
+
+  function listenForBroadcast() {
+    if (_pollTimer) return;
+    // ilk açılışda köhnə siqnala görə özünü yeniləməsin — cari
+    // siqnalı "görülmüş" kimi qeyd et, sonrakı YENİ siqnallara reaksiya versin
+    (async () => {
+      try {
+        const token = await _getOtaToken();
+        const res = await fetch(`${OTA_DB_URL}/${SIGNAL_NODE}.json?auth=${token}`);
+        if (res.ok) {
+          const val = await res.json();
+          if (val && val.ts && getLastSignal() === 0) setLastSignal(val.ts);
+        }
+      } catch (e) {}
+      _pollTimer = setInterval(pollForBroadcast, POLL_MS);
+    })();
   }
 
   /* ---------------- Studios səhifəsi ---------------- */
@@ -211,9 +257,8 @@ const JollyOTA = (() => {
     const localV = getInstalledVersion();
     const url = getUrl();
     const msg = (() => { try { return localStorage.getItem('jolly_ota_message') || ''; } catch (e) { return ''; } })();
-    // Admin yoxlaması — sənin JollyAuth-da fərqli funksiya adı varsa
-    // bu sətri ona uyğun dəyiş: məsələn JollyAuth.role === 'admin'
-    const isAdmin = (typeof JollyAuth !== 'undefined' && JollyAuth.isAdmin ? JollyAuth.isAdmin() : true);
+    // Admin yoxlaması — cloud.js-dəki eyni "jolly_sec_session" məntiqi
+    const isAdmin = _isAdminSession();
 
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">🔄 Yeniləmələr</h2>
