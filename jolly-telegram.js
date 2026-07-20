@@ -342,6 +342,8 @@
     registerLoginListener();
   }
 
+  const _deniedThrottle = new Map(); // "userId:key" -> son göndərmə vaxtı
+
   function registerLoginListener(attempt) {
     attempt = attempt || 0;
     if (window.JollyEvents) {
@@ -350,6 +352,20 @@
         if (!isConfigured()) return;
         const time = new Date().toLocaleString('az-AZ');
         sendMessage(`👤 <b>${payload.name}</b> daxil oldu\n🕐 ${time}`);
+      });
+
+      JollyEvents.on('permission.denied', (payload) => {
+        if (!payload || !payload.userId) return; // Admin-in özü üçün deyil
+        if (!isConfigured()) return;
+        const settings = getSettings();
+        if (settings.deniedAlert === false) return; // istəsə söndürə bilər
+        const throttleKey = payload.userId + ':' + payload.key;
+        const last = _deniedThrottle.get(throttleKey) || 0;
+        if (Date.now() - last < 60000) return; // eyni cəhd 1 dəqiqədə bir dəfə
+        _deniedThrottle.set(throttleKey, Date.now());
+        const time = new Date().toLocaleString('az-AZ');
+        const name = payload.userName || 'Naməlum';
+        sendMessage(`⚠️ <b>${name}</b> icazəsiz əməliyyata cəhd etdi\n🔒 ${payload.key}\n🕐 ${time}`);
       });
       return;
     }
