@@ -127,3 +127,5 @@ const JollyEvents = (() => {
     };
 
 })();
+
+window.JollyEvents = JollyEvents;
