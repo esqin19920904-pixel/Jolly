@@ -69,9 +69,13 @@ const JollyAISearch = (() => {
     return opts.limit ? results.slice(0, opts.limit) : results;
   }
 
+  // Girişdə icazə yoxlanılır — "AI Axtarış" bağlıdırsa, boş nəticə qaytarır
   function search(query, opts = {}) {
+    if (window.JollyAuth && !JollyAuth.can('search.ai')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 AI Axtarış icazən yoxdur');
+      return [];
+    }
     const q = norm(query);
-    // Sırf rəqəmdirsə: 4 rəqəm = son4, 8+ = barkod, sonra ümumi
     if (/^\d{4}$/.test(q)) {
       const byLast4 = searchByLast4(q);
       if (byLast4.length) return byLast4;
