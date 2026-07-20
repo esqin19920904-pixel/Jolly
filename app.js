@@ -427,6 +427,36 @@ const JollyApp = (() => {
     });
   }
 
+  function renderIdentityBadge() {
+    const old = document.getElementById('jollyIdBadge');
+    if (old) old.remove();
+    let session = null;
+    try { session = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null'); } catch (e) {}
+    if (!session) return; // PIN kilidi söndürülübsə, sessiya yoxdur — nişan göstərilmir
+
+    const isAdmin = session.role === 'admin';
+    const label = isAdmin ? 'Admin' : (session.userName || 'User');
+    const b = document.createElement('div');
+    b.id = 'jollyIdBadge';
+    b.style.cssText = `position:fixed;top:10px;left:12px;z-index:9998;
+      background:rgba(10,10,20,0.88);
+      border:1px solid ${isAdmin ? 'rgba(255,184,77,0.5)' : 'rgba(0,212,255,0.5)'};
+      color:${isAdmin ? '#fbbf24' : '#00d4ff'};
+      padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;
+      cursor:pointer;display:flex;align-items:center;gap:6px;
+      backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.3);`;
+    b.innerHTML = isAdmin
+      ? `👑 ${label} <span style="opacity:0.55;font-size:10px;">| 🔄</span>`
+      : `👤 ${label} <span style="opacity:0.55;font-size:10px;">| 🔄</span>`;
+    b.title = 'İstifadəçi dəyiş';
+    b.onclick = () => {
+      if (!confirm('Çıxış edib başqa istifadəçi ilə girmək istəyirsən?')) return;
+      try { sessionStorage.removeItem('jolly_sec_session'); sessionStorage.removeItem('jolly_pin_ok'); } catch (e) {}
+      location.reload();
+    };
+    document.body.appendChild(b);
+  }
+
   function continueInit() {
     // PIN düz oldu — səhifəni yenidən yüklə (init təmiz başlasın, bu dəfə PIN keçiləcək)
     try { sessionStorage.setItem('jolly_pin_ok', '1'); } catch (e) {}
@@ -455,6 +485,7 @@ const JollyApp = (() => {
       setTimeout(() => Toast.success(`${repaired} məhsul bərpa olundu ✓`), 800);
     }
     if (!checkPinLock()) return;
+    renderIdentityBadge();
     JollyStudios.applySavedTheme();
     if (typeof JollyCodeStudio !== 'undefined') JollyCodeStudio.runEnabledSnippets();
     if (typeof JollyWorkflow !== 'undefined') JollyWorkflow.runOnStartup();
