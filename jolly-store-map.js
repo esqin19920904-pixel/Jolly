@@ -43,6 +43,10 @@ const JollyStoreMap = (() => {
   }
 
   function render(highlightId) {
+    if (window.JollyAuth && !JollyAuth.can('storemap.view')) {
+      if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+      return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+    }
     const cells = SECTIONS.map(s => `
       <div class="sm-cell ${highlightId === s.id ? 'sm-hi' : ''}"
            style="grid-column:${s.col} / span ${s.cw}; grid-row:${s.row} / span ${s.ch}; --sc:${s.color};"
