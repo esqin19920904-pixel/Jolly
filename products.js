@@ -81,6 +81,7 @@ const JollyProducts = (() => {
         <input id="homeSearch" placeholder="Ad, kod, barkod, firma ilə axtar..." oninput="JollyProducts.liveSearch(this.value)">
         <button class="mic-btn" onclick="JollyProducts.voiceSearch()">🎤</button>
         <button class="scan-btn" onclick="JollyProducts.scanSearch()">▦</button>
+        <button class="scan-btn" title="Şəkillə axtar" onclick="JollyProducts.photoSearch()">📷</button>
       </div>
 
       <div class="chip-row" style="margin-bottom:6px;" id="homeFilterChips">
@@ -182,6 +183,27 @@ const JollyProducts = (() => {
       document.getElementById('homeSearch').value = text;
       liveSearch(text);
       Toast.success(`"${text}" axtarılır`);
+    });
+  }
+
+  function photoSearch() {
+    if (window.JollyAuth && !JollyAuth.can('search.ai')) {
+      Toast.error('İcazə yoxdur');
+      return;
+    }
+    if (typeof JollyVisualSearch === 'undefined') { Toast.error('Bu modul yüklənməyib'); return; }
+    Toast.info('📷 Şəkil çək — bazadan oxşarını axtaracam');
+    JollyVisualSearch.captureAndSearch((results) => {
+      if (!results || results.length === 0) {
+        Toast.error('Oxşar məhsul tapılmadı');
+        return;
+      }
+      if (typeof JollyChat !== 'undefined' && JollyChat.showVisualResults) {
+        JollyRouter.go('#/chat');
+        setTimeout(() => JollyChat.showVisualResults(results), 300);
+      } else if (results.length === 1) {
+        JollyRouter.go(`#/product/${results[0].id}`);
+      }
     });
   }
 
@@ -1253,7 +1275,7 @@ const JollyProducts = (() => {
   }
 
   return {
-    renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch,
+    renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch, photoSearch,
     renderFilteredPage, renderDraftsPage, deleteDraft, renderDetailPage, deleteProduct,
     renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
