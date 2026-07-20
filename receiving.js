@@ -745,6 +745,10 @@ const JollyReceiving = (() => {
       group: 'Anbar',
       enabled: true,
       render(rest) {
+        if (window.JollyAuth && !JollyAuth.can('receiving.view')) {
+          if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+          return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+        }
         if (rest === 'scan') return renderScanMode();
         if (rest === 'sheet') return renderConfirmSheet();
         if (rest === 'docs') return renderDocsList();
