@@ -6,9 +6,13 @@
    YENİ: admin "Hamıya Göndər"ə basanda Firebase-ə anlıq siqnal
    yazılır, açıq olan bütün tətbiqlər dərhal (24 saat gözləmədən)
    yoxlayıb tətbiq edir — çirkin alert() yerinə qızılı toast göstərir.
+
+   DÜZƏLİŞ (2026-07-21): DEFAULT_URL artıq workers.dev yox, öz
+   saytının içindəki fayldır — Bakcell workers.dev-i blokladığı
+   üçün Zülfiqarın telefonunda "Failed to fetch" verirdi.
    ============================================================ */
 const JollyOTA = (() => {
-  const DEFAULT_URL = 'https://jolly-store.esqin19920904.workers.dev/jolly-update.json';
+  const DEFAULT_URL = '/jolly-update.json';
 
   // ---- Siqnal REST-lə "jolly" node-un yanında ayrıca node-da
   // saxlanır (cloud.js-dəki eyni Firebase layihəsi, eyni REST üsulu,
