@@ -17,6 +17,7 @@ const JollyDB = (() => {
     edge: 'jolly_edge_config',
     drafts: 'jolly_drafts',
     trash: 'jolly_trash',
+    users: 'jolly_users_v1',
   };
 
   function uid(prefix = 'p') {
