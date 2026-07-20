@@ -274,6 +274,35 @@ const JollyApp = (() => {
   function celebrate() { confetti(); checkPop(); }
 
   /* --- Backup göstəricisi: yaşıl=qaydasında, sarı=dəyişiklik var, qırmızı=çoxdan yoxdur --- */
+  /* --- Arxa plan sinxronu: başqa cihazlarda əlavə olunan yeni qeydləri
+     sakitcə çəkir, mövcud lokal datanı əvəz etmir --- */
+  function silentCloudMerge() {
+    if (typeof JollyCloud === 'undefined' || !JollyCloud.enabled() || !navigator.onLine) return;
+    JollyCloud.pull().then(payload => {
+      if (!payload || !payload.data) return;
+      let addedProducts = 0;
+      const mergeArray = (key, cloudArr) => {
+        if (!Array.isArray(cloudArr)) return;
+        const local = JollyDB.read(key, []);
+        const localIds = new Set(local.map(x => x && x.id));
+        const missing = cloudArr.filter(x => x && x.id && !localIds.has(x.id));
+        if (missing.length) {
+          JollyDB.write(key, [...local, ...missing]);
+          if (key === JollyDB.KEYS.products) addedProducts += missing.length;
+        }
+      };
+      mergeArray(JollyDB.KEYS.products, payload.data.products);
+      mergeArray(JollyDB.KEYS.brands, payload.data.brands);
+      mergeArray(JollyDB.KEYS.groups, payload.data.groups);
+      mergeArray(JollyDB.KEYS.locations, payload.data.locations);
+      mergeArray(JollyDB.KEYS.statuses, payload.data.statuses);
+      if (addedProducts > 0) {
+        if (typeof Toast !== 'undefined') Toast.info(`🔄 ${addedProducts} yeni məhsul sinxronlaşdı`);
+        render();
+      }
+    }).catch(() => {});
+  }
+
   function renderBackupPill() {
     const dot = document.getElementById('backupDot');
     if (!dot) return;
@@ -713,6 +742,13 @@ const JollyApp = (() => {
           }, 1500);
         }
       } catch (e) {}
+
+      // Arxa plan sinxronu — bir cihazda əlavə olunan məhsul başqa
+      // cihazlarda da (əl ilə "Buluddan bərpa" basmadan) görünsün deyə,
+      // hər 45 saniyədən bir sakitcə buludu yoxlayır və YALNIZ yeni
+      // olan qeydləri (mövcud lokal məlumata toxunmadan) əlavə edir.
+      setInterval(silentCloudMerge, 45000);
+      setTimeout(silentCloudMerge, 12000);
     }
     if (typeof JollyOTA !== 'undefined') JollyOTA.autoCheck();
     // Avtomatik snapshot (gündə bir dəfə, qəza geri qaytarma üçün)
