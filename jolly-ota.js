@@ -191,7 +191,7 @@ const JollyOTA = (() => {
       if (toast) bumpOtaToast(90);
 
       finishOtaToast(applied);
-      setTimeout(() => location.reload(), 1800);
+      setTimeout(() => location.reload(), 5000);
 
       return { updated: true, version: remoteV, applied };
     } catch (e) {
