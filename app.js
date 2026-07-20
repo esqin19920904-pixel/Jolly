@@ -400,7 +400,7 @@ const JollyApp = (() => {
           <div class="lock-logo" style="font-size:1.1rem;">${isAdmin ? 'Admin' : identity.name}</div>
           <div class="lock-title">PIN daxil et</div>
           <div class="lock-dots" id="lockDots">
-            <span></span><span></span><span></span><span></span>
+            ${Array(isAdmin ? correctPin.length : 7).fill('<span></span>').join('')}
           </div>
           <div class="lock-err" id="lockErr"></div>
           <div class="lock-pad">
@@ -423,7 +423,7 @@ const JollyApp = (() => {
     }
 
     function check() {
-      const expectedLen = identity.type === 'admin' ? correctPin.length : 4;
+      const expectedLen = identity.type === 'admin' ? correctPin.length : 7;
       if (entered.length !== expectedLen) return;
 
       let matchedUser = null;
@@ -483,7 +483,7 @@ const JollyApp = (() => {
         const key = e.target.closest('.lock-key');
         if (!key) return;
         if (typeof JollySound !== 'undefined') JollySound.tap();
-        const maxLen2 = identity.type === 'admin' ? correctPin.length : 4;
+        const maxLen2 = identity.type === 'admin' ? correctPin.length : 7;
         if (key.dataset.del) { entered = entered.slice(0, -1); updateDots(); return; }
         if (key.dataset.n == null) return;
         if (entered.length < maxLen2) { entered += key.dataset.n; updateDots(); check(); }
@@ -559,7 +559,24 @@ const JollyApp = (() => {
     if (typeof JollyStorage !== 'undefined') {
       JollyStorage.migrateOldImages().then(() => JollyStorage.hydrate());
     }
-    if (typeof JollyCloud !== 'undefined') JollyCloud.initAutoSync();
+    if (typeof JollyCloud !== 'undefined') {
+      JollyCloud.initAutoSync();
+      // Möhkəmləndirmə: lokal yaddaş boşdursa (keş/storage təmizlənibsə),
+      // buludda məlumat varmı yoxla və bərpa təklif et.
+      try {
+        const localCount = JollyDB.Products.all().length;
+        if (localCount === 0 && JollyCloud.enabled() && navigator.onLine) {
+          setTimeout(() => {
+            JollyCloud.pull().then(payload => {
+              const cloudCount = payload && payload.data && Array.isArray(payload.data.products) ? payload.data.products.length : 0;
+              if (cloudCount > 0) {
+                JollyCloud.restoreFromCloud();
+              }
+            }).catch(() => {});
+          }, 1500);
+        }
+      } catch (e) {}
+    }
     if (typeof JollyOTA !== 'undefined') JollyOTA.autoCheck();
     // Avtomatik snapshot (gündə bir dəfə, qəza geri qaytarma üçün)
     try {
