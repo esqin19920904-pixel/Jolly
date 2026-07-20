@@ -59,7 +59,7 @@ const JollyUsers = (() => {
   // add({ name, pin, phone, avatar })
   function add({ name, pin, phone = '', avatar = '' }) {
     if (!name || !String(name).trim()) return { ok: false, error: 'Ad boş ola bilməz' };
-    if (!pin || !/^\d{4}$/.test(String(pin))) return { ok: false, error: 'PIN düz 4 rəqəm olmalıdır' };
+    if (!pin || !/^\d{7}$/.test(String(pin))) return { ok: false, error: 'PIN düz 7 rəqəm olmalıdır' };
     const list = _read();
     if (list.some(u => u.name.toLowerCase() === name.trim().toLowerCase())) {
       return { ok: false, error: 'Bu adda istifadəçi artıq var' };
@@ -89,7 +89,7 @@ const JollyUsers = (() => {
 
     // PIN dəyişirsə, formatı yoxla və hash-lə
     if (patch.pin) {
-      if (!/^\d{4}$/.test(String(patch.pin))) return { ok: false, error: 'PIN düz 4 rəqəm olmalıdır' };
+      if (!/^\d{7}$/.test(String(patch.pin))) return { ok: false, error: 'PIN düz 7 rəqəm olmalıdır' };
       patch = { ...patch, pinHash: hashPin(patch.pin) };
       delete patch.pin;
     }
