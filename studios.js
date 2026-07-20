@@ -973,6 +973,10 @@ const JollyStudios = (() => {
   }
 
   function exportBackup() {
+    if (window.JollyAuth && !JollyAuth.can('backup.export')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Export icazən yoxdur');
+      return;
+    }
     const data = JollyDB.exportAll();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -986,6 +990,10 @@ const JollyStudios = (() => {
   }
 
   function importBackup(e) {
+    if (window.JollyAuth && !JollyAuth.can('backup.import')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Bərpa/Import icazən yoxdur — Admin-dən istə');
+      return;
+    }
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -1013,6 +1021,10 @@ const JollyStudios = (() => {
     } catch (e) {}
   }
   function restoreSnapshot() {
+    if (window.JollyAuth && !JollyAuth.can('backup.restore')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Bərpa icazən yoxdur — Admin-dən istə');
+      return;
+    }
     const snap = JollyDB.read('jolly_snapshot', null);
     if (!snap || !snap.data) { Toast.error('Avtomatik nüsxə yoxdur'); return; }
     const when = new Date(snap.ts).toLocaleString('az-AZ');
