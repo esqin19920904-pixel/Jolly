@@ -351,11 +351,30 @@ const JollyApp = (() => {
     overlay.id = 'jollyLock';
     document.body.appendChild(overlay);
 
+    // Cosmic Galaxy — ulduzlar + kometa (bir dəfə yaradılır, ekranlar arası qalır)
+    for (let i = 0; i < 70; i++) {
+      const s = document.createElement('div');
+      s.className = 'lock-star';
+      const size = Math.random() * 2 + 0.5;
+      s.style.width = s.style.height = size + 'px';
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.top = Math.random() * 100 + 'vh';
+      s.style.animationDelay = (Math.random() * 2.5) + 's';
+      overlay.appendChild(s);
+    }
+    const comet = document.createElement('div');
+    comet.className = 'lock-comet';
+    overlay.appendChild(comet);
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'lock-content-layer';
+    overlay.appendChild(contentEl);
+
     function initials(name) { return (name || '?').trim().charAt(0).toUpperCase(); }
 
     function renderNameScreen() {
       const users = (window.JollyUsers ? JollyUsers.list() : []).filter(u => u.status === 'active');
-      overlay.innerHTML = `
+      contentEl.innerHTML = `
         <div class="lock-inner">
           <div class="lock-crown-zone"><div class="lock-ring"></div><div class="lock-crown">👑</div></div>
           <div class="lock-logo" data-text="JOLLY">JOLLY</div>
@@ -408,7 +427,7 @@ const JollyApp = (() => {
     function renderPinScreen() {
       const isAdmin = identity.type === 'admin';
       const bioAvailable = window.JollyBiometric && JollyBiometric.isRegistered(bioKey());
-      overlay.innerHTML = `
+      contentEl.innerHTML = `
         <div class="lock-inner">
           <div class="lock-back" id="lockBackBtn" style="text-align:left;color:rgba(255,255,255,0.4);font-size:13px;cursor:pointer;margin-bottom:10px;">‹ Geri</div>
           <div style="width:56px;height:56px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.3rem;color:${isAdmin ? '#000' : '#fff'};background:${isAdmin ? 'linear-gradient(135deg,#fbbf24,#f97316)' : 'linear-gradient(135deg,#00d4ff,#6366f1)'};">${isAdmin ? '👑' : initials(identity.name)}</div>
@@ -424,7 +443,22 @@ const JollyApp = (() => {
             <button class="lock-key" data-n="0">0</button>
             <button class="lock-key lock-del" data-del="1">⌫</button>
           </div>
-          ${bioAvailable ? `<div class="lock-bio" id="lockBioBtn" style="margin-top:16px;font-size:28px;cursor:pointer;">🔒</div><div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">Barmaq izi ilə aç</div>` : ''}
+          ${bioAvailable ? `
+          <div class="lock-bio-zone" id="lockBioBtn">
+            <div class="lock-bio-ripples"><span></span><span></span><span></span></div>
+            <div class="lock-bio-beam"></div>
+            <svg class="lock-bio-svg" viewBox="0 0 100 100">
+              <path d="M50 20 C 30 20, 20 35, 20 50 C 20 68, 32 78, 45 80"/>
+              <path d="M50 26 C 34 26, 26 38, 26 50 C 26 64, 36 72, 48 74"/>
+              <path d="M50 32 C 38 32, 32 41, 32 50 C 32 60, 40 66, 50 68"/>
+              <path d="M50 38 C 42 38, 38 44, 38 50 C 38 57, 44 61, 50 62"/>
+              <path d="M50 20 C 70 20, 80 35, 80 50 C 80 62, 73 71, 63 76"/>
+              <path d="M50 26 C 66 26, 74 38, 74 50 C 74 60, 68 67, 60 71"/>
+              <path d="M50 32 C 62 32, 68 41, 68 50 C 68 57, 63 63, 56 66"/>
+              <path d="M50 12 L50 18"/>
+            </svg>
+          </div>
+          <div class="lock-bio-caption">BARMAQ İZİ İLƏ AÇ</div>` : ''}
           ${isAdmin ? `<div class="lock-forgot" id="lockForgot">PIN-i unutmusan?</div>` : `<div class="lock-forgot" style="opacity:0.5;cursor:default;">PIN-i unutmusansa, Admin-dən istə</div>`}
         </div>
       `;
@@ -433,13 +467,13 @@ const JollyApp = (() => {
       const bioBtn = document.getElementById('lockBioBtn');
       if (bioBtn) {
         bioBtn.addEventListener('click', async () => {
-          bioBtn.textContent = '⏳';
+          bioBtn.classList.add('scanning');
           const matchedUser = identity.type === 'user' ? (window.JollyUsers ? JollyUsers.get(identity.id) : null) : null;
           const okBio = await JollyBiometric.authenticate(bioKey());
           if (okBio) {
             unlockSuccess(matchedUser);
           } else {
-            bioBtn.textContent = '🔒';
+            bioBtn.classList.remove('scanning');
             const err = overlay.querySelector('#lockErr');
             if (err) err.textContent = 'Barmaq izi tanınmadı';
           }
