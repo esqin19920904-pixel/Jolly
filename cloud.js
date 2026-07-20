@@ -179,7 +179,8 @@ const JollyCloud = (() => {
       // ayarlar/log dəyişikliyində sinxron etmə (döngü olmasın)
       if (key === JollyDB.KEYS.products || key === JollyDB.KEYS.brands ||
           key === JollyDB.KEYS.groups || key === JollyDB.KEYS.locations ||
-          key === JollyDB.KEYS.statuses || key === JollyDB.KEYS.drafts) {
+          key === JollyDB.KEYS.statuses || key === JollyDB.KEYS.drafts ||
+          key === JollyDB.KEYS.settings || key === JollyDB.KEYS.users) {
         scheduleSync();
       }
       return r;
