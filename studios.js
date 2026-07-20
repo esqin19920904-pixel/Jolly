@@ -762,6 +762,10 @@ const JollyStudios = (() => {
   }
 
   function renderTheme() {
+    if (window.JollyAuth && !JollyAuth.can('settings.theme')) {
+      if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+      return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+    }
     const settings = JollyDB.getSettings();
     const current = settings.theme || 'dark-neon';
     return `
@@ -1093,6 +1097,10 @@ const JollyStudios = (() => {
   function viewActivityLog() { JollyRouter.go('#/studios/data'); }
 
   function renderReport() {
+    if (window.JollyAuth && !JollyAuth.can('dashboard.reports')) {
+      if (window.JollyRouter) setTimeout(() => JollyRouter.go('#/home'), 0);
+      return `<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>`;
+    }
     const products = JollyDB.Products.all();
     const byBrand = {};
     const byGroup = {};
