@@ -11,6 +11,16 @@
    3) Gündə bir dəfə → Gündəlik Xülasə mesajı (real JollyDailySummary datası)
    4) "Test göndər" düyməsi ilə qurulmanı yoxlamaq
 
+   YENİ (2026-07-21):
+   5) 🔕 Səssiz bildirişlər — açılsa, bütün mesajlar Telegram-ın
+      disable_notification=true parametri ilə göndərilir (cihazda səs/
+      vibrasiya olmadan, sadəcə siyahıda görünür).
+   6) 👤 İşçi bildirişləri üçün AYRI Chat ID (könüllü) — işçi girişi və
+      icazə rədd edilməsi bildirişləri, doldurulubsa bu ayrı chat-a,
+      doldurulmayıbsa əsas Chat ID-yə gedir (məs. sahibkarın öz Telegramı
+      "yeni məhsul" kimi sakit bildirişlərlə, işçi ilə bağlı xəbərdarlıqlar
+      isə fərqli/ayrı bir Telegram söhbətinə getsin deyə).
+
    NƏ ETMİR (bilərəkdən):
    - Stok/satış bildirişi YOXDUR (JOLLY-də belə məlumat yoxdur)
    - Uzaqdan sual-cavab (/search və s.) YOXDUR — bu, backend + Firebase
@@ -31,13 +41,16 @@
 
   const TOKEN_KEY = "jolly_tg_token";
   const CHAT_KEY = "jolly_tg_chat";
+  const CHAT_EMPLOYEE_KEY = "jolly_tg_chat_employee";
   const SETTINGS_KEY = "jolly_tg_settings";
   const LAST_DAILY_KEY = "jolly_tg_last_daily";
 
   function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
   function getChat() { try { return localStorage.getItem(CHAT_KEY) || ""; } catch (e) { return ""; } }
+  function getChatEmployee() { try { return localStorage.getItem(CHAT_EMPLOYEE_KEY) || ""; } catch (e) { return ""; } }
   function setToken(v) { try { localStorage.setItem(TOKEN_KEY, v.trim()); } catch (e) {} }
   function setChat(v) { try { localStorage.setItem(CHAT_KEY, v.trim()); } catch (e) {} }
+  function setChatEmployee(v) { try { localStorage.setItem(CHAT_EMPLOYEE_KEY, v.trim()); } catch (e) {} }
 
   function getSettings() {
     try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch (e) { return {}; }
@@ -50,15 +63,21 @@
     return !!(getToken() && getChat());
   }
 
-  async function sendMessage(text) {
+  // targetChat: hansı Chat ID-yə göndərilsin (verilməzsə əsas Chat ID).
+  // Səssiz rejim aktivdirsə, hər mesaj disable_notification=true ilə gedir.
+  async function sendMessage(text, targetChat) {
     const token = getToken();
-    const chat = getChat();
+    const chat = targetChat || getChat();
     if (!token || !chat) return { ok: false, error: "Token/Chat ID yoxdur" };
+    const settings = getSettings();
     try {
       const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chat, text, parse_mode: "HTML" })
+        body: JSON.stringify({
+          chat_id: chat, text, parse_mode: "HTML",
+          disable_notification: !!settings.silentMode,
+        })
       });
       const data = await res.json();
       if (!data.ok) return { ok: false, error: data.description || "Naməlum xəta" };
@@ -66,6 +85,13 @@
     } catch (e) {
       return { ok: false, error: String(e.message || e) };
     }
+  }
+
+  // İşçi ilə bağlı bildirişlər (giriş, icazə rədd) üçün — ayrı chat
+  // ayarlanıbsa ora, ayarlanmayıbsa əsas Chat ID-yə göndərir.
+  function sendEmployeeMessage(text) {
+    const target = getChatEmployee() || getChat();
+    return sendMessage(text, target);
   }
 
   // ------------------------------------------------------------------------
@@ -111,16 +137,18 @@
     return new Blob([arr], { type: mime });
   }
 
-  async function sendPhoto(caption, dataUrl) {
+  async function sendPhoto(caption, dataUrl, targetChat) {
     const token = getToken();
-    const chat = getChat();
+    const chat = targetChat || getChat();
     if (!token || !chat) return { ok: false, error: "Token/Chat ID yoxdur" };
+    const settings = getSettings();
     try {
       const blob = dataUrlToBlob(dataUrl);
       const form = new FormData();
       form.append("chat_id", chat);
       form.append("caption", caption);
       form.append("parse_mode", "HTML");
+      form.append("disable_notification", settings.silentMode ? "true" : "false");
       form.append("photo", blob, "photo.jpg");
       const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
         method: "POST",
@@ -273,8 +301,12 @@
         <input id="jtg-token" placeholder="123456789:ABC..." value="${getToken()}">
       </div>
       <div class="jtg-field">
-        <label>Chat ID</label>
+        <label>Chat ID (əsas — sənin üçün: yeni məhsul, xülasə və s.)</label>
         <input id="jtg-chat" placeholder="123456789" value="${getChat()}">
+      </div>
+      <div class="jtg-field">
+        <label>👤 İşçi bildirişləri üçün AYRI Chat ID (könüllü)</label>
+        <input id="jtg-chat-employee" placeholder="Boş qalsa, əsas Chat ID istifadə olunur" value="${getChatEmployee()}">
       </div>
       <div class="jtg-toggle-row">
         <span>➕ Yeni məhsul bildirişi</span>
@@ -288,6 +320,14 @@
         <span>📊 Gündəlik Xülasə bildirişi</span>
         <input type="checkbox" id="jtg-t-daily" ${settings.dailySummary !== false ? "checked" : ""}>
       </div>
+      <div class="jtg-toggle-row">
+        <span>👤 İşçi girişi / icazə rədd bildirişi</span>
+        <input type="checkbox" id="jtg-t-denied" ${settings.deniedAlert !== false ? "checked" : ""}>
+      </div>
+      <div class="jtg-toggle-row">
+        <span>🔕 Səssiz bildirişlər (səs/vibrasiya olmadan)</span>
+        <input type="checkbox" id="jtg-t-silent" ${settings.silentMode === true ? "checked" : ""}>
+      </div>
       <div class="jtg-btn-row">
         <button class="jtg-btn ghost" id="jtg-save">💾 Saxla</button>
         <button class="jtg-btn primary" id="jtg-test">📤 Test göndər</button>
@@ -298,10 +338,13 @@
     panel.querySelector("#jtg-save").onclick = () => {
       setToken(panel.querySelector("#jtg-token").value);
       setChat(panel.querySelector("#jtg-chat").value);
+      setChatEmployee(panel.querySelector("#jtg-chat-employee").value);
       setSettings({
         newProduct: panel.querySelector("#jtg-t-new").checked,
         archiveAlert: panel.querySelector("#jtg-t-archive").checked,
         dailySummary: panel.querySelector("#jtg-t-daily").checked,
+        deniedAlert: panel.querySelector("#jtg-t-denied").checked,
+        silentMode: panel.querySelector("#jtg-t-silent").checked,
       });
       panel.querySelector("#jtg-status").textContent = "✅ Saxlanıldı";
     };
@@ -351,7 +394,7 @@
         if (!payload || payload.role !== 'user') return;
         if (!isConfigured()) return;
         const time = new Date().toLocaleString('az-AZ');
-        sendMessage(`👤 <b>${payload.name}</b> daxil oldu\n🕐 ${time}`);
+        sendEmployeeMessage(`👤 <b>${payload.name}</b> daxil oldu\n🕐 ${time}`);
       });
 
       JollyEvents.on('permission.denied', (payload) => {
@@ -365,7 +408,7 @@
         _deniedThrottle.set(throttleKey, Date.now());
         const time = new Date().toLocaleString('az-AZ');
         const name = payload.userName || 'Naməlum';
-        sendMessage(`⚠️ <b>${name}</b> icazəsiz əməliyyata cəhd etdi\n🔒 ${payload.key}\n🕐 ${time}`);
+        sendEmployeeMessage(`⚠️ <b>${name}</b> icazəsiz əməliyyata cəhd etdi\n🔒 ${payload.key}\n🕐 ${time}`);
       });
       return;
     }
@@ -382,9 +425,10 @@
   window.JollyTelegram = {
     id: "telegram",
     name: "Telegram Bildirişləri",
-    version: "1.0.0",
+    version: "1.1.0",
     show,
     sendMessage,
+    sendEmployeeMessage,
     isConfigured
   };
 
