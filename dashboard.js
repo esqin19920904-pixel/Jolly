@@ -2,6 +2,11 @@
    JOLLY Dashboard Pro Plus — iş masası
    Toxunulan kartlar, "Bu gün diqqət", tez şəkil çək, qalereya
    Dashboard Studio ilə idarə olunur (əlavə/gizlət/sırala)
+
+   DƏYİŞİKLİK (2026-07-21): "🔍 Smart Axtarış" düyməsi ləğv edildi,
+   yerinə "⚙️ Ətraflı Axtarış" qoyuldu — products.js-dəki yeni
+   panelin (JollyProducts.openAdvancedSearch) açılış nöqtəsidir,
+   ən çöl/ilk görünən yerdə (Sürətli Əməliyyatlar başlığının yanı).
    ============================================================ */
 
 // Təhlükəsizlik: jolly-icons.js qoyulmayıbsa belə çökməsin
@@ -249,7 +254,7 @@ const JollyDashboard = (() => {
 
         <div class="dash-section-head">
           <span class="section-title" style="margin:0;">SÜRƏTLİ ƏMƏLİYYATLAR</span>
-          <span class="gp-tez-giris" onclick="JollyDashboard.openSmartSearch()">🔍 Smart Axtarış</span>
+          <span class="gp-tez-giris" onclick="JollyProducts.openAdvancedSearch()">⚙️ Ətraflı Axtarış</span>
         </div>
         <div class="big-op-grid gold-ops">
           ${PRIMARY.map(bigCard).join('')}
@@ -364,8 +369,10 @@ const JollyDashboard = (() => {
   }
 
   /* ============================================================
-     SMART AXTARIŞ — "qırmızı köynək" kimi yazanda, rəngi VƏ adı
-     birlikdə tanıyıb süzür. "Tez giriş" düyməsinin yerinə keçdi.
+     SMART AXTARIŞ (KÖHNƏ) — dashboard-dakı düymə artıq buna
+     yönləndirmir (yerinə JollyProducts.openAdvancedSearch açılır).
+     Funksiyalar toxunulmadan saxlanılıb ki, başqa bir yerdən
+     çağırılırsa (yoxdur) sınmasın.
      ============================================================ */
   const COLOR_WORDS = {
     'qırmızı': 'qırmızı', 'qirmizi': 'qırmızı',
