@@ -3,9 +3,15 @@
    Uzaqdakı bir JSON faylından yeni kod/snippet/ayar çəkir.
    Studios → "Yeniləmələr" bölməsindən idarə olunur.
 
-   YENİ: admin "Hamıya Göndər"ə basanda Firebase-ə anlıq siqnal
-   yazılır, açıq olan bütün tətbiqlər dərhal (24 saat gözləmədən)
-   yoxlayıb tətbiq edir — çirkin alert() yerinə qızılı toast göstərir.
+   "Hamıya Göndər" — admin basanda Firebase-ə anlıq siqnal yazılır,
+   açıq olan bütün tətbiqlər dərhal (24 saat gözləmədən) yoxlayıb
+   tətbiq edir — qızılı toast göstərilir, versiyadan asılı olmayaraq
+   hər zaman görünür.
+
+   "Elan Göndər" — ayrıca, tam müstəqil jolly-announce.js modulunun
+   funksiyasını çağırır (əyləncəli, tam ekran Matrix+yazı-maşını
+   animasiyası). Bu fayl JollyAnnounce-un məntiqinə toxunmur,
+   sadəcə düyməni bu paneldə göstərir.
 
    DÜZƏLİŞ (2026-07-21): DEFAULT_URL artıq workers.dev yox, öz
    saytının içindəki fayldır — Bakcell workers.dev-i blokladığı
@@ -14,13 +20,10 @@
 const JollyOTA = (() => {
   const DEFAULT_URL = '/jolly-update.json';
 
-  // ---- Siqnal REST-lə "jolly" node-un yanında ayrıca node-da
-  // saxlanır (cloud.js-dəki eyni Firebase layihəsi, eyni REST üsulu,
-  // SDK yoxdur — ona görə firebase.database() işləmir)
   const OTA_DB_URL = "https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app";
   const OTA_API_KEY = "AIzaSyAhv-ZFTTNeyoXIDjn3VrVcknPKor4kZvw";
   const SIGNAL_NODE = 'jolly_ota_signal';
-  const POLL_MS = 20000; // 20 saniyədə bir yoxla (SDK olmadığı üçün real-time push əvəzi)
+  const POLL_MS = 20000;
 
   let _otaToken = null, _otaTokenExpiry = 0;
   async function _getOtaToken() {
@@ -57,7 +60,7 @@ const JollyOTA = (() => {
   }
   function setLastSignal(ts) { try { localStorage.setItem('jolly_ota_last_signal', String(ts)); } catch (e) {} }
 
-  /* ---------------- Qızılı toast UI ---------------- */
+  /* ---------------- Qızılı toast UI (Hamıya Göndər üçün) ---------------- */
   function ensureToastStyles() {
     if (document.getElementById('jollyOtaToastStyle')) return;
     const style = document.createElement('style');
@@ -96,7 +99,7 @@ const JollyOTA = (() => {
       el.innerHTML = `
         <div class="ota-spin" id="jollyOtaSpin"></div>
         <div class="ota-text">
-          <div class="ota-title" id="jollyOtaTitle">Gör indi qaqan nağarajax 😅😅😅</div>
+          <div class="ota-title" id="jollyOtaTitle">Yeniləmə gəlir…</div>
           <div class="ota-sub" id="jollyOtaSub">Yüklənir, bağlamayın</div>
           <div class="ota-track"><div class="ota-fill" id="jollyOtaFill"></div></div>
         </div>`;
@@ -104,7 +107,7 @@ const JollyOTA = (() => {
     }
     el.classList.remove('done');
     document.getElementById('jollyOtaFill').style.width = '0%';
-    document.getElementById('jollyOtaTitle').textContent = 'Gör indi qaqan nağarajax 😅😅😅';
+    document.getElementById('jollyOtaTitle').textContent = 'Yeniləmə gəlir…';
     document.getElementById('jollyOtaSub').textContent = 'Yüklənir, bağlamayın';
     document.getElementById('jollyOtaSpin').innerHTML = '';
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
@@ -201,7 +204,7 @@ const JollyOTA = (() => {
     }
   }
 
-  /* ---------------- Admin: Hamıya Göndər ---------------- */
+  /* ---------------- Admin: Hamıya Göndər (kod yeniləməsi) ---------------- */
   function _isAdminSession() {
     try {
       const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
@@ -228,8 +231,6 @@ const JollyOTA = (() => {
   async function runBroadcastToast() {
     const toast = showOtaToast();
     bumpOtaToast(20);
-    // arxa planda əsl yeniləməni sakit yoxla/tətbiq et (versiya artıbsa) —
-    // amma toast-un görünməsi bundan asılı deyil, hər halda göstərilir
     try { await checkAndApply(true); } catch (e) {}
     bumpOtaToast(100);
     finishOtaToast();
@@ -253,8 +254,6 @@ const JollyOTA = (() => {
 
   function listenForBroadcast() {
     if (_pollTimer) return;
-    // ilk açılışda köhnə siqnala görə özünü yeniləməsin — cari
-    // siqnalı "görülmüş" kimi qeyd et, sonrakı YENİ siqnallara reaksiya versin
     (async () => {
       try {
         const token = await _getOtaToken();
@@ -273,7 +272,6 @@ const JollyOTA = (() => {
     const localV = getInstalledVersion();
     const url = getUrl();
     const msg = (() => { try { return localStorage.getItem('jolly_ota_message') || ''; } catch (e) { return ''; } })();
-    // Admin yoxlaması — cloud.js-dəki eyni "jolly_sec_session" məntiqi
     const isAdmin = _isAdminSession();
 
     return `
@@ -287,6 +285,7 @@ const JollyOTA = (() => {
         <div class="muted" style="font-size:12px;margin-bottom:14px;">Quraşdırılmış versiya</div>
         <button class="btn btn-primary btn-block" onclick="JollyOTA.check()">🔄 Yeniləmələri yoxla</button>
         ${isAdmin ? `<button class="btn btn-block" style="margin-top:8px;background:linear-gradient(135deg,#d4af37,#b8912b);color:#1a1206;font-weight:700;" onclick="JollyOTA.broadcastUpdate()">📤 Hamıya Göndər</button>` : ''}
+        ${isAdmin && typeof JollyAnnounce !== 'undefined' ? `<button class="btn btn-block" style="margin-top:8px;background:linear-gradient(135deg,#2a3560,#1a2140);color:#f4d777;font-weight:700;border:1px solid rgba(212,175,55,.4);" onclick="JollyAnnounce.send()">📢 Elan Göndər</button>` : ''}
       </div>
 
       <div class="section-title">Mənbə linki</div>
@@ -313,7 +312,6 @@ const JollyOTA = (() => {
         setTimeout(() => checkAndApply(true), 3000);
       }
     } catch (e) {}
-    // siqnal dinləyicisini də başlat
     setTimeout(listenForBroadcast, 2000);
   }
 
