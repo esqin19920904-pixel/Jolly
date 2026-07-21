@@ -99,6 +99,7 @@ const JollyProducts = (() => {
         <button class="scan-btn" title="Şəkillə axtar" onclick="JollyProducts.photoSearch()">📷</button>
         <button class="scan-btn" title="Ətraflı Axtarış" onclick="JollyProducts.openAdvancedSearch()">⚙️</button>
         <button class="scan-btn" title="Axtarış tarixçəsi" onclick="JollyProducts.openSearchHistory()">🕓</button>
+        <button class="scan-btn" title="Saxlanan filtrlər" onclick="JollyProducts.openSavedFilters()">⭐</button>
       </div>
 
       <div class="chip-row" style="margin-bottom:6px;" id="homeFilterChips">
@@ -318,6 +319,75 @@ const JollyProducts = (() => {
     openSearchHistory();
   }
 
+  // ── Yadda saxlanan filtr dəstləri — zəncirin özünü ad verib saxla,
+  // sonra bir toxunuşla eyni zənciri yenidən tətbiq et. ──
+  const SAVED_FILTERS_KEY = 'jolly_saved_filters';
+
+  function getSavedFilters() {
+    try { return JSON.parse(localStorage.getItem(SAVED_FILTERS_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function setSavedFilters(list) {
+    try { localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  function saveCurrentFilterSet() {
+    if (!homeState.chain.length) { Toast.error('Əvvəlcə bir neçə söz zəncirə əlavə et'); return; }
+    const name = prompt('Bu filtr dəstinə ad ver:', homeState.chain.join(' + '));
+    if (!name || !name.trim()) return;
+    const list = getSavedFilters();
+    const idx = list.findIndex(f => f.name.toLowerCase() === name.trim().toLowerCase());
+    const entry = { name: name.trim(), terms: homeState.chain.slice() };
+    if (idx >= 0) list[idx] = entry; else list.push(entry);
+    setSavedFilters(list);
+    Toast.success(`"${name.trim()}" saxlanıldı`);
+  }
+
+  function openSavedFilters() {
+    let overlay = document.getElementById('savedFiltersOverlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'savedFiltersOverlay';
+    overlay.className = 'qa-overlay';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('on'); });
+    const list = getSavedFilters();
+    overlay.innerHTML = `
+      <div class="glass qa-sheet">
+        <div class="row between" style="margin-bottom:10px;">
+          <div class="qa-title" style="margin:0;">⭐ Saxlanan Filtrlər</div>
+          <button class="icon-btn" onclick="document.getElementById('savedFiltersOverlay').classList.remove('on')">✕</button>
+        </div>
+        ${list.length ? list.map((f, i) => `
+          <div class="qa-item" style="justify-content:space-between;">
+            <span onclick="document.getElementById('savedFiltersOverlay').classList.remove('on');JollyProducts.applySavedFilter(${i})" style="flex:1;cursor:pointer;">⭐ ${escapeHtml(f.name)} <span class="muted" style="font-size:11px;">(${f.terms.length} söz)</span></span>
+            <span onclick="event.stopPropagation();JollyProducts.deleteSavedFilter(${i})" style="color:var(--accent-danger);cursor:pointer;padding-left:10px;">✕</span>
+          </div>
+        `).join('') : '<div class="muted" style="padding:14px;">Hələ saxlanan filtr yoxdur — zəncir qurub "💾 Saxla" ilə yadda saxla</div>'}
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('on'));
+  }
+
+  function applySavedFilter(idx) {
+    const list = getSavedFilters();
+    const f = list[idx];
+    if (!f) return;
+    homeState.filter = null;
+    homeState.chain = f.terms.slice();
+    renderChainChips();
+    applyChainSearch('');
+    Toast.success(`"${f.name}" tətbiq olundu`);
+  }
+
+  function deleteSavedFilter(idx) {
+    const list = getSavedFilters();
+    if (!list[idx]) return;
+    if (!confirm(`"${list[idx].name}" silinsin?`)) return;
+    list.splice(idx, 1);
+    setSavedFilters(list);
+    openSavedFilters();
+  }
+
   function openSearchHistory() {
     let overlay = document.getElementById('searchHistoryOverlay');
     if (overlay) overlay.remove();
@@ -373,6 +443,7 @@ const JollyProducts = (() => {
       <div class="chip-row" id="chainFilterBar" style="margin-bottom:6px;align-items:center;">
         <span class="muted" style="font-size:11px;margin-right:2px;">Zəncir:</span>
         ${homeState.chain.map((term, i) => `<span class="chip chip-active">${escapeHtml(term)} <span onclick="JollyProducts.removeChainTerm(${i})" style="margin-left:5px;cursor:pointer;">✕</span></span>`).join('')}
+        <span class="chip" style="opacity:.75;" onclick="JollyProducts.saveCurrentFilterSet()">💾 Saxla</span>
         <span class="chip" style="opacity:.75;" onclick="JollyProducts.clearChain()">🗑 Təmizlə</span>
       </div>`;
     if (existing) { existing.outerHTML = html; }
@@ -1971,15 +2042,4 @@ const JollyProducts = (() => {
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
     rotateImageAt,
     applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
-    commitChainTerm, removeChainTerm, clearChain, filterByBrandChain,
-    openSearchHistory, clearSearchHistory, applyDidYouMean,
-    openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
-    submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
-    openViewer, showBarcode, generateBarcodeImage,
-    smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
-    lookupBarcodeOnline, applyOnlineLookup, focusNext,
-    quickAddToReceiving,
-    expiryInfo, expiringProducts,
-    renderFilterTagChips, toggleFilterTag, addNewFilterTagInline,
-  };
-})();
+    commitChainTerm, removeChainTe
