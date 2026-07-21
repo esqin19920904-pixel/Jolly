@@ -279,6 +279,32 @@ const JollyDashboard = (() => {
         ${renderChangelogCard()}
 
         ${(() => {
+          if (navigator.onLine) return '';
+          let mins = 0;
+          if (typeof JollyCloud !== 'undefined' && JollyCloud.getOfflineSince) {
+            const since = JollyCloud.getOfflineSince();
+            if (since) mins = Math.floor((Date.now() - since) / 60000);
+          }
+          return `
+            <div class="glass anim-pop" style="padding:10px 14px;margin-bottom:14px;border:1px solid rgba(255,92,108,0.4);background:rgba(255,92,108,0.08);display:flex;align-items:center;gap:10px;">
+              <span style="font-size:20px;">📴</span>
+              <span style="flex:1;font-size:12.5px;">Oflaynsan${mins > 0 ? ` — ${mins} dəqiqədir` : ''}. Dəyişikliklər internet gələndə avtomatik sinxronlaşacaq.</span>
+            </div>
+          `;
+        })()}
+
+        ${(() => {
+          if (!navigator.onLine) return ''; // offline banner onsuz da göstərilir, təkrar olmasın
+          if (typeof JollyCloud === 'undefined' || !JollyCloud.isPendingSync || !JollyCloud.isPendingSync()) return '';
+          return `
+            <div class="glass anim-pop" style="padding:10px 14px;margin-bottom:14px;border:1px solid rgba(124,138,255,0.4);background:rgba(124,138,255,0.08);display:flex;align-items:center;gap:10px;">
+              <span style="font-size:20px;">🔄</span>
+              <span style="flex:1;font-size:12.5px;">Dəyişikliklər sinxronizasiya gözləyir...</span>
+            </div>
+          `;
+        })()}
+
+        ${(() => {
           if (!backupOk && s.backupReminder !== false && total > 0) {
             const daysSinceBackup = s.lastBackup ? Math.floor((Date.now() - s.lastBackup) / 864e5) : null;
             const msg = daysSinceBackup === null
