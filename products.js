@@ -1411,6 +1411,63 @@ const JollyProducts = (() => {
       <input type="file" id="imgCameraInput" accept="image/*" capture="environment" style="display:none" onchange="JollyProducts.handleImageUpload(event)">
     `;
     strip.innerHTML = html;
+    attachImageDrag();
+  }
+
+  // ── Şəkilləri sürüşdürərək sıralamaq — bir şəklin üstünə basıb yana
+  // çəkəndə, sıra dəyişir. ✕/🧹/🔄 ikonlarına toxunma sürükləmə başlatmır. ──
+  function attachImageDrag() {
+    const strip = document.getElementById('imgStrip');
+    if (!strip) return;
+    let dragEl = null;
+    let dragging = false;
+    const imgSlots = () => [...strip.querySelectorAll('.image-slot[id^="imgSlot"]')];
+
+    imgSlots().forEach(slot => {
+      slot.addEventListener('touchstart', (e) => {
+        if (e.target.classList.contains('rm') || e.target.classList.contains('clean-ico')) return;
+        dragEl = slot; dragging = true;
+        slot.style.opacity = '0.4';
+      }, { passive: true });
+
+      slot.addEventListener('touchmove', (e) => {
+        if (!dragging || !dragEl) return;
+        e.preventDefault();
+        const x = e.touches[0].clientX;
+        const others = imgSlots().filter(s => s !== dragEl);
+        const after = others.find(s => {
+          const box = s.getBoundingClientRect();
+          return x < box.left + box.width / 2;
+        });
+        if (after) strip.insertBefore(dragEl, after);
+        else {
+          const addSlot = [...strip.children].find(c => !c.id || !c.id.startsWith('imgSlot'));
+          if (addSlot) strip.insertBefore(dragEl, addSlot); else strip.appendChild(dragEl);
+        }
+      }, { passive: false });
+
+      slot.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        if (dragEl) dragEl.style.opacity = '1';
+        persistImageOrder();
+        dragEl = null;
+      });
+    });
+  }
+
+  function persistImageOrder() {
+    const strip = document.getElementById('imgStrip');
+    if (!strip) return;
+    const oldIdxOrder = [...strip.querySelectorAll('.image-slot[id^="imgSlot"]')]
+      .map(s => parseInt(s.id.replace('imgSlot', ''), 10));
+    const reordered = oldIdxOrder.map(idx => formState.images[idx]);
+    // Yalnız reallıqda sıra dəyişibsə yenilə (lazımsız re-render etməsin)
+    const changed = reordered.some((v, i) => v !== formState.images[i]);
+    if (!changed) return;
+    formState.images = reordered;
+    if (typeof JollySound !== 'undefined') JollySound.tap();
+    renderImageStrip();
   }
 
   function handleImageUpload(e) {
