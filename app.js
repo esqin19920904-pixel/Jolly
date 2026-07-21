@@ -1,5 +1,11 @@
 /* ============================================================
    JOLLY App — router və əsas tətbiq qabığı
+
+   YENİ (2026-07-21): Fəaliyyətsizlikdən sonra avtomatik kilid —
+   toxunma/klik/klaviatura/sürüşdürmə "fəaliyyət" sayılır. Security
+   Studio-da seçilmiş dəqiqə (settings.autoLockMinutes) ərzində heç
+   bir fəaliyyət olmasa və PIN qoruması aktivdirsə, sessiya özü
+   sıfırlanır və kilid ekranı yenidən göstərilir.
    ============================================================ */
 
 const JollyRouter = (() => {
@@ -675,6 +681,39 @@ const JollyApp = (() => {
       : '🔔';
   }
 
+  // ── FƏALİYYƏTSİZLİKDƏN SONRA AVTOMATİK KİLİD (#23) ──────────
+  // Toxunma/klik/klaviatura/sürüşdürmə hər hansı biri fəaliyyət sayılır.
+  // Security Studio-dakı seçimə (settings.autoLockMinutes) görə, PIN
+  // qoruması aktivdirsə və seçilmiş müddət ərzində heç bir fəaliyyət
+  // olmasa, sessiya sıfırlanır və səhifə yenidən yüklənir — bu, growth
+  // checkPinLock()-un yenidən kilid ekranını göstərməsinə səbəb olur.
+  let _lastActivityTs = Date.now();
+  function _markActivity() { _lastActivityTs = Date.now(); }
+
+  function initAutoLockWatcher() {
+    if (window._jollyAutoLockInit) return;
+    window._jollyAutoLockInit = true;
+    ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, _markActivity, { passive: true });
+    });
+    setInterval(() => {
+      const settings = JollyDB.getSettings();
+      const minutes = settings.autoLockMinutes || 0;
+      if (minutes <= 0) return; // söndürülüb
+      if (!settings.pinEnabled || !settings.pin) return; // PIN aktiv deyil
+      let hasSession = false;
+      try { hasSession = sessionStorage.getItem('jolly_pin_ok') === '1'; } catch (e) {}
+      if (!hasSession) return; // artıq kilidli
+      if (Date.now() - _lastActivityTs >= minutes * 60 * 1000) {
+        try {
+          sessionStorage.removeItem('jolly_pin_ok');
+          sessionStorage.removeItem('jolly_sec_session');
+        } catch (e) {}
+        location.reload();
+      }
+    }, 20000); // hər 20 saniyədə bir yoxla
+  }
+
   function init() {
     JollyDB.seedIfEmpty();
     // Topbar konturlu ikonları yerləşdir
@@ -726,6 +765,7 @@ const JollyApp = (() => {
   function continueBoot() {
     if (!checkPinLock()) return;
     renderIdentityBadge();
+    initAutoLockWatcher();
     JollyStudios.applySavedTheme();
     if (typeof JollyCodeStudio !== 'undefined') JollyCodeStudio.runEnabledSnippets();
     if (typeof JollyWorkflow !== 'undefined') JollyWorkflow.runOnStartup();
