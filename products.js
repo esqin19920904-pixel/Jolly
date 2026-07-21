@@ -1913,8 +1913,22 @@ const JollyProducts = (() => {
     return true;
   }
 
+  // ── Kateqoriya üzrə minimum şəkil sayı qaydası (#26) — bloklamır,
+  // sadəcə xəbərdar edib təsdiq istəyir (admin-studio.js-də təyin olunur). ──
+  function checkMinImagesRule() {
+    if (!formState.group) return true;
+    const groups = (typeof JollyDB !== 'undefined' && JollyDB.Groups) ? JollyDB.Groups.all() : [];
+    const g = groups.find(x => x.name === formState.group);
+    const min = g && g.minImages ? g.minImages : 0;
+    if (min <= 0) return true;
+    const have = (formState.images || []).length;
+    if (have >= min) return true;
+    return confirm(`"${formState.group}" qrupu üçün minimum ${min} şəkil tələb olunur, hazırda ${have} var.\n\nYenə də saxlanılsın?`);
+  }
+
   function submitForm(keepOpen) {
     if (!validate()) return false;
+    if (!checkMinImagesRule()) return false;
     const payload = { ...formState };
     delete payload._draftId;
     if (formState.price !== '' && formState.price != null) payload.price = parseFloat(formState.price);
@@ -2035,89 +2049,4 @@ const JollyProducts = (() => {
     overlay = document.createElement('div');
     overlay.id = 'quickPreviewOverlay';
     overlay.className = 'qa-overlay';
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('on'); });
-    const thumb = (p.images && p.images[0])
-      ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:100%;height:180px;object-fit:cover;border-radius:12px;">`
-      : `<div style="width:100%;height:180px;display:flex;align-items:center;justify-content:center;font-size:44px;background:rgba(255,255,255,0.05);border-radius:12px;">🧴</div>`;
-    overlay.innerHTML = `
-      <div class="glass qa-sheet" style="max-width:340px;">
-        ${thumb}
-        <div style="font-family:var(--font-display);font-size:17px;font-weight:700;margin-top:12px;">${escapeHtml(p.name || 'Adsız məhsul')}</div>
-        <div class="row between" style="margin-top:6px;">
-          <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--accent-2);">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'}</span>
-          ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
-        </div>
-        ${(p.barcodes && p.barcodes[0]) ? `<div class="mono" style="font-size:12px;color:var(--accent-2);margin-top:6px;">🏷️ ${escapeHtml(p.barcodes[0])}</div>` : ''}
-        ${p.brand ? `<div class="muted" style="font-size:12px;margin-top:4px;">🏭 ${escapeHtml(p.brand)}</div>` : ''}
-        <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="document.getElementById('quickPreviewOverlay').classList.remove('on');JollyRouter.go('#/product/${p.id}')">Tam kartı aç ›</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('on'));
-  }
-
-  // ────────────────────────────────────────────────────────────
-  // KLAVİATURA QISAYOLLARI — fiziki/Bluetooth klaviaturası olan
-  // cihazlar üçün (nadir, amma pulsuz). Yazı sahəsindəykən (input,
-  // textarea) qısayollar söndürülür ki, adi yazmağa mane olmasın —
-  // Esc istisnadır, o həmişə işləyir.
-  // ────────────────────────────────────────────────────────────
-  function initKeyboardShortcuts() {
-    if (document.body.dataset.kbInit) return;
-    document.body.dataset.kbInit = '1';
-    document.addEventListener('keydown', (e) => {
-      const tag = (e.target && e.target.tagName || '').toLowerCase();
-      const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
-
-      if (e.key === 'Escape') {
-        closeAdvancedSearch();
-        const qp = document.getElementById('quickPreviewOverlay'); if (qp) qp.classList.remove('on');
-        const mm = document.getElementById('moreMenuOverlay'); if (mm) mm.classList.remove('on');
-        return;
-      }
-
-      if (typing) return;
-
-      if (e.key === '/' || e.key === 'f') {
-        const input = document.getElementById('homeSearch');
-        if (input) { e.preventDefault(); input.focus(); }
-      } else if (e.key === 'n') {
-        e.preventDefault();
-        JollyRouter.go('#/product/new');
-      } else if (e.key === 'b') {
-        e.preventDefault();
-        scanSearch();
-      } else if (e.key === 'a') {
-        e.preventDefault();
-        openAdvancedSearch();
-      } else if (e.key === '?') {
-        e.preventDefault();
-        alert('⌨️ Klaviatura qısayolları:\n\n/ və ya f  —  axtarışa fokuslan\nn  —  yeni məhsul\nb  —  barkod skan\na  —  ətraflı axtarış\nEsc  —  pəncərəni bağla\n?  —  bu siyahı');
-      }
-    });
-  }
-
-  initLongPressPreview();
-  initKeyboardShortcuts();
-
-  return {
-    renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch, photoSearch,
-    renderFilteredPage, renderDraftsPage, deleteDraft, renderDetailPage, deleteProduct,
-    renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
-    addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
-    rotateImageAt,
-    applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
-    commitChainTerm, removeChainTerm, clearChain, filterByBrandChain,
-    openSearchHistory, clearSearchHistory, applyDidYouMean,
-    saveCurrentFilterSet, openSavedFilters, applySavedFilter, deleteSavedFilter,
-    toggleBulkSelectMode, toggleBulkSelect, shareSelectedViaWhatsApp,
-    openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
-    submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
-    openViewer, showBarcode, generateBarcodeImage,
-    smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
-    lookupBarcodeOnline, applyOnlineLookup, focusNext,
-    quickAddToReceiving,
-    expiryInfo, expiringProducts,
-    renderFilterTagChips, toggleFilterTag, addNewFilterTagInline,
-  };
-})();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overla
