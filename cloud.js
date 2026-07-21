@@ -308,6 +308,34 @@ const JollyCloud = (() => {
   let syncTimer = null;
   let pendingSync = false;
 
+  function isPendingSync() { return pendingSync; }
+
+  // ── Offline vaxt sayğacı — cihaz nə vaxtdan oflayn olduğunu qeydə
+  // alır, Dashboard bunu göstərir. Cloud aç/bağlıdan asılı olmadan
+  // işləyir (skript yüklənən kimi bir dəfə qoşulur). ──
+  const OFFLINE_SINCE_KEY = 'jolly_offline_since';
+
+  function getOfflineSince() {
+    try {
+      const v = localStorage.getItem(OFFLINE_SINCE_KEY);
+      return v ? parseInt(v, 10) : null;
+    } catch (e) { return null; }
+  }
+
+  (function initOfflineTracking() {
+    if (window._jollyOfflineTrackingInit) return;
+    window._jollyOfflineTrackingInit = true;
+    if (!navigator.onLine) {
+      try { if (!localStorage.getItem(OFFLINE_SINCE_KEY)) localStorage.setItem(OFFLINE_SINCE_KEY, String(Date.now())); } catch (e) {}
+    }
+    window.addEventListener('offline', () => {
+      try { localStorage.setItem(OFFLINE_SINCE_KEY, String(Date.now())); } catch (e) {}
+    });
+    window.addEventListener('online', () => {
+      try { localStorage.removeItem(OFFLINE_SINCE_KEY); } catch (e) {}
+    });
+  })();
+
   function scheduleSync() {
     if (!enabled()) return;
     pendingSync = true;
@@ -342,6 +370,7 @@ const JollyCloud = (() => {
     // internet qayıdanda göndər
     window.addEventListener('online', () => { if (pendingSync || enabled()) scheduleSync(); });
   }
+
 
   /* ---------- Cloud Studio UI ---------- */
   function renderStudio() {
@@ -413,5 +442,6 @@ const JollyCloud = (() => {
   return {
     push, pull, restoreFromCloud, manualPush, toggle, initAutoSync, renderStudio, scheduleSync, enabled,
     getDeviceId, getDeviceName, renameThisDevice, loadDevicesList, fetchDevices,
+    isPendingSync, getOfflineSince,
   };
 })();
