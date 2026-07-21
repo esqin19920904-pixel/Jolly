@@ -5,6 +5,11 @@
    Admin göndərəndə bütün açıq telefonlarda tam ekran animasiya
    açılır: Matrix yağışı arxa planda + mətn yazı maşını effekti,
    üstünə "jolly-nagarajax.mp4" faylının səsi çalınır.
+
+   DÜZƏLİŞ: səs indi TOXUNMA ANINDA, şəbəkə sorğusundan ƏVVƏL
+   çalınır (brauzerlər gecikmiş çalmanı səssizcə bloklayır).
+   Həm də səhifədə hər hansı ilk toxunuşda səs "kilidi açılır" ki,
+   siqnalla özündən gələn (toxunmasız) çalma da işləmə şansı artsın.
    ============================================================ */
 const JollyAnnounce = (() => {
   const DB_URL = "https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app";
@@ -40,8 +45,41 @@ const JollyAnnounce = (() => {
   }
   function setLastSignal(ts) { try { localStorage.setItem('jolly_announce_last', String(ts)); } catch (e) {} }
 
+  /* ---------------- Səs ---------------- */
+  let _audioUnlocked = false;
+
+  function _unlockAudioOnce() {
+    if (_audioUnlocked) return;
+    _audioUnlocked = true;
+    try {
+      const a = new Audio(SOUND_URL);
+      a.volume = 0;
+      const p = a.play();
+      if (p && p.then) p.then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+    } catch (e) {}
+  }
+  // səhifədə İSTƏNİLƏN ilk toxunuşda səs kilidini aç (bir dəfə)
+  ['touchstart', 'click'].forEach(ev => {
+    document.addEventListener(ev, _unlockAudioOnce, { once: true, passive: true });
+  });
+
+  function playSound() {
+    try {
+      const audio = new Audio(SOUND_URL);
+      audio.volume = 1.0;
+      const p = audio.play();
+      if (p && p.catch) {
+        p.catch(() => {
+          // brauzer bloklayıb (toxunma yoxdur) — animasiya səssiz davam edir
+        });
+      }
+    } catch (e) {}
+  }
+
   /* ---------------- Göndər ---------------- */
   async function send() {
+    // ƏVVƏLCƏ animasiya+səs — TOXUNMA ANINDA, heç bir gözləmə olmadan
+    playOverlay();
     try {
       const token = await _getToken();
       const res = await fetch(`${DB_URL}/${SIGNAL_NODE}.json?auth=${token}`, {
@@ -50,7 +88,6 @@ const JollyAnnounce = (() => {
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       if (typeof Toast !== 'undefined') Toast.success('Elan göndərildi 📢');
-      playOverlay(); // admin özündə də görsün (toxunma ilə başladığı üçün səs bloklanmır)
     } catch (e) {
       if (typeof Toast !== 'undefined') Toast.error('Göndərilmədi: ' + (e.message || e));
     }
@@ -85,21 +122,6 @@ const JollyAnnounce = (() => {
       } catch (e) {}
       _pollTimer = setInterval(poll, POLL_MS);
     })();
-  }
-
-  /* ---------------- Səs ---------------- */
-  function playSound() {
-    try {
-      const audio = new Audio(SOUND_URL);
-      audio.volume = 1.0;
-      const p = audio.play();
-      if (p && p.catch) {
-        p.catch(() => {
-          // brauzer avtomatik çalmağı bloklayıb (toxunma olmadan gələn siqnal) —
-          // sakit keç, animasiya səssiz davam edir
-        });
-      }
-    } catch (e) {}
   }
 
   /* ---------------- Tam ekran animasiya: Matrix + Yazı maşını ---------------- */
