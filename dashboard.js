@@ -196,10 +196,14 @@ const JollyDashboard = (() => {
 
         ${(() => {
           if (!backupOk && s.backupReminder !== false && total > 0) {
+            const daysSinceBackup = s.lastBackup ? Math.floor((Date.now() - s.lastBackup) / 864e5) : null;
+            const msg = daysSinceBackup === null
+              ? 'Heç vaxt backup edilməyib — məlumatların qorunmayıb.'
+              : (daysSinceBackup === 0 ? 'Bu gün hələ backup edilməyib.' : `${daysSinceBackup} gündür backup yoxdur — məlumatların qorunmayıb.`);
             return `
               <div class="glass anim-pop" style="padding:12px 14px;margin-bottom:14px;border:1px solid rgba(255,184,77,0.4);background:rgba(255,184,77,0.08);display:flex;align-items:center;gap:10px;">
                 <span style="font-size:22px;">💾</span>
-                <span style="flex:1;font-size:12.5px;">Backup vaxtıdır — məlumatların qorunmayıb.</span>
+                <span style="flex:1;font-size:12.5px;">${msg}</span>
                 <button class="btn btn-primary btn-sm" onclick="JollyStudios.exportBackup()">İndi et</button>
               </div>
             `;
