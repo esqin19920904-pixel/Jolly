@@ -809,14 +809,56 @@ const JollyProducts = (() => {
     return false;
   }
 
+  // ── UNDO (son əməliyyatı geri al) — 10 saniyəlik pəncərə ──
+  function showUndoSnackbar(message, onUndo) {
+    let bar = document.getElementById('undoSnackbar');
+    if (bar) bar.remove();
+    bar = document.createElement('div');
+    bar.id = 'undoSnackbar';
+    bar.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:99998;background:#1a1a1a;color:#fff;padding:12px 16px;border-radius:14px;display:flex;align-items:center;gap:14px;box-shadow:0 8px 24px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);font-size:13px;max-width:92vw;';
+    let secondsLeft = 10;
+    bar.innerHTML = `
+      <span style="flex:1;">${message}</span>
+      <span id="undoCountdown" style="color:#ffb84d;font-weight:700;min-width:22px;">${secondsLeft}s</span>
+      <button id="undoBtn" style="background:#7c8aff;border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;">Geri al</button>
+    `;
+    document.body.appendChild(bar);
+    const countdownEl = bar.querySelector('#undoCountdown');
+    const btn = bar.querySelector('#undoBtn');
+    let done = false;
+    const interval = setInterval(() => {
+      secondsLeft--;
+      if (countdownEl) countdownEl.textContent = secondsLeft + 's';
+      if (secondsLeft <= 0) finish();
+    }, 1000);
+    function finish() {
+      if (done) return;
+      done = true;
+      clearInterval(interval);
+      if (bar && bar.parentNode) bar.remove();
+    }
+    btn.onclick = () => {
+      if (done) return;
+      finish();
+      onUndo();
+    };
+  }
+
   function deleteProduct(id) {
     if (!confirm('Məhsul silinsin? (Silinənlər səbətinə düşəcək, 30 gün ərzində bərpa edə bilərsən)')) return;
     if (!checkPinForDelete()) return;
+    const p = JollyDB.Products.get(id);
+    const name = (p && p.name) ? p.name : 'Məhsul';
     JollyDB.Trash.moveToTrash(id);
     if (typeof JollySound !== 'undefined') JollySound.warn();
-    Toast.success('Səbətə atıldı — Dashboard → Səbətdən bərpa edə bilərsən');
     if (window.JollyEvents) JollyEvents.emit('product.deleted', { id });
     JollyRouter.go('#/home');
+    showUndoSnackbar(`"${escapeHtml(name)}" silindi`, () => {
+      JollyDB.Trash.restore(id);
+      if (typeof JollySound !== 'undefined') JollySound.success();
+      Toast.success('Bərpa olundu ♻️');
+      if (typeof JollyApp !== 'undefined') JollyApp.render();
+    });
   }
 
   function whatsappShare(id) {
