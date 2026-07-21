@@ -15,6 +15,14 @@ const JollyLiveLens = (() => {
   /* ---------- Aç / bağla ---------- */
   async function open() {
     if (overlay) return;
+
+    // İcazə yoxlaması — livelens.use
+    if (typeof POS !== 'undefined' && !POS.can('livelens.use')) {
+      if (window.Toast) Toast.error('❌ Live Lens üçün icazəniz yoxdur');
+      if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+      return;
+    }
+
     overlay = document.createElement('div');
     overlay.className = 'scan-overlay vs-scanning ll-overlay';
     overlay.innerHTML = `
