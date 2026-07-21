@@ -15,7 +15,8 @@
    2) "⚙️ Ətraflı Axtarış" paneli — bütün axtarış üsullarını (ad,
       rəng, etiket, firma, qrup, yer, tədarükçü, status, barkod,
       barkodun son 4 rəqəmi, xüsusi kod, model/no kodu, qiymət
-      aralığı, şəklə görə, səslə) TEK bir yerdə birləşdirir.
+      aralığı, YARADILMA TARİXİ ARALIĞI, QEYD mətnində axtarış,
+      şəklə görə, səslə) TEK bir yerdə birləşdirir.
    ============================================================ */
 
 const JollyProducts = (() => {
@@ -317,6 +318,7 @@ const JollyProducts = (() => {
         <div class="field"><label>İçindəki hərflərə görə (ümumi)</label><input id="adv_text" placeholder="istənilən sahədə axtar..."></div>
         <div class="field"><label>Ad</label><input id="adv_name" placeholder="məhsul adı..."></div>
         <div class="field"><label>Rəng</label><input id="adv_color" placeholder="məs. qara"></div>
+        <div class="field"><label>Qeyd mətnində axtarış</label><input id="adv_note" placeholder="qeyddə keçən söz..."></div>
 
         <div class="field"><label>Etiket</label><select id="adv_tag"><option value="">— hamısı —</option>${opts(JollyDB.Tags.all())}</select></div>
         <div class="field"><label>Firma</label><select id="adv_brand"><option value="">— hamısı —</option>${opts(JollyDB.Brands.all())}</select></div>
@@ -335,6 +337,11 @@ const JollyProducts = (() => {
           <div class="field"><label>Qiymət (max)</label><input id="adv_priceMax" type="number" step="0.01" placeholder="999"></div>
         </div>
 
+        <div class="field-row">
+          <div class="field"><label>Yaradılma tarixi (bu tarixdən)</label><input id="adv_dateFrom" type="date"></div>
+          <div class="field"><label>Yaradılma tarixi (bu tarixə qədər)</label><input id="adv_dateTo" type="date"></div>
+        </div>
+
         <div class="row" style="gap:8px;margin-top:8px;">
           <button class="btn btn-ghost" style="flex:1;" onclick="JollyProducts.clearAdvancedFields()">🗑 Təmizlə</button>
           <button class="btn btn-primary" style="flex:1;" onclick="JollyProducts.applyAdvancedSearch()">🔍 Axtar</button>
@@ -351,7 +358,7 @@ const JollyProducts = (() => {
   }
 
   function clearAdvancedFields() {
-    ['adv_text', 'adv_name', 'adv_color', 'adv_barcode', 'adv_last4', 'adv_mainCode', 'adv_extraCodeValue', 'adv_priceMin', 'adv_priceMax']
+    ['adv_text', 'adv_name', 'adv_color', 'adv_note', 'adv_barcode', 'adv_last4', 'adv_mainCode', 'adv_extraCodeValue', 'adv_priceMin', 'adv_priceMax', 'adv_dateFrom', 'adv_dateTo']
       .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     ['adv_tag', 'adv_brand', 'adv_group', 'adv_location', 'adv_supplier', 'adv_status']
       .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -363,6 +370,7 @@ const JollyProducts = (() => {
       text: val('adv_text').toLowerCase(),
       name: val('adv_name').toLowerCase(),
       color: val('adv_color').toLowerCase(),
+      note: val('adv_note').toLowerCase(),
       tag: val('adv_tag'),
       brand: val('adv_brand'),
       group: val('adv_group'),
@@ -375,12 +383,15 @@ const JollyProducts = (() => {
       extraCodeValue: val('adv_extraCodeValue').toLowerCase(),
       priceMin: val('adv_priceMin'),
       priceMax: val('adv_priceMax'),
+      dateFrom: val('adv_dateFrom'),
+      dateTo: val('adv_dateTo'),
     };
 
     let items = JollyDB.Products.all();
     if (f.text) items = items.filter(p => JSON.stringify(p).toLowerCase().includes(f.text));
     if (f.name) items = items.filter(p => (p.name || '').toLowerCase().includes(f.name));
     if (f.color) items = items.filter(p => (p.color || '').toLowerCase().includes(f.color));
+    if (f.note) items = items.filter(p => (p.note || '').toLowerCase().includes(f.note));
     if (f.tag) items = items.filter(p => (p.filterTags || []).includes(f.tag));
     if (f.brand) items = items.filter(p => p.brand === f.brand);
     if (f.group) items = items.filter(p => p.group === f.group);
@@ -393,15 +404,37 @@ const JollyProducts = (() => {
     if (f.extraCodeValue) items = items.filter(p => (p.extraCodeValue || '').toLowerCase().includes(f.extraCodeValue));
     if (f.priceMin) items = items.filter(p => p.price != null && p.price !== '' && parseFloat(p.price) >= parseFloat(f.priceMin));
     if (f.priceMax) items = items.filter(p => p.price != null && p.price !== '' && parseFloat(p.price) <= parseFloat(f.priceMax));
+    if (f.dateFrom) {
+      const fromTs = new Date(f.dateFrom + 'T00:00:00').getTime();
+      items = items.filter(p => p.createdAt && p.createdAt >= fromTs);
+    }
+    if (f.dateTo) {
+      const toTs = new Date(f.dateTo + 'T23:59:59').getTime();
+      items = items.filter(p => p.createdAt && p.createdAt <= toTs);
+    }
 
     closeAdvancedSearch();
     homeState.filter = null;
     resetChain();
-    const input = document.getElementById('homeSearch');
-    if (input) input.value = '';
-    const titleEl = document.querySelector('.section-title');
-    if (titleEl) titleEl.textContent = `Ətraflı axtarış: ${items.length} məhsul`;
-    renderList(document.getElementById('homeProductList'), items);
+
+    // Panel istənilən səhifədən (Dashboard daxil) açıla bilər, amma nəticə
+    // yalnız Axtarış (#/home) səhifəsindəki #homeProductList konteynerinə
+    // yazıla bilər — əvvəlcə ora keç, sonra nəticəni göstər.
+    const writeResults = () => {
+      const input = document.getElementById('homeSearch');
+      if (input) input.value = '';
+      const titleEl = document.querySelector('.section-title');
+      if (titleEl) titleEl.textContent = `Ətraflı axtarış: ${items.length} məhsul`;
+      const container = document.getElementById('homeProductList');
+      if (container) renderList(container, items);
+    };
+
+    if (document.getElementById('homeProductList')) {
+      writeResults();
+    } else {
+      JollyRouter.go('#/home');
+      setTimeout(writeResults, 60);
+    }
     if (typeof Toast !== 'undefined') Toast.success(`${items.length} nəticə tapıldı`);
   }
 
