@@ -7,12 +7,16 @@
    topbar qarışmasın, sürüşdürmə lazım olmasın.
 
    Necə işləyir:
-   - Topbar-da YALNIZ bir düymə: 🧰 Alətlər
+   - Topbar-da YALNIZ bir düymə: 🧰 Alətlər (YALNIZ ADMİN görür)
    - Basanda grid şəklində bütün alətlər açılır (ikon + ad)
    - Hər alətə toxunanda öz overlay-i açılır (əvvəlki kimi işləyir)
 
-   DƏYİŞİKLİK: "🐞 Qara Qutu" indi burada — əvvəlki ekranda üzən 🐞
-   düyməsi silinib, diaqnostika paneli bu grid-dən açılır.
+   DƏYİŞİKLİK (2026-07-21):
+   - "📋 Xəta Hesabatı" (jolly-diag-report.js) əlavə olundu — mövcud
+     "🩺 Diaqnostika"dan ayrı, öz JS xəta bufferini və modul/keş/SW
+     statusunu mətn kimi göstərib bir toxunuşla kopyalayan alət.
+   - "🧰 Alətlər" düyməsi indi YALNIZ admin sessiyasında göstərilir —
+     adi userlər (məs. Zülfiqar) bu düyməni ümumiyyətlə görmür.
 
    Quraşdırma:
    1. Bu faylı JOLLY-nin flat qovluğuna at.
@@ -23,6 +27,13 @@
 
 (function () {
   "use strict";
+
+  function _isAdminSession() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem("jolly_sec_session") || "null");
+      return !sess || sess.role === "admin";
+    } catch (e) { return true; }
+  }
 
   function getTools() {
     const tools = [];
@@ -95,6 +106,9 @@
     }
     if (typeof window.JollyDiagnostics !== "undefined") {
       tools.push({ icon: "🩺", label: "Diaqnostika", run: () => window.JollyDiagnostics.show() });
+    }
+    if (typeof window.JollyDiagReport !== "undefined") {
+      tools.push({ icon: "📋", label: "Xəta Hesabatı", run: () => window.JollyDiagReport.openModal() });
     }
 
     return tools;
@@ -189,6 +203,7 @@
   }
 
   function injectButton() {
+    if (!_isAdminSession()) return; // adi userlər (Zülfiqar) Alətlər düyməsini görmür
     if (document.getElementById("jolly-tm-toggle")) return;
     const container = document.querySelector(".top-actions");
     if (!container) {
