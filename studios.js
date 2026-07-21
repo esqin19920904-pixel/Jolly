@@ -126,23 +126,25 @@ const JollyStudios = (() => {
   function renderVoiceVision() {
     const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    // İcazəsi olmayan istifadəçidə uyğun kartları gizlət (data-perm + syncUI)
+    setTimeout(() => { if (typeof POS !== 'undefined') POS.syncUI(); }, 0);
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">👁️ Voice & Vision Studio</h2>
       <p class="muted" style="font-size:12.5px;margin:0 0 16px;">Kamera və səs əsaslı bütün alətlər bir yerdə.</p>
       <div class="studio-grid">
-        <div class="glass studio-card" onclick="${typeof JollyLiveLens !== 'undefined' ? 'JollyLiveLens.open()' : "Toast.error('Live Lens yüklənməyib')"}" style="border-color:rgba(41,224,201,0.4);">
+        <div class="glass studio-card" data-perm="livelens.use" onclick="${typeof JollyLiveLens !== 'undefined' ? 'JollyLiveLens.open()' : "Toast.error('Live Lens yüklənməyib')"}" style="border-color:rgba(41,224,201,0.4);">
           <div class="ic">📡</div><div class="title">Live Lens</div><div class="sub">Canlı kamera tanıma</div>
         </div>
-        <div class="glass studio-card" onclick="${hasCamera ? "JollyStudios.startVisualSearchFromStudio()" : "Toast.error('Bu cihazda kamera dəstəklənmir')"}">
+        <div class="glass studio-card" data-perm="search.photo" onclick="${hasCamera ? "JollyStudios.startVisualSearchFromStudio()" : "Toast.error('Bu cihazda kamera dəstəklənmir')"}">
           <div class="ic">📷</div><div class="title">Visual Search</div><div class="sub">Şəkillə məhsul tap</div>
         </div>
-        <div class="glass studio-card" onclick="${hasCamera ? "JollyProducts.scanSearch()" : "Toast.error('Bu cihazda kamera dəstəklənmir')"}">
+        <div class="glass studio-card" data-perm="barcode.scan" onclick="${hasCamera ? "JollyProducts.scanSearch()" : "Toast.error('Bu cihazda kamera dəstəklənmir')"}">
           <div class="ic">🧾</div><div class="title">Barkod skan</div><div class="sub">Kamera ilə oxu</div>
         </div>
-        <div class="glass studio-card" onclick="${hasCamera && typeof JollyOCR !== 'undefined' ? "JollyStudios.runOcr()" : "Toast.error('OCR bu cihazda mövcud deyil')"}">
+        <div class="glass studio-card" data-perm="ai.ocr" onclick="${hasCamera && typeof JollyOCR !== 'undefined' ? "JollyStudios.runOcr()" : "Toast.error('OCR bu cihazda mövcud deyil')"}">
           <div class="ic">📝</div><div class="title">OCR</div><div class="sub">Yazını oxu</div>
         </div>
-        <div class="glass studio-card" onclick="${hasSpeech ? "JollyProducts.voiceSearch()" : "Toast.error('Bu cihazda səsli axtarış dəstəklənmir')"}">
+        <div class="glass studio-card" data-perm="search.voice" onclick="${hasSpeech ? "JollyProducts.voiceSearch()" : "Toast.error('Bu cihazda səsli axtarış dəstəklənmir')"}">
           <div class="ic">🎙️</div><div class="title">Səsli axtarış</div><div class="sub">${hasSpeech ? 'Danış, axtar' : 'Dəstəklənmir'}</div>
         </div>
       </div>
@@ -989,14 +991,16 @@ const JollyStudios = (() => {
       return;
     }
     const data = JollyDB.exportAll();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const checksum = computeChecksum(data);
+    const payload = { ...data, __checksum: checksum };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `jolly-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     JollyDB.setSettings({ lastBackup: Date.now() });
-    Toast.success('Backup yükləndi');
+    Toast.success(`Backup yükləndi ✓ (yoxlama kodu: ${checksum})`);
     JollyRouter.go('#/studios/data');
   }
 
@@ -1010,7 +1014,19 @@ const JollyStudios = (() => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target.result);
+        const raw = JSON.parse(ev.target.result);
+        const { __checksum, ...data } = raw;
+        if (__checksum) {
+          const recomputed = computeChecksum(data);
+          if (recomputed !== __checksum) {
+            if (!confirm('⚠️ Bu backup faylının yoxlama kodu uyğun gəlmir — fayl yarımçıq köçürülmüş və ya korlanmış ola bilər.\n\nYenə də bərpa etmək istəyirsən? (Riskli — natamam məlumat gələ bilər)')) {
+              Toast.error('Bərpa ləğv edildi');
+              return;
+            }
+          } else {
+            Toast.success('✓ Fayl bütövlüyü təsdiqləndi');
+          }
+        }
         const count = (data.jolly_products || []).length;
         if (confirm(`Bu backup-da ${count} məhsul var. Mövcud məlumatlar bununla əvəz olunacaq. Davam edilsin?`)) {
           saveSnapshot();
@@ -1079,6 +1095,17 @@ const JollyStudios = (() => {
   function hashPin(s) {
     let h = 0x811c9dc5;
     for (let i = 0; i < String(s).length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
+
+  // ── Backup checksum — export edərkən faylın "barmaq izi"ni yaradır,
+  // import edərkən yenidən hesablayıb müqayisə edir. Fayl əldə/yolda
+  // yarımçıq köçürülübsə (natamam yükləmə, WhatsApp sıxması və s.),
+  // uyğunsuzluq dərhal görünür. ──
+  function computeChecksum(obj) {
+    const str = JSON.stringify(obj);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
     return h.toString(16).padStart(8, '0');
   }
 
