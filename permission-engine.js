@@ -2,6 +2,13 @@
  * JOLLY PermissionOS v2.0
  * data-perm / data-perm-module atributu əsaslı icazə sistemi
  * Arxitektura: JOLLY.PermissionOS (POS)
+ *
+ * DƏYİŞİKLİK (2026-07-21):
+ * - Live Lens (livelens.use) və Səsli axtarış (search.voice) üçün icazə
+ *   qeydiyyatı əlavə olundu — əvvəllər bu alətlərin heç icazə açarı
+ *   olmadığı üçün İcazə Mərkəzində heç görünmürdülər.
+ * - İcazə siyahısı indi 2 sütunlu şəbəkə (grid) formatında — uzun tək
+ *   sütun siyahı əvəzinə, az aşağı düşmək lazımdır.
  */
 (function() {
 'use strict';
@@ -366,20 +373,25 @@ class AdminUI {
           <span style="font-size:13px;font-weight:600;">${g.icon} ${g.label}</span>
           <span id="pos-gc-${mid}" style="font-size:11px;color:var(--accent-1,#00d4ff);">0/${g.items.length}</span>
         </div>
-        <div id="pos-gb-${mid}" class="glass" style="border-radius:0 0 10px 10px;padding:4px 14px;border-top:none;">
-          ${g.items.map(p => {
-            const tag = TAGS[p.tag]||TAGS.view;
-            const checked = this.os.engine.resolveFor(this._selectedUserId, p.key);
-            return `<div class="pos-row list-row" data-key="${p.key}" data-tag="${p.tag}" data-label="${p.label.toLowerCase()}" style="gap:10px;">
-              <label style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer;padding:4px 0;">
-                <input type="checkbox" class="pos-cb" data-key="${p.key}" ${checked?'checked':''}
-                  onchange="POS.admin._onChange('${p.key}', this.checked)"
-                  style="width:16px;height:16px;accent-color:var(--accent-1,#00d4ff);cursor:pointer;flex-shrink:0;">
-                <span style="flex:1;font-size:13px;">${p.label}</span>
-                <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${tag.bg};color:${tag.color};">${tag.emoji}</span>
-              </label>
-            </div>`;
-          }).join('')}
+        <div id="pos-gb-${mid}" class="glass" style="border-radius:0 0 10px 10px;padding:10px;border-top:none;">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+            ${g.items.map(p => {
+              const tag = TAGS[p.tag]||TAGS.view;
+              const checked = this.os.engine.resolveFor(this._selectedUserId, p.key);
+              return `<div class="pos-row" data-key="${p.key}" data-tag="${p.tag}" data-label="${p.label.toLowerCase()}"
+                  style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:8px 9px;">
+                <label style="display:flex;align-items:flex-start;gap:8px;width:100%;cursor:pointer;">
+                  <input type="checkbox" class="pos-cb" data-key="${p.key}" ${checked?'checked':''}
+                    onchange="POS.admin._onChange('${p.key}', this.checked)"
+                    style="width:16px;height:16px;accent-color:var(--accent-1,#00d4ff);cursor:pointer;flex-shrink:0;margin-top:2px;">
+                  <span style="flex:1;font-size:12px;line-height:1.3;">${p.label}</span>
+                </label>
+                <div style="margin-top:6px;text-align:right;">
+                  <span style="font-size:9px;padding:2px 7px;border-radius:10px;background:${tag.bg};color:${tag.color};">${tag.emoji} ${tag.label}</span>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
         </div>
       </div>
     `).join('');
@@ -607,10 +619,15 @@ document.addEventListener('DOMContentLoaded', function() {
   ]});
 
   POS.register({ id:'search', name:'Axtarış', icon:'🔍', permissions:[
-    { key:'search.use',  label:'Axtarış et',   tag:'view', default:true },
-    { key:'search.ai',   label:'AI Axtarış',   tag:'ai',   default:false },
-    { key:'search.color',label:'Rəng axtarışı',tag:'view', default:true  },
-    { key:'search.photo',label:'Şəkillə axtar',tag:'ai',   default:false },
+    { key:'search.use',   label:'Axtarış et',    tag:'view', default:true },
+    { key:'search.ai',    label:'AI Axtarış',    tag:'ai',   default:false },
+    { key:'search.color', label:'Rəng axtarışı', tag:'view', default:true  },
+    { key:'search.photo', label:'Şəkillə axtar', tag:'ai',   default:false },
+    { key:'search.voice', label:'Səsli axtarış', tag:'ai',   default:false },
+  ]});
+
+  POS.register({ id:'livelens', name:'Live Lens', icon:'📡', permissions:[
+    { key:'livelens.use', label:'Live Lens (canlı kamera tanıma)', tag:'ai', default:false },
   ]});
 
   POS.register({ id:'barcode', name:'Barkod', icon:'📷', permissions:[
