@@ -31,11 +31,17 @@ const JollyProducts = (() => {
     const pki = escapeHtml(JSON.stringify(p.images || []));
     const st = (p.status || '').toLowerCase();
     const glowClass = st.includes('problem') ? 'card-glow-danger' : (st.includes('yeni') ? 'card-glow-new' : '');
-    const quickAddBtn = (typeof JollyReceiving !== 'undefined')
+    const isSelected = bulkSelectMode && bulkSelectedIds.has(p.id);
+    const quickAddBtn = (typeof JollyReceiving !== 'undefined' && !bulkSelectMode)
       ? `<button class="icon-btn" title="Qəbul səbətinə əlavə et" onclick="event.stopPropagation();JollyProducts.quickAddToReceiving('${p.id}', this)" style="position:absolute;top:6px;right:6px;z-index:5;width:30px;height:30px;min-width:30px;padding:0;border-radius:50%;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;color:#fff;border:1px solid rgba(255,255,255,0.15);">+</button>`
       : '';
+    const bulkCheck = bulkSelectMode
+      ? `<div style="position:absolute;top:6px;left:6px;z-index:6;width:26px;height:26px;border-radius:50%;background:${isSelected ? 'var(--accent-1,#7c8aff)' : 'rgba(0,0,0,0.5)'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;border:1px solid rgba(255,255,255,0.3);">${isSelected ? '✓' : ''}</div>`
+      : '';
+    const cardClick = bulkSelectMode ? `JollyProducts.toggleBulkSelect('${p.id}')` : `JollyRouter.go('#/product/${p.id}')`;
     return `
-      <div class="glass product-card ${glowClass}" data-id="${p.id}" onclick="JollyRouter.go('#/product/${p.id}')" style="position:relative;">
+      <div class="glass product-card ${glowClass}" data-id="${p.id}" onclick="${cardClick}" style="position:relative;${isSelected ? 'border-color:var(--accent-1,#7c8aff);box-shadow:0 0 0 2px var(--accent-1,#7c8aff);' : ''}">
+        ${bulkCheck}
         ${quickAddBtn}
         <div class="thumb peekable" data-pki='${pki}' data-pkx="0">${thumb}</div>
         <div class="p-name">${escapeHtml(p.name || 'Adsız məhsul')}</div>
@@ -112,6 +118,7 @@ const JollyProducts = (() => {
       </div>
       <div class="chip-row" style="margin-bottom:6px;">
         <span class="chip" id="sortChip" onclick="JollyProducts.cycleSort()">↕️ Sıra: Yeni</span>
+        <span class="chip" id="bulkModeChip" onclick="JollyProducts.toggleBulkSelectMode()">☑️ Seç</span>
       </div>
 
       <div class="section-title">Son əlavə edilənlər</div>
@@ -130,6 +137,64 @@ const JollyProducts = (() => {
   }
 
   let homeState = { filter: null, sort: 'new', chain: [] };
+
+  // ── Kütləvi seçim + WhatsApp paylaşımı ──
+  let bulkSelectMode = false;
+  let bulkSelectedIds = new Set();
+
+  function redrawCurrentHomeList() {
+    if (homeState.chain.length) { applyChainSearch(''); return; }
+    const input = document.getElementById('homeSearch');
+    if (input && input.value) { applyChainSearch(input.value); return; }
+    applyHomeView();
+  }
+
+  function toggleBulkSelectMode() {
+    bulkSelectMode = !bulkSelectMode;
+    if (!bulkSelectMode) bulkSelectedIds.clear();
+    redrawCurrentHomeList();
+    refreshBulkUI();
+  }
+
+  function toggleBulkSelect(id) {
+    if (bulkSelectedIds.has(id)) bulkSelectedIds.delete(id); else bulkSelectedIds.add(id);
+    redrawCurrentHomeList();
+    refreshBulkUI();
+  }
+
+  function refreshBulkUI() {
+    const chip = document.getElementById('bulkModeChip');
+    if (chip) {
+      chip.classList.toggle('chip-active', bulkSelectMode);
+      chip.textContent = bulkSelectMode ? '✕ Seçimi bitir' : '☑️ Seç';
+    }
+    let bar = document.getElementById('bulkActionBar');
+    if (bulkSelectMode && bulkSelectedIds.size > 0) {
+      const html = `
+        <div id="bulkActionBar" style="position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:99997;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);font-size:13px;">
+          <span>${bulkSelectedIds.size} seçildi</span>
+          <button style="background:#25D366;border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.shareSelectedViaWhatsApp()">📤 WhatsApp</button>
+        </div>`;
+      if (bar) { bar.outerHTML = html; } else { document.body.insertAdjacentHTML('beforeend', html); }
+    } else if (bar) {
+      bar.remove();
+    }
+  }
+
+  function shareSelectedViaWhatsApp() {
+    if (!bulkSelectedIds.size) return;
+    const products = [...bulkSelectedIds].map(id => JollyDB.Products.get(id)).filter(Boolean);
+    if (!products.length) return;
+    const lines = products.map(p => {
+      const parts = [p.name || 'Adsız'];
+      if (p.price != null && p.price !== '') parts.push(p.price + ' ₼');
+      if (p.barcodes && p.barcodes[0]) parts.push('🏷️' + p.barcodes[0]);
+      return '• ' + parts.join(' — ');
+    });
+    const text = `📦 Məhsullar (${products.length}):\n\n` + lines.join('\n');
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  }
+
   const SORTS = [
     { key: 'new', label: '↕️ Sıra: Yeni', fn: (a,b) => (b.createdAt||0)-(a.createdAt||0) },
     { key: 'name', label: '↕️ Sıra: Ad (A-Z)', fn: (a,b) => String(a.name||'').localeCompare(String(b.name||''), 'az') },
@@ -1978,68 +2043,4 @@ const JollyProducts = (() => {
       <div class="glass qa-sheet" style="max-width:340px;">
         ${thumb}
         <div style="font-family:var(--font-display);font-size:17px;font-weight:700;margin-top:12px;">${escapeHtml(p.name || 'Adsız məhsul')}</div>
-        <div class="row between" style="margin-top:6px;">
-          <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--accent-2);">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'}</span>
-          ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
-        </div>
-        ${(p.barcodes && p.barcodes[0]) ? `<div class="mono" style="font-size:12px;color:var(--accent-2);margin-top:6px;">🏷️ ${escapeHtml(p.barcodes[0])}</div>` : ''}
-        ${p.brand ? `<div class="muted" style="font-size:12px;margin-top:4px;">🏭 ${escapeHtml(p.brand)}</div>` : ''}
-        <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="document.getElementById('quickPreviewOverlay').classList.remove('on');JollyRouter.go('#/product/${p.id}')">Tam kartı aç ›</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('on'));
-  }
-
-  // ────────────────────────────────────────────────────────────
-  // KLAVİATURA QISAYOLLARI — fiziki/Bluetooth klaviaturası olan
-  // cihazlar üçün (nadir, amma pulsuz). Yazı sahəsindəykən (input,
-  // textarea) qısayollar söndürülür ki, adi yazmağa mane olmasın —
-  // Esc istisnadır, o həmişə işləyir.
-  // ────────────────────────────────────────────────────────────
-  function initKeyboardShortcuts() {
-    if (document.body.dataset.kbInit) return;
-    document.body.dataset.kbInit = '1';
-    document.addEventListener('keydown', (e) => {
-      const tag = (e.target && e.target.tagName || '').toLowerCase();
-      const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
-
-      if (e.key === 'Escape') {
-        closeAdvancedSearch();
-        const qp = document.getElementById('quickPreviewOverlay'); if (qp) qp.classList.remove('on');
-        const mm = document.getElementById('moreMenuOverlay'); if (mm) mm.classList.remove('on');
-        return;
-      }
-
-      if (typing) return;
-
-      if (e.key === '/' || e.key === 'f') {
-        const input = document.getElementById('homeSearch');
-        if (input) { e.preventDefault(); input.focus(); }
-      } else if (e.key === 'n') {
-        e.preventDefault();
-        JollyRouter.go('#/product/new');
-      } else if (e.key === 'b') {
-        e.preventDefault();
-        scanSearch();
-      } else if (e.key === 'a') {
-        e.preventDefault();
-        openAdvancedSearch();
-      } else if (e.key === '?') {
-        e.preventDefault();
-        alert('⌨️ Klaviatura qısayolları:\n\n/ və ya f  —  axtarışa fokuslan\nn  —  yeni məhsul\nb  —  barkod skan\na  —  ətraflı axtarış\nEsc  —  pəncərəni bağla\n?  —  bu siyahı');
-      }
-    });
-  }
-
-  initLongPressPreview();
-  initKeyboardShortcuts();
-
-  return {
-    renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch, photoSearch,
-    renderFilteredPage, renderDraftsPage, deleteDraft, renderDetailPage, deleteProduct,
-    renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
-    addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
-    rotateImageAt,
-    applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
-    commitChainTerm, removeChainTe
+        <div class="row between" style
