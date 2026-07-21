@@ -98,6 +98,7 @@ const JollyProducts = (() => {
         <button class="scan-btn" onclick="JollyProducts.scanSearch()">▦</button>
         <button class="scan-btn" title="Şəkillə axtar" onclick="JollyProducts.photoSearch()">📷</button>
         <button class="scan-btn" title="Ətraflı Axtarış" onclick="JollyProducts.openAdvancedSearch()">⚙️</button>
+        <button class="scan-btn" title="Axtarış tarixçəsi" onclick="JollyProducts.openSearchHistory()">🕓</button>
       </div>
 
       <div class="chip-row" style="margin-bottom:6px;" id="homeFilterChips">
@@ -216,16 +217,131 @@ const JollyProducts = (() => {
       else titleEl.textContent = `Nəticələr (${results.length})`;
     }
     renderList(document.getElementById('homeProductList'), results);
+    renderDidYouMean(results, liveTerm);
+  }
+
+  // ── "Bunu demək istədin?" — nəticə 0 olanda, kataloqdakı əsl sözlərə
+  // görə ən yaxın uyğunluğu tapıb təklif edir (yazı səhvi ehtimalı). ──
+  function _levenshtein(a, b) {
+    a = a.toLowerCase(); b = b.toLowerCase();
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    const dp = new Array(n + 1);
+    for (let j = 0; j <= n; j++) dp[j] = j;
+    for (let i = 1; i <= m; i++) {
+      let prev = dp[0]; dp[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const tmp = dp[j];
+        dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+        prev = tmp;
+      }
+    }
+    return dp[n];
+  }
+
+  function _catalogWordPool() {
+    const words = new Set();
+    JollyDB.Products.all().forEach(p => {
+      if (p.brand) words.add(p.brand);
+      if (p.group) words.add(p.group);
+      (String(p.name || '').split(/\s+/)).forEach(w => { if (w.length >= 3) words.add(w); });
+    });
+    return [...words];
+  }
+
+  function renderDidYouMean(results, lastTerm) {
+    const existing = document.getElementById('didYouMeanBar');
+    const term = (homeState.chain.length ? homeState.chain[homeState.chain.length - 1] : lastTerm) || '';
+    if (results.length !== 0 || !term || term.trim().length < 3) { if (existing) existing.remove(); return; }
+    const pool = _catalogWordPool();
+    let best = null, bestDist = Infinity;
+    pool.forEach(w => {
+      if (w.toLowerCase() === term.toLowerCase()) return;
+      const d = _levenshtein(term, w);
+      if (d < bestDist) { bestDist = d; best = w; }
+    });
+    const threshold = term.length <= 5 ? 2 : 3;
+    if (!best || bestDist === 0 || bestDist > threshold) { if (existing) existing.remove(); return; }
+    const html = `
+      <div class="chip-row" id="didYouMeanBar" style="margin-bottom:6px;">
+        <span class="chip" style="background:rgba(255,184,77,0.14);border-color:rgba(255,184,77,0.4);" onclick="JollyProducts.applyDidYouMean('${escapeHtml(best).replace(/'/g, "\\'")}')">🤔 Bunu demək istədin: <b style="margin-left:4px;">${escapeHtml(best)}</b>?</span>
+      </div>`;
+    if (existing) { existing.outerHTML = html; }
+    else {
+      const suggestBar = document.getElementById('suggestFilterBar');
+      const chainBar = document.getElementById('chainFilterBar');
+      const searchBar = document.querySelector('.command-bar');
+      const anchor = suggestBar || chainBar || searchBar;
+      if (anchor) anchor.insertAdjacentHTML('afterend', html);
+    }
+  }
+
+  function applyDidYouMean(word) {
+    if (homeState.chain.length) homeState.chain[homeState.chain.length - 1] = word;
+    else homeState.chain.push(word);
+    recordSearchHistory(word);
+    renderChainChips();
+    applyChainSearch('');
   }
 
   function commitChainTerm(term) {
     if (!term || !term.trim()) return;
     homeState.chain.push(term.trim());
+    recordSearchHistory(term.trim());
     const input = document.getElementById('homeSearch');
     if (input) input.value = '';
     if (typeof JollySound !== 'undefined') JollySound.tap();
     renderChainChips();
     applyChainSearch('');
+  }
+
+  // ── Axtarış tarixçəsi — son axtarılan sözləri yadda saxlayır ──
+  const SEARCH_HISTORY_KEY = 'jolly_search_history';
+  const SEARCH_HISTORY_MAX = 10;
+
+  function getSearchHistory() {
+    try { return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]'); } catch (e) { return []; }
+  }
+
+  function recordSearchHistory(term) {
+    try {
+      let hist = getSearchHistory();
+      hist = hist.filter(t => t.toLowerCase() !== term.toLowerCase());
+      hist.unshift(term);
+      hist = hist.slice(0, SEARCH_HISTORY_MAX);
+      localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(hist));
+    } catch (e) {}
+  }
+
+  function clearSearchHistory() {
+    try { localStorage.removeItem(SEARCH_HISTORY_KEY); } catch (e) {}
+    openSearchHistory();
+  }
+
+  function openSearchHistory() {
+    let overlay = document.getElementById('searchHistoryOverlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'searchHistoryOverlay';
+    overlay.className = 'qa-overlay';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('on'); });
+    const hist = getSearchHistory();
+    overlay.innerHTML = `
+      <div class="glass qa-sheet">
+        <div class="row between" style="margin-bottom:10px;">
+          <div class="qa-title" style="margin:0;">🕓 Axtarış tarixçəsi</div>
+          <button class="icon-btn" onclick="document.getElementById('searchHistoryOverlay').classList.remove('on')">✕</button>
+        </div>
+        ${hist.length ? hist.map(term => `
+          <div class="qa-item" onclick="document.getElementById('searchHistoryOverlay').classList.remove('on');JollyProducts.commitChainTerm('${escapeHtml(term).replace(/'/g, "\\'")}')">
+            <span>🔎</span><span>${escapeHtml(term)}</span>
+          </div>
+        `).join('') : '<div class="muted" style="padding:14px;">Hələ axtarış edilməyib</div>'}
+        ${hist.length ? `<button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="JollyProducts.clearSearchHistory()">🗑 Tarixçəni təmizlə</button>` : ''}
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('on'));
   }
 
   function removeChainTerm(idx) {
@@ -1286,6 +1402,7 @@ const JollyProducts = (() => {
         <img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(src) : 'src="' + src + '"'}>
         <div class="rm" onclick="JollyProducts.removeImage(${i})">✕</div>
         <div class="clean-ico" title="Arxa fonu təmizlə" onclick="JollyProducts.cleanImageAt(${i})" style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.55);border-radius:6px;padding:2px 5px;font-size:12px;cursor:pointer;line-height:1;">🧹</div>
+        <div class="clean-ico" title="90° döndər" onclick="JollyProducts.rotateImageAt(${i})" style="position:absolute;bottom:2px;left:28px;background:rgba(0,0,0,0.55);border-radius:6px;padding:2px 5px;font-size:12px;cursor:pointer;line-height:1;">🔄</div>
       </div>
     `).join('');
     html += `
@@ -1320,6 +1437,56 @@ const JollyProducts = (() => {
     }
     formState.images.splice(i, 1);
     renderImageStrip();
+  }
+
+  // ------------------------------------------------------------------------
+  // ŞƏKİL DÖNDƏRMƏ — hər şəklin altındakı 🔄 düyməsi ilə, 90° saat
+  // əqrəbi istiqamətində döndərib YERİNƏ QOYUR. Kamera bəzən şəkli
+  // yan çəkəndə faydalıdır.
+  // ------------------------------------------------------------------------
+  async function rotateImageAt(i) {
+    const ref = formState.images[i];
+    if (!ref) return;
+    let sourceDataUrl = ref;
+    if (typeof JollyStorage !== 'undefined' && ref.startsWith && ref.startsWith('idb:')) {
+      const resolved = await JollyStorage.resolveAll([ref]);
+      sourceDataUrl = resolved && resolved[0];
+    }
+    if (!sourceDataUrl) { Toast.error('Şəkil oxunmadı'); return; }
+
+    const slot = document.getElementById('imgSlot' + i);
+    const originalHtml = slot ? slot.innerHTML : null;
+    if (slot) slot.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;">⏳</div>`;
+
+    try {
+      const rotatedDataUrl = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.height; canvas.height = img.width;
+          const ctx = canvas.getContext('2d');
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(img, -img.width / 2, -img.height / 2);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = sourceDataUrl;
+      });
+
+      let newRef = rotatedDataUrl;
+      if (typeof JollyStorage !== 'undefined') newRef = await JollyStorage.saveImage(rotatedDataUrl);
+      if (typeof JollyStorage !== 'undefined' && ref.startsWith && ref.startsWith('idb:')) {
+        JollyStorage.deleteImage(ref);
+      }
+      formState.images[i] = newRef;
+      renderImageStrip();
+      if (typeof JollySound !== 'undefined') JollySound.tap();
+    } catch (err) {
+      console.error('[rotateImageAt]', err);
+      if (slot && originalHtml) slot.innerHTML = originalHtml;
+      Toast.error('Şəkil döndərilmədi');
+    }
   }
 
   // ------------------------------------------------------------------------
@@ -1696,15 +1863,59 @@ const JollyProducts = (() => {
     requestAnimationFrame(() => overlay.classList.add('on'));
   }
 
+  // ────────────────────────────────────────────────────────────
+  // KLAVİATURA QISAYOLLARI — fiziki/Bluetooth klaviaturası olan
+  // cihazlar üçün (nadir, amma pulsuz). Yazı sahəsindəykən (input,
+  // textarea) qısayollar söndürülür ki, adi yazmağa mane olmasın —
+  // Esc istisnadır, o həmişə işləyir.
+  // ────────────────────────────────────────────────────────────
+  function initKeyboardShortcuts() {
+    if (document.body.dataset.kbInit) return;
+    document.body.dataset.kbInit = '1';
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target && e.target.tagName || '').toLowerCase();
+      const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
+
+      if (e.key === 'Escape') {
+        closeAdvancedSearch();
+        const qp = document.getElementById('quickPreviewOverlay'); if (qp) qp.classList.remove('on');
+        const mm = document.getElementById('moreMenuOverlay'); if (mm) mm.classList.remove('on');
+        return;
+      }
+
+      if (typing) return;
+
+      if (e.key === '/' || e.key === 'f') {
+        const input = document.getElementById('homeSearch');
+        if (input) { e.preventDefault(); input.focus(); }
+      } else if (e.key === 'n') {
+        e.preventDefault();
+        JollyRouter.go('#/product/new');
+      } else if (e.key === 'b') {
+        e.preventDefault();
+        scanSearch();
+      } else if (e.key === 'a') {
+        e.preventDefault();
+        openAdvancedSearch();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        alert('⌨️ Klaviatura qısayolları:\n\n/ və ya f  —  axtarışa fokuslan\nn  —  yeni məhsul\nb  —  barkod skan\na  —  ətraflı axtarış\nEsc  —  pəncərəni bağla\n?  —  bu siyahı');
+      }
+    });
+  }
+
   initLongPressPreview();
+  initKeyboardShortcuts();
 
   return {
     renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch, photoSearch,
     renderFilteredPage, renderDraftsPage, deleteDraft, renderDetailPage, deleteProduct,
     renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
+    rotateImageAt,
     applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
     commitChainTerm, removeChainTerm, clearChain, filterByBrandChain,
+    openSearchHistory, clearSearchHistory, applyDidYouMean,
     openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
