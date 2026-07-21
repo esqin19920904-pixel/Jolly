@@ -1563,6 +1563,99 @@ const JollyProducts = (() => {
     JollyRouter.go('#/home');
   }
 
+  // ────────────────────────────────────────────────────────────
+  // UZUN-BAS İLƏ SÜRƏTLİ ÖNİZLƏMƏ — məhsul kartına ~0.5s basıb
+  // saxlayanda, kartı açmadan kiçik popup-da əsas məlumat göstərilir.
+  // Toxunuş/siçan hər ikisi dəstəklənir; adi (qısa) toxunuş normal
+  // kimi kartı açır — heç nə pozulmur.
+  // ────────────────────────────────────────────────────────────
+  let _lpTimer = null;
+  let _lpTriggered = false;
+  let _lpStartX = 0, _lpStartY = 0;
+  const LP_DELAY = 480;
+  const LP_MOVE_TOLERANCE = 12;
+
+  function _lpFindCard(target) {
+    return target && target.closest ? target.closest('.product-card') : null;
+  }
+
+  function _lpStart(e) {
+    const card = _lpFindCard(e.target);
+    if (!card) return;
+    const point = e.touches ? e.touches[0] : e;
+    _lpStartX = point.clientX; _lpStartY = point.clientY;
+    clearTimeout(_lpTimer);
+    _lpTimer = setTimeout(() => {
+      _lpTriggered = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      showQuickPreview(card.dataset.id);
+    }, LP_DELAY);
+  }
+
+  function _lpMove(e) {
+    if (!_lpTimer) return;
+    const point = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(point.clientX - _lpStartX);
+    const dy = Math.abs(point.clientY - _lpStartY);
+    if (dx > LP_MOVE_TOLERANCE || dy > LP_MOVE_TOLERANCE) { clearTimeout(_lpTimer); _lpTimer = null; }
+  }
+
+  function _lpEnd() { clearTimeout(_lpTimer); _lpTimer = null; }
+
+  // Uzun-bas tetiklənəndə, kartın öz onclick-i (kartı açma) işə düşməsin
+  // deyə capture mərhələsində click-i tutub dayandırırıq.
+  function _lpClickGuard(e) {
+    if (_lpTriggered) {
+      e.stopPropagation();
+      e.preventDefault();
+      _lpTriggered = false;
+    }
+  }
+
+  function initLongPressPreview() {
+    if (document.body.dataset.lpInit) return;
+    document.body.dataset.lpInit = '1';
+    document.addEventListener('touchstart', _lpStart, { passive: true });
+    document.addEventListener('touchmove', _lpMove, { passive: true });
+    document.addEventListener('touchend', _lpEnd, { passive: true });
+    document.addEventListener('touchcancel', _lpEnd, { passive: true });
+    document.addEventListener('mousedown', _lpStart);
+    document.addEventListener('mousemove', _lpMove);
+    document.addEventListener('mouseup', _lpEnd);
+    document.addEventListener('click', _lpClickGuard, true);
+  }
+
+  function showQuickPreview(id) {
+    const p = JollyDB.Products.get(id);
+    if (!p) return;
+    let overlay = document.getElementById('quickPreviewOverlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'quickPreviewOverlay';
+    overlay.className = 'qa-overlay';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('on'); });
+    const thumb = (p.images && p.images[0])
+      ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:100%;height:180px;object-fit:cover;border-radius:12px;">`
+      : `<div style="width:100%;height:180px;display:flex;align-items:center;justify-content:center;font-size:44px;background:rgba(255,255,255,0.05);border-radius:12px;">🧴</div>`;
+    overlay.innerHTML = `
+      <div class="glass qa-sheet" style="max-width:340px;">
+        ${thumb}
+        <div style="font-family:var(--font-display);font-size:17px;font-weight:700;margin-top:12px;">${escapeHtml(p.name || 'Adsız məhsul')}</div>
+        <div class="row between" style="margin-top:6px;">
+          <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--accent-2);">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'}</span>
+          ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
+        </div>
+        ${(p.barcodes && p.barcodes[0]) ? `<div class="mono" style="font-size:12px;color:var(--accent-2);margin-top:6px;">🏷️ ${escapeHtml(p.barcodes[0])}</div>` : ''}
+        ${p.brand ? `<div class="muted" style="font-size:12px;margin-top:4px;">🏭 ${escapeHtml(p.brand)}</div>` : ''}
+        <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="document.getElementById('quickPreviewOverlay').classList.remove('on');JollyRouter.go('#/product/${p.id}')">Tam kartı aç ›</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('on'));
+  }
+
+  initLongPressPreview();
+
   return {
     renderHomePage, afterHomeRender, liveSearch, voiceSearch, scanSearch, photoSearch,
     renderFilteredPage, renderDraftsPage, deleteDraft, renderDetailPage, deleteProduct,
