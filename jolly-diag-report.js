@@ -1,10 +1,13 @@
 /* ============================================================
    JOLLY Diag Report — Diaqnostika Hesabatı
-   Tam müstəqil modul. Admin kiçik "🩺" düyməsinə basanda tətbiqin
-   cari vəziyyətini (versiyalar, xətalar, yaddaş, şəbəkə və s.)
-   mətn şəklində toplayır, ekranda göstərir, "Kopyala" düyməsi ilə
-   bir toxunuşla panoya köçürür — sən onu birbaşa Claude-a yapışdıra
-   bilərsən.
+   Tam müstəqil modul. "Alətlər" (tools-menu.js) → "📋 Xəta
+   Hesabatı" kartından açılır. Tətbiqin cari vəziyyətini
+   (versiyalar, xətalar, yaddaş, şəbəkə və s.) mətn şəklində
+   toplayır, "Kopyala" düyməsi ilə bir toxunuşla panoya köçürür.
+
+   DƏYİŞİKLİK: özü ayrıca üzən 🩺 düymə yaratmır artıq — yerini
+   Alətlər grid-indəki kart tutur (tools-menu.js buradan
+   JollyDiagReport.openModal() çağırır).
    ============================================================ */
 const JollyDiagReport = (() => {
   const MAX_ERRORS = 25;
@@ -21,13 +24,6 @@ const JollyDiagReport = (() => {
   function _push(type, msg) {
     _errors.push({ t: Date.now(), type, msg });
     if (_errors.length > MAX_ERRORS) _errors.shift();
-  }
-
-  function _isAdminSession() {
-    try {
-      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
-      return !sess || sess.role === 'admin';
-    } catch (e) { return true; }
   }
 
   function _checkModule(name) {
@@ -128,14 +124,6 @@ const JollyDiagReport = (() => {
     const style = document.createElement('style');
     style.id = 'jollyDiagStyle';
     style.textContent = `
-      #jollyDiagBtn{
-        position:fixed;top:14px;right:14px;z-index:9997;
-        width:40px;height:40px;border-radius:50%;border:1px solid rgba(212,175,55,.35);
-        background:rgba(18,22,42,.85);color:#f4d777;font-size:18px;
-        display:flex;align-items:center;justify-content:center;cursor:pointer;
-        box-shadow:0 4px 14px rgba(0,0,0,.4);opacity:.55;
-      }
-      #jollyDiagBtn:active{ opacity:1; transform:scale(.94); }
       #jollyDiagModal{
         position:fixed;inset:0;z-index:999998;background:rgba(5,6,12,.9);
         display:flex;align-items:center;justify-content:center;padding:18px;
@@ -164,18 +152,6 @@ const JollyDiagReport = (() => {
     document.head.appendChild(style);
   }
 
-  function injectButton() {
-    if (!_isAdminSession()) return;
-    if (document.getElementById('jollyDiagBtn')) return;
-    ensureStyles();
-    const btn = document.createElement('button');
-    btn.id = 'jollyDiagBtn';
-    btn.textContent = '🩺';
-    btn.title = 'Diaqnostika';
-    btn.onclick = openModal;
-    document.body.appendChild(btn);
-  }
-
   async function openModal() {
     ensureStyles();
     let modal = document.getElementById('jollyDiagModal');
@@ -184,7 +160,7 @@ const JollyDiagReport = (() => {
       modal.id = 'jollyDiagModal';
       modal.innerHTML = `
         <div id="jollyDiagPanel">
-          <h3>🩺 Diaqnostika Hesabatı</h3>
+          <h3>📋 Xəta Hesabatı</h3>
           <pre id="jollyDiagText">Hazırlanır…</pre>
           <div id="jollyDiagActions">
             <button id="jollyDiagCopyBtn">📋 Kopyala</button>
@@ -232,14 +208,6 @@ const JollyDiagReport = (() => {
       document.body.removeChild(ta);
       ok ? done() : fail();
     } catch (e) { fail(); }
-  }
-
-  /* ---------------- Başlat ---------------- */
-  function init() { setTimeout(injectButton, 1500); }
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    init();
-  } else {
-    window.addEventListener('DOMContentLoaded', init);
   }
 
   return { buildReport, openModal };
