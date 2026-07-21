@@ -5,10 +5,17 @@
    Qəbul Studio-ya girmədən, birbaşa "Mal Qəbul" səbətinə əlavə
    etmək üçün (JollyReceiving.quickAddToBasket çağırır).
 
-   YENİ (2026-07-21): Zəncirvari axtarış filtri — axtarış qutusuna
-   "corab" yazanda nəticələr çıxır, altında YALNIZ o nəticələrin
-   içindəki firmaların çipləri görünür (məs. "Mariya"); ona basanda
-   nəticələr daha da daralır. "Daxilində filtrlə" zolağı.
+   YENİ (2026-07-21):
+   1) Zəncirvari sərbəst-mətn filtri — axtarış qutusuna istənilən
+      söz yazıb Enter basırsan, o "zəncirə" əlavə olunur, nəticə
+      daralır; üstünə YENİ söz yazıb yenə Enter — daha da daralır,
+      sonsuz dərinlikdə ("Pink House" → "Dırnaq əti üçün güllü yağ").
+      Aşağıda o an nəticələrin içindəki firmalar da təklif kimi çıxır,
+      toxunmaqla zəncirə əlavə olunur.
+   2) "⚙️ Ətraflı Axtarış" paneli — bütün axtarış üsullarını (ad,
+      rəng, etiket, firma, qrup, yer, tədarükçü, status, barkod,
+      barkodun son 4 rəqəmi, xüsusi kod, model/no kodu, qiymət
+      aralığı, şəklə görə, səslə) TEK bir yerdə birləşdirir.
    ============================================================ */
 
 const JollyProducts = (() => {
@@ -83,10 +90,11 @@ const JollyProducts = (() => {
     return `
       <div class="glass command-bar" onclick="if(event.target.tagName!=='INPUT'){}">
         <span style="opacity:.6">🔎</span>
-        <input id="homeSearch" placeholder="Ad, kod, barkod, firma ilə axtar..." oninput="JollyProducts.liveSearch(this.value)">
+        <input id="homeSearch" placeholder="Ad, kod, barkod, firma ilə axtar... (Enter = zəncirə əlavə et)" oninput="JollyProducts.liveSearch(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.commitChainTerm(this.value);}">
         <button class="mic-btn" onclick="JollyProducts.voiceSearch()">🎤</button>
         <button class="scan-btn" onclick="JollyProducts.scanSearch()">▦</button>
         <button class="scan-btn" title="Şəkillə axtar" onclick="JollyProducts.photoSearch()">📷</button>
+        <button class="scan-btn" title="Ətraflı Axtarış" onclick="JollyProducts.openAdvancedSearch()">⚙️</button>
       </div>
 
       <div class="chip-row" style="margin-bottom:6px;" id="homeFilterChips">
@@ -116,7 +124,7 @@ const JollyProducts = (() => {
     if (sc) { const s = SORTS.find(x => x.key === homeState.sort); if (s) sc.textContent = s.label; }
   }
 
-  let homeState = { filter: null, sort: 'new', chainBrand: null, baseResults: null };
+  let homeState = { filter: null, sort: 'new', chain: [] };
   const SORTS = [
     { key: 'new', label: '↕️ Sıra: Yeni', fn: (a,b) => (b.createdAt||0)-(a.createdAt||0) },
     { key: 'name', label: '↕️ Sıra: Ad (A-Z)', fn: (a,b) => String(a.name||'').localeCompare(String(b.name||''), 'az') },
@@ -149,8 +157,7 @@ const JollyProducts = (() => {
 
   function homeFilter(f, chipEl) {
     homeState.filter = (homeState.filter === f) ? null : f;
-    homeState.chainBrand = null;
-    removeChainBar();
+    resetChain();
     document.querySelectorAll('#homeFilterChips .chip').forEach(c => c.classList.remove('chip-active'));
     if (homeState.filter && chipEl) chipEl.classList.add('chip-active');
     if (typeof JollySound !== 'undefined') JollySound.tap();
@@ -169,64 +176,233 @@ const JollyProducts = (() => {
   let _searchDebounce = null;
   function liveSearch(q) {
     if (_searchDebounce) clearTimeout(_searchDebounce);
-    _searchDebounce = setTimeout(() => runSearch(q), 250);
+    _searchDebounce = setTimeout(() => {
+      if (!q && !homeState.chain.length) {
+        removeChainBar(); removeSuggestBar();
+        afterHomeRender();
+        return;
+      }
+      applyChainSearch(q);
+    }, 250);
   }
 
-  function runSearch(q) {
-    const container = document.getElementById('homeProductList');
+  // ────────────────────────────────────────────────────────────
+  // ZƏNCİRVARİ SƏRBƏST-MƏTN FİLTRİ
+  // homeState.chain = ["Pink House", "Dırnaq əti üçün güllü yağ", ...]
+  // Hər söz JollyDB.Products.search() ilə axtarılır, nəticələr
+  // KƏSİŞMƏ (AND) ilə birləşdirilir — hər yeni söz daha da daraldır.
+  // ────────────────────────────────────────────────────────────
+  function chainedProducts(liveTerm) {
+    let base = JollyDB.Products.all();
+    const terms = homeState.chain.slice();
+    if (liveTerm && liveTerm.trim()) terms.push(liveTerm.trim());
+    terms.forEach(term => {
+      const matches = JollyDB.Products.search(term);
+      const idSet = new Set(matches.map(p => p.id));
+      base = base.filter(p => idSet.has(p.id));
+    });
+    return base;
+  }
+
+  function applyChainSearch(liveTerm) {
+    const results = chainedProducts(liveTerm);
+    renderChainSuggestChips(results);
     const titleEl = document.querySelector('.section-title');
-    homeState.chainBrand = null; // yeni axtarışda əvvəlki zəncir sıfırlanır
-    if (!q) {
-      if (titleEl) titleEl.firstChild.textContent = 'Son əlavə edilənlər ';
-      removeChainBar();
-      afterHomeRender();
-      return;
+    if (titleEl) {
+      if (titleEl.firstChild && titleEl.firstChild.nodeType === 3) titleEl.firstChild.textContent = `Nəticələr (${results.length}) `;
+      else titleEl.textContent = `Nəticələr (${results.length})`;
     }
-    const results = JollyDB.Products.search(q);
-    renderChainBar(results);
-    if (titleEl) titleEl.firstChild.textContent = `Nəticələr (${results.length}) `;
-    renderList(container, results);
+    renderList(document.getElementById('homeProductList'), results);
   }
 
-  // ── Zəncirvari filtr: axtarış nəticəsinin İÇİNDƏKİ firmalar üzrə
-  // əlavə çip zolağı göstərir. Bir firmaya basanda nəticə daha da
-  // daralır ("corab" axtar → "Mariya" bas → yalnız Mariya corabları). ──
-  function renderChainBar(results) {
-    homeState.baseResults = results;
-    const brandCounts = {};
-    (results || []).forEach(p => { if (p.brand) brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1; });
-    const brands = Object.entries(brandCounts).sort((a, b) => b[1] - a[1]);
+  function commitChainTerm(term) {
+    if (!term || !term.trim()) return;
+    homeState.chain.push(term.trim());
+    const input = document.getElementById('homeSearch');
+    if (input) input.value = '';
+    if (typeof JollySound !== 'undefined') JollySound.tap();
+    renderChainChips();
+    applyChainSearch('');
+  }
+
+  function removeChainTerm(idx) {
+    homeState.chain.splice(idx, 1);
+    renderChainChips();
+    const input = document.getElementById('homeSearch');
+    applyChainSearch(input ? input.value : '');
+  }
+
+  function clearChain() {
+    homeState.chain = [];
+    removeChainBar();
+    removeSuggestBar();
+    const input = document.getElementById('homeSearch');
+    if (input) input.value = '';
+    afterHomeRender();
+  }
+
+  function resetChain() {
+    homeState.chain = [];
+    removeChainBar();
+    removeSuggestBar();
+  }
+
+  function renderChainChips() {
     const existing = document.getElementById('chainFilterBar');
-    if (!brands.length) { if (existing) existing.remove(); return; }
+    if (!homeState.chain.length) { if (existing) existing.remove(); return; }
     const html = `
       <div class="chip-row" id="chainFilterBar" style="margin-bottom:6px;align-items:center;">
-        <span class="muted" style="font-size:11px;margin-right:2px;">Daxilində filtrlə:</span>
-        ${brands.map(([b, c]) => `<span class="chip ${homeState.chainBrand === b ? 'chip-active' : ''}" onclick="JollyProducts.applyChainBrand('${escapeHtml(b)}', this)">🏭 ${escapeHtml(b)} (${c})</span>`).join('')}
+        <span class="muted" style="font-size:11px;margin-right:2px;">Zəncir:</span>
+        ${homeState.chain.map((term, i) => `<span class="chip chip-active">${escapeHtml(term)} <span onclick="JollyProducts.removeChainTerm(${i})" style="margin-left:5px;cursor:pointer;">✕</span></span>`).join('')}
+        <span class="chip" style="opacity:.75;" onclick="JollyProducts.clearChain()">🗑 Təmizlə</span>
       </div>`;
-    if (existing) {
-      existing.outerHTML = html;
-    } else {
+    if (existing) { existing.outerHTML = html; }
+    else {
       const searchBar = document.querySelector('.command-bar');
       if (searchBar) searchBar.insertAdjacentHTML('afterend', html);
     }
   }
 
-  function removeChainBar() {
-    const bar = document.getElementById('chainFilterBar');
-    if (bar) bar.remove();
+  // Cari (zəncirlə daralmış) nəticələrin içindəki firmaları təklif kimi göstər —
+  // toxunmaqla birbaşa zəncirə əlavə olunur (bir addım da daralt).
+  function renderChainSuggestChips(results) {
+    const counts = {};
+    (results || []).forEach(p => { if (p.brand) counts[p.brand] = (counts[p.brand] || 0) + 1; });
+    const brands = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const existing = document.getElementById('suggestFilterBar');
+    const allCount = JollyDB.Products.all().length;
+    if (!brands.length || results.length === allCount) { if (existing) existing.remove(); return; }
+    const html = `
+      <div class="chip-row" id="suggestFilterBar" style="margin-bottom:6px;">
+        <span class="muted" style="font-size:11px;margin-right:2px;">Daxilində:</span>
+        ${brands.map(([b, c]) => `<span class="chip" onclick="JollyProducts.commitChainTerm('${escapeHtml(b)}')">🏭 ${escapeHtml(b)} (${c})</span>`).join('')}
+      </div>`;
+    if (existing) { existing.outerHTML = html; }
+    else {
+      const chainBar = document.getElementById('chainFilterBar');
+      const searchBar = document.querySelector('.command-bar');
+      const anchor = chainBar || searchBar;
+      if (anchor) anchor.insertAdjacentHTML('afterend', html);
+    }
   }
 
-  function applyChainBrand(brand, chipEl) {
-    homeState.chainBrand = (homeState.chainBrand === brand) ? null : brand;
-    document.querySelectorAll('#chainFilterBar .chip').forEach(c => c.classList.remove('chip-active'));
-    if (homeState.chainBrand && chipEl) chipEl.classList.add('chip-active');
-    if (typeof JollySound !== 'undefined') JollySound.tap();
+  function removeChainBar() { const b = document.getElementById('chainFilterBar'); if (b) b.remove(); }
+  function removeSuggestBar() { const b = document.getElementById('suggestFilterBar'); if (b) b.remove(); }
 
-    const base = homeState.baseResults || [];
-    const filtered = homeState.chainBrand ? base.filter(p => p.brand === homeState.chainBrand) : base;
+  // ────────────────────────────────────────────────────────────
+  // ƏTRAFLI AXTARIŞ PANELİ — bütün axtarış üsulları tək yerdə
+  // ────────────────────────────────────────────────────────────
+  function openAdvancedSearch() {
+    let overlay = document.getElementById('advSearchOverlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'advSearchOverlay';
+    overlay.className = 'qa-overlay';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAdvancedSearch(); });
+
+    const opts = (list) => list.map(x => `<option>${escapeHtml(x.name)}</option>`).join('');
+
+    overlay.innerHTML = `
+      <div class="glass qa-sheet" style="max-height:85vh;overflow-y:auto;">
+        <div class="row between" style="margin-bottom:12px;">
+          <div class="qa-title" style="margin:0;">⚙️ Ətraflı Axtarış</div>
+          <button class="icon-btn" onclick="JollyProducts.closeAdvancedSearch()">✕</button>
+        </div>
+
+        <div class="row" style="gap:8px;margin-bottom:16px;">
+          <button class="btn btn-ghost" style="flex:1;" onclick="JollyProducts.closeAdvancedSearch();JollyProducts.photoSearch();">📷 Şəklə görə</button>
+          <button class="btn btn-ghost" style="flex:1;" onclick="JollyProducts.closeAdvancedSearch();JollyProducts.voiceSearch();">🎤 Səslə</button>
+        </div>
+
+        <div class="field"><label>İçindəki hərflərə görə (ümumi)</label><input id="adv_text" placeholder="istənilən sahədə axtar..."></div>
+        <div class="field"><label>Ad</label><input id="adv_name" placeholder="məhsul adı..."></div>
+        <div class="field"><label>Rəng</label><input id="adv_color" placeholder="məs. qara"></div>
+
+        <div class="field"><label>Etiket</label><select id="adv_tag"><option value="">— hamısı —</option>${opts(JollyDB.Tags.all())}</select></div>
+        <div class="field"><label>Firma</label><select id="adv_brand"><option value="">— hamısı —</option>${opts(JollyDB.Brands.all())}</select></div>
+        <div class="field"><label>Qrup</label><select id="adv_group"><option value="">— hamısı —</option>${opts(JollyDB.Groups.all())}</select></div>
+        <div class="field"><label>Ref yeri</label><select id="adv_location"><option value="">— hamısı —</option>${opts(JollyDB.Locations.all())}</select></div>
+        <div class="field"><label>Tədarükçü</label><select id="adv_supplier"><option value="">— hamısı —</option>${opts(JollyDB.Suppliers.all())}</select></div>
+        <div class="field"><label>Status</label><select id="adv_status"><option value="">— hamısı —</option>${opts(JollyDB.Statuses.all())}</select></div>
+
+        <div class="field"><label>Barkod (tam və ya hissə)</label><input id="adv_barcode" inputmode="numeric" placeholder="barkod..."></div>
+        <div class="field"><label>Barkodun son 4 rəqəmi</label><input id="adv_last4" inputmode="numeric" maxlength="4" placeholder="0000"></div>
+        <div class="field"><label>Xüsusi kod</label><input id="adv_mainCode" placeholder="məs. 545"></div>
+        <div class="field"><label>Model / No kodu</label><input id="adv_extraCodeValue" placeholder="məs. 128128"></div>
+
+        <div class="field-row">
+          <div class="field"><label>Qiymət (min)</label><input id="adv_priceMin" type="number" step="0.01" placeholder="0"></div>
+          <div class="field"><label>Qiymət (max)</label><input id="adv_priceMax" type="number" step="0.01" placeholder="999"></div>
+        </div>
+
+        <div class="row" style="gap:8px;margin-top:8px;">
+          <button class="btn btn-ghost" style="flex:1;" onclick="JollyProducts.clearAdvancedFields()">🗑 Təmizlə</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="JollyProducts.applyAdvancedSearch()">🔍 Axtar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('on'));
+  }
+
+  function closeAdvancedSearch() {
+    const overlay = document.getElementById('advSearchOverlay');
+    if (overlay) { overlay.classList.remove('on'); setTimeout(() => overlay.remove(), 200); }
+  }
+
+  function clearAdvancedFields() {
+    ['adv_text', 'adv_name', 'adv_color', 'adv_barcode', 'adv_last4', 'adv_mainCode', 'adv_extraCodeValue', 'adv_priceMin', 'adv_priceMax']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['adv_tag', 'adv_brand', 'adv_group', 'adv_location', 'adv_supplier', 'adv_status']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  }
+
+  function applyAdvancedSearch() {
+    const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const f = {
+      text: val('adv_text').toLowerCase(),
+      name: val('adv_name').toLowerCase(),
+      color: val('adv_color').toLowerCase(),
+      tag: val('adv_tag'),
+      brand: val('adv_brand'),
+      group: val('adv_group'),
+      location: val('adv_location'),
+      supplier: val('adv_supplier'),
+      status: val('adv_status'),
+      barcode: val('adv_barcode'),
+      last4: val('adv_last4'),
+      mainCode: val('adv_mainCode').toLowerCase(),
+      extraCodeValue: val('adv_extraCodeValue').toLowerCase(),
+      priceMin: val('adv_priceMin'),
+      priceMax: val('adv_priceMax'),
+    };
+
+    let items = JollyDB.Products.all();
+    if (f.text) items = items.filter(p => JSON.stringify(p).toLowerCase().includes(f.text));
+    if (f.name) items = items.filter(p => (p.name || '').toLowerCase().includes(f.name));
+    if (f.color) items = items.filter(p => (p.color || '').toLowerCase().includes(f.color));
+    if (f.tag) items = items.filter(p => (p.filterTags || []).includes(f.tag));
+    if (f.brand) items = items.filter(p => p.brand === f.brand);
+    if (f.group) items = items.filter(p => p.group === f.group);
+    if (f.location) items = items.filter(p => p.location === f.location);
+    if (f.supplier) items = items.filter(p => p.supplier === f.supplier);
+    if (f.status) items = items.filter(p => p.status === f.status);
+    if (f.barcode) items = items.filter(p => (p.barcodes || []).some(b => b.includes(f.barcode)));
+    if (f.last4) items = items.filter(p => (p.last4 || '') === f.last4 || (p.barcodes || []).some(b => b.slice(-4) === f.last4));
+    if (f.mainCode) items = items.filter(p => (p.mainCode || '').toLowerCase().includes(f.mainCode));
+    if (f.extraCodeValue) items = items.filter(p => (p.extraCodeValue || '').toLowerCase().includes(f.extraCodeValue));
+    if (f.priceMin) items = items.filter(p => p.price != null && p.price !== '' && parseFloat(p.price) >= parseFloat(f.priceMin));
+    if (f.priceMax) items = items.filter(p => p.price != null && p.price !== '' && parseFloat(p.price) <= parseFloat(f.priceMax));
+
+    closeAdvancedSearch();
+    homeState.filter = null;
+    resetChain();
+    const input = document.getElementById('homeSearch');
+    if (input) input.value = '';
     const titleEl = document.querySelector('.section-title');
-    if (titleEl) titleEl.firstChild.textContent = `Nəticələr (${filtered.length}) `;
-    renderList(document.getElementById('homeProductList'), filtered);
+    if (titleEl) titleEl.textContent = `Ətraflı axtarış: ${items.length} məhsul`;
+    renderList(document.getElementById('homeProductList'), items);
+    if (typeof Toast !== 'undefined') Toast.success(`${items.length} nəticə tapıldı`);
   }
 
   function voiceSearch() {
@@ -1331,7 +1507,8 @@ const JollyProducts = (() => {
     renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
     applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
-    applyChainBrand,
+    commitChainTerm, removeChainTerm, clearChain,
+    openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
