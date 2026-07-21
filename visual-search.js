@@ -6,6 +6,11 @@
 const JollyVisualSearch = (() => {
   const HASH_SIZE = 8; // 8x8 = 64-bit hash
 
+  function _denied() {
+    if (window.Toast) Toast.error('❌ Şəkillə axtarış üçün icazəniz yoxdur');
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+  }
+
   function computeHashFromImage(img) {
     const canvas = document.createElement('canvas');
     canvas.width = HASH_SIZE; canvas.height = HASH_SIZE;
@@ -67,6 +72,9 @@ const JollyVisualSearch = (() => {
   }
 
   async function captureAndSearch(onResults) {
+    // İcazə yoxlaması — search.photo
+    if (typeof POS !== 'undefined' && !POS.can('search.photo')) { _denied(); return; }
+
     const overlay = document.createElement('div');
     overlay.className = 'scan-overlay vs-scanning';
     overlay.id = 'visualScanOverlay';
@@ -114,6 +122,9 @@ const JollyVisualSearch = (() => {
 
   /* ---------- Qalereyadan şəkil seçib müqayisə et ---------- */
   function pickAndSearch(onResults) {
+    // İcazə yoxlaması — search.photo
+    if (typeof POS !== 'undefined' && !POS.can('search.photo')) { _denied(); return; }
+
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'image/*';
     input.onchange = (e) => {
