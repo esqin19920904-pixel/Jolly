@@ -3,13 +3,15 @@
    OTA-dan asılı deyil (ayrıca Firebase node), amma düyməsi
    Studio → Yeniləmələr panelinin içindədir (jolly-ota.js-də).
    Admin göndərəndə bütün açıq telefonlarda tam ekran animasiya
-   açılır: Matrix yağışı arxa planda + mətn yazı maşını effekti,
-   üstünə "jolly-nagarajax.mp4" faylının səsi çalınır.
+   açılır: Matrix yağışı (canvas, yüngül) + mətn yazı maşını
+   effekti, üstünə "jolly-nagarajax.mp4" faylının səsi çalınır.
 
-   DÜZƏLİŞ: səs indi TOXUNMA ANINDA, şəbəkə sorğusundan ƏVVƏL
-   çalınır (brauzerlər gecikmiş çalmanı səssizcə bloklayır).
-   Həm də səhifədə hər hansı ilk toxunuşda səs "kilidi açılır" ki,
-   siqnalla özündən gələn (toxunmasız) çalma da işləmə şansı artsın.
+   DÜZƏLİŞ (performans): Matrix yağışı əvvəllər hər 3 saniyədə
+   onlarla DOM elementini (text-shadow ilə) yenidən yaradırdı —
+   bu, zəif telefonlarda bütün proqramı dondururdu. İndi tək bir
+   <canvas> üzərində, DOM-a toxunmadan çəkilir — qat-qat yüngül.
+
+   DÜZƏLİŞ: səs toxunma anında, şəbəkə sorğusundan ƏVVƏL çalınır.
    ============================================================ */
 const JollyAnnounce = (() => {
   const DB_URL = "https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app";
@@ -47,7 +49,6 @@ const JollyAnnounce = (() => {
 
   /* ---------------- Səs ---------------- */
   let _audioUnlocked = false;
-
   function _unlockAudioOnce() {
     if (_audioUnlocked) return;
     _audioUnlocked = true;
@@ -58,7 +59,6 @@ const JollyAnnounce = (() => {
       if (p && p.then) p.then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
     } catch (e) {}
   }
-  // səhifədə İSTƏNİLƏN ilk toxunuşda səs kilidini aç (bir dəfə)
   ['touchstart', 'click'].forEach(ev => {
     document.addEventListener(ev, _unlockAudioOnce, { once: true, passive: true });
   });
@@ -68,18 +68,13 @@ const JollyAnnounce = (() => {
       const audio = new Audio(SOUND_URL);
       audio.volume = 1.0;
       const p = audio.play();
-      if (p && p.catch) {
-        p.catch(() => {
-          // brauzer bloklayıb (toxunma yoxdur) — animasiya səssiz davam edir
-        });
-      }
+      if (p && p.catch) p.catch(() => {});
     } catch (e) {}
   }
 
   /* ---------------- Göndər ---------------- */
   async function send() {
-    // ƏVVƏLCƏ animasiya+səs — TOXUNMA ANINDA, heç bir gözləmə olmadan
-    playOverlay();
+    playOverlay(); // ƏVVƏLCƏ — toxunma anında, gözləmə olmadan
     try {
       const token = await _getToken();
       const res = await fetch(`${DB_URL}/${SIGNAL_NODE}.json?auth=${token}`, {
@@ -124,7 +119,7 @@ const JollyAnnounce = (() => {
     })();
   }
 
-  /* ---------------- Tam ekran animasiya: Matrix + Yazı maşını ---------------- */
+  /* ---------------- Stillər ---------------- */
   function ensureStyles() {
     if (document.getElementById('jollyAnnounceStyle')) return;
     const style = document.createElement('style');
@@ -141,15 +136,12 @@ const JollyAnnounce = (() => {
         animation: jaTwinkle 2.2s ease-in-out infinite; }
       @keyframes jaTwinkle{ 0%,100%{opacity:.15;} 50%{opacity:.85;} }
 
-      #jaRain{ position:absolute; inset:0; z-index:4; overflow:hidden; }
-      .ja-rain-col{ position:absolute; top:-100vh; font-family:monospace; font-size:15px; color:#8fffb0; line-height:1.15;
-        text-shadow:0 0 6px rgba(143,255,176,.6); white-space:pre; animation: jaRainFall linear infinite; }
-      @keyframes jaRainFall{ to{ transform:translateY(200vh); } }
+      #jaRainCanvas{ position:absolute; inset:0; z-index:4; }
 
       #jaTyped{
         position:relative;z-index:5;text-align:center;padding:0 24px;
         font-size:clamp(24px,7vw,44px);font-weight:900;line-height:1.35;white-space:pre-wrap;
-        color:#f4d777;text-shadow:0 0 22px rgba(212,175,55,.5), 0 0 6px rgba(143,255,176,.3);
+        color:#f4d777;text-shadow:0 0 18px rgba(212,175,55,.45);
         min-height:1em;
       }
       #jaTyped .ja-cursor{ display:inline-block;width:3px;background:#f4d777;margin-left:2px;animation: jaBlink .9s steps(1) infinite; }
@@ -162,41 +154,67 @@ const JollyAnnounce = (() => {
     document.head.appendChild(style);
   }
 
+  /* ---------------- Matrix yağışı — canvas (yüngül) ---------------- */
   const _RAIN_CHARS = 'アカサタナ01ﾊﾏﾔﾗﾜ京都愛金運夢火水木';
+  let _rainRAF = null;
 
-  function spawnRain(container) {
-    container.innerHTML = '';
-    const cols = Math.ceil(window.innerWidth / 20);
-    for (let i = 0; i < cols; i++) {
-      const col = document.createElement('div');
-      col.className = 'ja-rain-col';
-      let str = '';
-      const len = 20 + Math.floor(Math.random() * 14);
-      for (let j = 0; j < len; j++) str += _RAIN_CHARS[Math.floor(Math.random() * _RAIN_CHARS.length)] + '\n';
-      col.textContent = str;
-      col.style.left = (i * 20) + 'px';
-      col.style.animationDuration = (2.4 + Math.random() * 1.8) + 's';
-      col.style.animationDelay = (Math.random() * -2.5) + 's';
-      col.style.opacity = 0.3 + Math.random() * 0.4;
-      container.appendChild(col);
+  function startCanvasRain(canvas) {
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let w = window.innerWidth, h = window.innerHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const fontSize = 16;
+    const colCount = Math.floor(w / fontSize);
+    const drops = new Array(colCount).fill(0).map(() => Math.random() * -30);
+
+    let lastTime = 0;
+    const frameInterval = 60; // ~16fps — kifayət qədər axıcı, yüngül
+
+    function frame(ts) {
+      _rainRAF = requestAnimationFrame(frame);
+      if (ts - lastTime < frameInterval) return;
+      lastTime = ts;
+
+      ctx.fillStyle = 'rgba(5,6,12,0.18)';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = '#8fffb0';
+      ctx.font = fontSize + 'px monospace';
+      for (let i = 0; i < colCount; i++) {
+        const ch = _RAIN_CHARS[Math.floor(Math.random() * _RAIN_CHARS.length)];
+        ctx.fillText(ch, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > h && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
     }
+    _rainRAF = requestAnimationFrame(frame);
   }
 
+  function stopCanvasRain() {
+    if (_rainRAF) { cancelAnimationFrame(_rainRAF); _rainRAF = null; }
+  }
+
+  /* ---------------- Tam ekran overlay ---------------- */
   function playOverlay() {
     ensureStyles();
     let old = document.getElementById('jollyAnnounceOverlay');
-    if (old) old.remove();
+    if (old) { stopCanvasRain(); old.remove(); }
 
     const el = document.createElement('div');
     el.id = 'jollyAnnounceOverlay';
     el.innerHTML = `
-      <div id="jaRain"></div>
+      <canvas id="jaRainCanvas"></canvas>
       <div id="jaTyped"></div>
       <div class="ja-hint">✦ ekrana toxun, bağla ✦</div>
     `;
     document.body.appendChild(el);
 
-    for (let s = 0; s < 40; s++) {
+    for (let s = 0; s < 20; s++) {
       const st = document.createElement('div');
       st.className = 'ja-star';
       st.style.left = Math.random() * 100 + 'vw';
@@ -207,12 +225,7 @@ const JollyAnnounce = (() => {
 
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
     playSound();
-
-    spawnRain(el.querySelector('#jaRain'));
-    const rainRefresh = setInterval(() => {
-      if (!document.getElementById('jollyAnnounceOverlay')) { clearInterval(rainRefresh); return; }
-      if (Math.random() < 0.4) spawnRain(el.querySelector('#jaRain'));
-    }, 3000);
+    startCanvasRain(el.querySelector('#jaRainCanvas'));
 
     const typed = el.querySelector('#jaTyped');
     const full = 'Gör indi qaqan\nnağarajax 😅😅😅';
@@ -224,18 +237,18 @@ const JollyAnnounce = (() => {
       if (i >= full.length) clearInterval(typeIv);
     }, 60);
 
-    el.addEventListener('click', () => close(el, rainRefresh));
-    setTimeout(() => close(el, rainRefresh), 9000);
+    el.addEventListener('click', () => close(el));
+    setTimeout(() => close(el), 9000);
   }
 
-  function close(el, rainRefresh) {
-    if (rainRefresh) clearInterval(rainRefresh);
+  function close(el) {
+    stopCanvasRain();
     if (!el || !el.parentNode) return;
     el.classList.remove('show');
     setTimeout(() => el.remove(), 350);
   }
 
-  /* ---------------- Başlat (yalnız siqnal dinləyicisi — düymə OTA panelindədir) ---------------- */
+  /* ---------------- Başlat ---------------- */
   function init() {
     setTimeout(listen, 1500);
   }
