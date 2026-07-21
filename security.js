@@ -1,5 +1,10 @@
 /* ============================================================
    JOLLY Security v3 — Auth + Session + Data Lock
+
+   YENİ (2026-07-21): Fəaliyyətsizlikdən sonra avtomatik kilidlənmə —
+   toxunma/klik/klaviatura fəaliyyəti izlənir, seçilmiş müddət ərzində
+   heç bir fəaliyyət olmasa, sessiya avtomatik kilidlənir (lockNow()).
+   Security Studio-da "Avtomatik kilid" seçimi əlavə olundu.
    ============================================================ */
 const JollySecurity = (() => {
   const CFG_KEY      = 'jolly_security_cfg';
@@ -21,6 +26,7 @@ const JollySecurity = (() => {
       viewerEnabled: false,
       viewerPinHash: null,
       recoveryHash: null,
+      autoLockMinutes: 0, // 0 = söndürülüb
     });
   }
   function saveCfg(patch) { JollyDB.write(CFG_KEY, { ...getCfg(), ...patch }); }
@@ -216,8 +222,50 @@ const JollySecurity = (() => {
     }
   }
 
+  // ── FƏALİYYƏTSİZLİKDƏN SONRA AVTOMATİK KİLİD (#23) ──────
+  // toxunma/klik/klaviatura/sürüşdürmə hər hansı biri "fəaliyyət"
+  // sayılır. Seçilmiş dəqiqə ərzində heç biri baş verməsə, aktiv
+  // sessiya varsa (admin və ya user) özü avtomatik kilidlənir.
+  let _lastActivity = Date.now();
+  let _autoLockTimer = null;
+
+  function _markActivity() { _lastActivity = Date.now(); }
+
+  function _initActivityTracking() {
+    if (window._jollyActivityTrackingInit) return;
+    window._jollyActivityTrackingInit = true;
+    ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, _markActivity, { passive: true });
+    });
+  }
+
+  function _startAutoLockWatcher() {
+    if (_autoLockTimer) return;
+    _initActivityTracking();
+    _autoLockTimer = setInterval(() => {
+      const cfg = getCfg();
+      const minutes = cfg.autoLockMinutes || 0;
+      if (minutes <= 0) return; // söndürülüb
+      if (!isUnlocked()) return; // artıq kilidlidir
+      const idleMs = Date.now() - _lastActivity;
+      if (idleMs >= minutes * 60 * 1000) {
+        _markActivity(); // təkrar tetiklənməsin
+        if (window.Toast) Toast.info(`🔒 ${minutes} dəqiqə fəaliyyətsizlikdən sonra avtomatik kilidləndi`);
+        lockNow();
+      }
+    }, 20000); // hər 20 saniyədə bir yoxla
+  }
+
+  function setAutoLockMinutes(minutes) {
+    saveCfg({ autoLockMinutes: parseInt(minutes, 10) || 0 });
+    _markActivity();
+    Toast.success(minutes > 0 ? `Avtomatik kilid: ${minutes} dəqiqə` : 'Avtomatik kilid söndürüldü');
+    JollyRouter.go('#/studios/security');
+  }
+
   // ── İnit ─────────────────────────────────────────────────
   function init() {
+    _startAutoLockWatcher();
     const cfg = getCfg();
     if (!cfg.enabled) return;
 
@@ -258,6 +306,13 @@ const JollySecurity = (() => {
   function renderStudio() {
     if (isViewer()) { if (window.JollyRouter) JollyRouter.go('#/home'); return ''; }
     const cfg = getCfg();
+    const autoLockOptions = [
+      { v: 0, label: 'Söndür' },
+      { v: 2, label: '2 dəqiqə' },
+      { v: 5, label: '5 dəqiqə' },
+      { v: 10, label: '10 dəqiqə' },
+      { v: 30, label: '30 dəqiqə' },
+    ];
     return `
       <div class="back-btn anim-slide" onclick="JollyRouter.go('#/home')">‹ Geri</div>
       <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:19px;">🔐 Security Studio</h2>
@@ -299,6 +354,15 @@ const JollySecurity = (() => {
           <span>🔢 User PIN ${cfg.viewerPinHash ? '✅' : '—'}</span>
           <span style="color:var(--accent-1);">›</span>
         </div>` : ''}
+      </div>
+
+      <!-- Avtomatik kilid -->
+      <div class="section-title">⏱️ Fəaliyyətsizlikdən sonra avtomatik kilid</div>
+      <div class="glass" style="padding:12px 14px;margin-bottom:14px;">
+        <select onchange="JollySecurity.setAutoLockMinutes(this.value)" style="width:100%;padding:10px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+          ${autoLockOptions.map(o => `<option value="${o.v}" ${cfg.autoLockMinutes === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        <p class="muted" style="font-size:11px;margin-top:8px;">Seçilmiş müddət ərzində toxunulmasa, tətbiq özü kilidlənir (Admin da, User da).</p>
       </div>
 
       <!-- Sessiya -->
@@ -526,5 +590,6 @@ const JollySecurity = (() => {
     toggleEnabled, toggleViewer,
     setupPin, confirmSetupPin, setupBiometric,
     genNewRecovery, disableAll, clearActivityLog,
+    setAutoLockMinutes,
   };
 })();
