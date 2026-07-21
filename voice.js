@@ -6,6 +6,13 @@ const JollyVoice = (() => {
   }
 
   function listen(onText, onError) {
+    // İcazə yoxlaması — search.voice
+    if (typeof POS !== 'undefined' && !POS.can('search.voice')) {
+      if (window.Toast) Toast.error('❌ Səsli axtarış üçün icazəniz yoxdur');
+      if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+      return;
+    }
+
     if (!isSupported()) {
       Toast.error('Bu cihazda səsli tanıma dəstəklənmir.');
       return;
