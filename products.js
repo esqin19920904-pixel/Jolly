@@ -46,6 +46,7 @@ const JollyProducts = (() => {
           ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
         </div>
         ${p.group ? `<div class="p-related" onclick="event.stopPropagation();JollyRouter.go('#/products?group=${encodeURIComponent(p.group)}')" style="font-size:10px;color:var(--accent-1);margin-top:5px;opacity:.85;">📦 ${escapeHtml(p.group)} qrupundan daha çox ›</div>` : ''}
+        ${p.brand ? `<div class="p-related" onclick="event.stopPropagation();JollyProducts.filterByBrandChain('${escapeHtml(p.brand)}')" style="font-size:10px;color:var(--accent-1);margin-top:3px;opacity:.85;">🏭 ${escapeHtml(p.brand)} firmasının bütün məhsulları ›</div>` : ''}
         ${expiryBadgeHtml(p)}
       </div>
     `;
@@ -73,6 +74,7 @@ const JollyProducts = (() => {
   }
 
   function renderList(container, products) {
+    if (!container) return;
     if (!products.length) {
       container.innerHTML = `
         <div class="empty-state">
@@ -419,23 +421,50 @@ const JollyProducts = (() => {
 
     // Panel istənilən səhifədən (Dashboard daxil) açıla bilər, amma nəticə
     // yalnız Axtarış (#/home) səhifəsindəki #homeProductList konteynerinə
-    // yazıla bilər — əvvəlcə ora keç, sonra nəticəni göstər.
+    // yazıla bilər. titleEl-i də YALNIZ container tapılanda toxunuruq —
+    // əks halda Dashboard-un öz başlığını səhvən üzərinə yazırdıq.
     const writeResults = () => {
+      const container = document.getElementById('homeProductList');
+      if (!container) return false;
       const input = document.getElementById('homeSearch');
       if (input) input.value = '';
       const titleEl = document.querySelector('.section-title');
       if (titleEl) titleEl.textContent = `Ətraflı axtarış: ${items.length} məhsul`;
-      const container = document.getElementById('homeProductList');
-      if (container) renderList(container, items);
+      renderList(container, items);
+      return true;
     };
 
-    if (document.getElementById('homeProductList')) {
-      writeResults();
+    if (writeResults()) {
+      // artıq Home səhifəsindəydik, dərhal yazıldı
     } else {
       JollyRouter.go('#/home');
-      setTimeout(writeResults, 60);
+      let tries = 0;
+      const poll = setInterval(() => {
+        tries++;
+        if (writeResults() || tries >= 15) clearInterval(poll);
+      }, 80);
     }
     if (typeof Toast !== 'undefined') Toast.success(`${items.length} nəticə tapıldı`);
+  }
+
+  // "Bu firmanın bütün məhsulları" — kart/detal səhifəsindən bir toxunuşla
+  // zəncirvari axtarışa (Home) keçir, firmanı ilk zəncir sözü kimi əlavə edir.
+  // Sonra istəyən "corab", "qara" kimi sözlərlə davam edib daralda bilər.
+  function filterByBrandChain(brand) {
+    homeState.filter = null;
+    resetChain();
+    const tryCommit = () => {
+      if (!document.getElementById('homeProductList')) return false;
+      commitChainTerm(brand);
+      return true;
+    };
+    if (tryCommit()) return;
+    JollyRouter.go('#/home');
+    let tries = 0;
+    const poll = setInterval(() => {
+      tries++;
+      if (tryCommit() || tries >= 15) clearInterval(poll);
+    }, 80);
   }
 
   function voiceSearch() {
@@ -659,7 +688,7 @@ const JollyProducts = (() => {
 
         <div class="section-title">Məlumat</div>
         <div class="glass" style="padding:4px 14px;">
-          ${infoRow('Firma', p.brand)}
+          ${p.brand ? `<div class="list-row" style="cursor:pointer;" onclick="JollyProducts.filterByBrandChain('${escapeHtml(p.brand)}')"><span>Firma</span><span class="mono" style="color:var(--accent-1);">${escapeHtml(p.brand)} — bütün məhsullar ›</span></div>` : infoRow('Firma', p.brand)}
           ${infoRow('Qrup', p.group)}
           ${infoRow('Yer / Rəf', p.location)}
           ${infoRow('Tədarükçü', p.supplier)}
@@ -1540,7 +1569,7 @@ const JollyProducts = (() => {
     renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
     applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
-    commitChainTerm, removeChainTerm, clearChain,
+    commitChainTerm, removeChainTerm, clearChain, filterByBrandChain,
     openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
