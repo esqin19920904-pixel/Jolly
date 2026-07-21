@@ -1075,6 +1075,13 @@ const JollyStudios = (() => {
       }
     } catch (e) {}
     const settings = JollyDB.getSettings();
+    const autoLockOptions = [
+      { v: 0, label: 'Söndür' },
+      { v: 2, label: '2 dəqiqə' },
+      { v: 5, label: '5 dəqiqə' },
+      { v: 10, label: '10 dəqiqə' },
+      { v: 30, label: '30 dəqiqə' },
+    ];
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 16px;font-size:19px;">🔐 Security Studio</h2>
       <div class="glass" style="padding:4px 14px;">
@@ -1088,8 +1095,23 @@ const JollyStudios = (() => {
           <span>Tam fəaliyyət jurnalı</span><span>›</span>
         </div>
       </div>
+
+      <div class="section-title">⏱️ Fəaliyyətsizlikdən sonra avtomatik kilid</div>
+      <div class="glass" style="padding:12px 14px;margin-bottom:14px;">
+        <select onchange="JollyStudios.toggleAutoLock(this.value)" style="width:100%;padding:10px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+          ${autoLockOptions.map(o => `<option value="${o.v}" ${(settings.autoLockMinutes || 0) === o.v ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        <p class="muted" style="font-size:11px;margin-top:8px;">PIN qoruması aktiv olduğu halda işləyir. Seçilmiş müddət ərzində toxunulmasa, tətbiq özü kilidlənir.</p>
+      </div>
+
       <p class="muted" style="font-size:12px;margin-top:12px;padding:0 4px;">Barmaq izi girişi cihaz dəstəyi olduqda gələcək yeniləmədə aktivləşəcək.</p>
     `;
+  }
+
+  function toggleAutoLock(minutes) {
+    const m = parseInt(minutes, 10) || 0;
+    JollyDB.setSettings({ autoLockMinutes: m });
+    Toast.success(m > 0 ? `Avtomatik kilid: ${m} dəqiqə` : 'Avtomatik kilid söndürüldü');
   }
 
   function hashPin(s) {
@@ -1176,7 +1198,7 @@ const JollyStudios = (() => {
     renderTheme, applyTheme, applySavedTheme, THEMES, toggleAnim, toggleSound, toggleVibrate, toggleFx,
     renderData, exportBackup, importBackup, saveSnapshot, restoreSnapshot, toggleBackupReminder,
     loadPersistStatus, requestPersist, exportAllImages,
-    renderSecurity, togglePinLock, viewActivityLog,
+    renderSecurity, togglePinLock, viewActivityLog, toggleAutoLock,
     renderReport,
     renderVoiceVision, startVisualSearchFromStudio, runOcr,
     renderAnalyticsStudio,
