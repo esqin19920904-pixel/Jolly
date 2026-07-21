@@ -9,6 +9,11 @@ const JollyOCR = (() => {
 
   const CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 
+  function _denied() {
+    if (window.Toast) Toast.error('❌ OCR üçün icazəniz yoxdur');
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+  }
+
   function loadLibrary() {
     return new Promise((resolve, reject) => {
       if (tesseractLoaded && window.Tesseract) return resolve();
@@ -52,6 +57,9 @@ const JollyOCR = (() => {
 
   /* Kamera aç, şəkil çək, OCR et */
   async function captureAndRead(onResult) {
+    // İcazə yoxlaması — ai.ocr
+    if (typeof POS !== 'undefined' && !POS.can('ai.ocr')) { _denied(); return; }
+
     const overlay = document.createElement('div');
     overlay.className = 'scan-overlay';
     overlay.id = 'ocrOverlay';
@@ -106,6 +114,9 @@ const JollyOCR = (() => {
 
   /* Qalereyadan şəkil seçib OCR et */
   function pickAndRead(onResult) {
+    // İcazə yoxlaması — ai.ocr
+    if (typeof POS !== 'undefined' && !POS.can('ai.ocr')) { _denied(); return; }
+
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'image/*';
     input.onchange = (e) => {
