@@ -73,11 +73,14 @@ const JollyAdminStudio = (() => {
     const colorDot = it.color ? `<span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${it.color};margin-right:8px;"></span>` : '';
     const codePrefix = it.code ? `<span class="mono muted" style="margin-right:6px;">${JollyProducts.escapeHtml(it.code)} ·</span>` : '';
     const groupIcon = (key === 'groups') ? `<span style="margin-right:6px;">${it.icon ? JollyProducts.escapeHtml(it.icon) : '📦'}</span>` : '';
+    const minImagesBadge = (key === 'groups' && it.minImages > 0)
+      ? `<span class="mono muted" style="font-size:10.5px;margin-left:6px;">🖼️ min ${it.minImages}</span>` : '';
     return `
       <div class="list-row" draggable="true" data-id="${it.id}">
-        <span>${groupIcon}${colorDot}${codePrefix}${JollyProducts.escapeHtml(it.name)}</span>
+        <span>${groupIcon}${colorDot}${codePrefix}${JollyProducts.escapeHtml(it.name)}${minImagesBadge}</span>
         <span class="actions">
           ${key === 'groups' ? `<span onclick="JollyAdminStudio.editIcon('${it.id}')">🎨</span>` : ''}
+          ${key === 'groups' ? `<span onclick="JollyAdminStudio.editMinImages('${it.id}')">🖼️</span>` : ''}
           <span onclick="JollyAdminStudio.editItem('${key}','${it.id}')">✏️</span>
           <span onclick="JollyAdminStudio.deleteItem('${key}','${it.id}')">🗑️</span>
         </span>
@@ -93,6 +96,21 @@ const JollyAdminStudio = (() => {
     if (icon === null) return;
     JollyDB.Groups.update(id, { icon: icon.trim() || '📦' });
     Toast.success('İkon yeniləndi');
+    JollyRouter.go('#/studios/admin/groups');
+  }
+
+  // ── Kateqoriya üzrə minimum şəkil sayı qaydası — #26 ──
+  // Bu qrupdan olan məhsul saxlanılanda (products.js → submitForm),
+  // əgər şəkil sayı buradan az olarsa xəbərdarlıq edir (bloklamır,
+  // sadəcə xəbərdar edib təsdiq istəyir).
+  function editMinImages(id) {
+    const item = JollyDB.Groups.get(id);
+    if (!item) return;
+    const val = prompt(`"${item.name}" qrupu üçün minimum şəkil sayı (0 = tələb yoxdur):`, item.minImages || 0);
+    if (val === null) return;
+    const n = parseInt(val, 10);
+    JollyDB.Groups.update(id, { minImages: isNaN(n) || n < 0 ? 0 : n });
+    Toast.success(n > 0 ? `Minimum ${n} şəkil tələbi qoyuldu` : 'Tələb ləğv edildi');
     JollyRouter.go('#/studios/admin/groups');
   }
 
@@ -186,5 +204,5 @@ const JollyAdminStudio = (() => {
     }
   }
 
-  return { renderHome, renderList, addItem, editItem, deleteItem, editIcon, STORE_MAP };
+  return { renderHome, renderList, addItem, editItem, deleteItem, editIcon, editMinImages, STORE_MAP };
 })();
