@@ -154,6 +154,13 @@ const JollyCloud = (() => {
     return Math.floor(diff / 86400) + ' gün əvvəl';
   }
 
+  // "İndi onlayn" — heartbeat 60 saniyədə bir yeniləndiyi üçün, son 90
+  // saniyə ərzində görülübsə, cihaz "indi aktiv" sayılır (#29).
+  const ONLINE_THRESHOLD_MS = 90 * 1000;
+  function isDeviceOnlineNow(lastSeen) {
+    return !!lastSeen && (Date.now() - lastSeen) < ONLINE_THRESHOLD_MS;
+  }
+
   async function loadDevicesList() {
     const zone = document.getElementById('devicesListZone');
     if (!zone) return;
@@ -162,13 +169,17 @@ const JollyCloud = (() => {
       zone.innerHTML = '<div class="muted" style="padding:14px;">Cihaz məlumatı yoxdur (hələ sinxron olmayıb)</div>';
       return;
     }
-    zone.innerHTML = devices.map(d => `
+    zone.innerHTML = devices.map(d => {
+      const onlineNow = isDeviceOnlineNow(d.lastSeen);
+      const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${onlineNow ? '#29e0c9' : '#666'};margin-right:6px;"></span>`;
+      return `
       <div class="list-row">
-        <span>${d.isThis ? '📍 ' : '📱 '}${escDev(d.name || 'Naməlum cihaz')}${d.isThis ? ' <span class="muted" style="font-size:11px;">(bu cihaz)</span>' : ''}<br>
-          <span class="muted" style="font-size:11px;">${d.role === 'admin' ? '👑 Admin' : '👤 User'} · ${timeAgoDevice(d.lastSeen)}</span>
+        <span>${dot}${d.isThis ? '📍 ' : '📱 '}${escDev(d.name || 'Naməlum cihaz')}${d.isThis ? ' <span class="muted" style="font-size:11px;">(bu cihaz)</span>' : ''}<br>
+          <span class="muted" style="font-size:11px;">${d.role === 'admin' ? '👑 Admin' : '👤 User'} · ${onlineNow ? '<span style="color:#29e0c9;">İndi onlayn</span>' : timeAgoDevice(d.lastSeen)}</span>
         </span>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function renameThisDevice() {
@@ -354,6 +365,9 @@ const JollyCloud = (() => {
   function initAutoSync() {
     if (!enabled()) return;
     registerDevice(); // dəyişiklik olmasa belə, bu cihazı "aktiv" kimi qeydə al
+    // Heartbeat — tətbiq açıq qaldıqca hər 60 saniyədə bir lastSeen-i
+    // təzələyir ki, "İndi onlayn" statusu dəqiq olsun (#29).
+    setInterval(() => { registerDevice(); }, 60000);
     // hər DB yazısında sinxron planla — JollyDB.write-ı sarıyırıq
     const origWrite = JollyDB.write;
     JollyDB.write = function (key, value) {
