@@ -8,6 +8,12 @@
    botu (/search) məhsulu şəkillə göstərə bilsin. ƏSL, BÖYÜK
    şəkillər YENƏ DƏ buluda getmir (yalnız telefonda qalır) —
    yalnız kiçik "baxış üçün kifayət edən" nüsxə əlavə olunur.
+
+   YENİ (2026-07-21): Cihaz izləmə — hər telefon/tablet özünü
+   unikal ID ilə tanıyır, hər sinxronda `/jolly_devices/{id}`-ə
+   ad + rol + son görülmə vaxtını yazır. Cloud Studio-da "Qoşulan
+   cihazlar" siyahısı bunları göstərir (bu hesaba hansı cihazlar
+   qoşulub, hər biri nə vaxt aktiv olub).
    ============================================================ */
 
 const JollyCloud = (() => {
@@ -23,6 +29,7 @@ const JollyCloud = (() => {
 
   const BASE = firebaseConfig.databaseURL;
   const NODE = 'jolly'; // bulud düyünü: /jolly
+  const DEVICES_NODE = 'jolly_devices'; // hər cihaz üçün ayrıca düyün: /jolly_devices/{id}
 
   // ── Anonim giriş (Firebase Auth) ──────────────────────────
   // Rules "auth != null" tələb etdiyi üçün, hər sorğudan əvvəl
@@ -58,6 +65,120 @@ const JollyCloud = (() => {
     return s.cloudEnabled !== false; // standart açıq
   }
   function online() { return navigator.onLine; }
+
+  /* ---------- Cihaz izləmə — hər telefon özünü tanıdır ---------- */
+  function getDeviceId() {
+    let id;
+    try { id = localStorage.getItem('jolly_device_id'); } catch (e) {}
+    if (!id) {
+      id = 'dev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      try { localStorage.setItem('jolly_device_id', id); } catch (e) {}
+    }
+    return id;
+  }
+
+  function guessDeviceName() {
+    const ua = navigator.userAgent || '';
+    if (/Android/i.test(ua)) return 'Android telefon';
+    if (/iPhone/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua)) return 'iPad';
+    if (/Windows/i.test(ua)) return 'Windows kompüter';
+    if (/Macintosh/i.test(ua)) return 'Mac';
+    return 'Naməlum cihaz';
+  }
+
+  function getDeviceName() {
+    try {
+      const saved = localStorage.getItem('jolly_device_name');
+      if (saved && saved.trim()) return saved;
+    } catch (e) {}
+    return guessDeviceName();
+  }
+
+  function setDeviceName(name) {
+    try { localStorage.setItem('jolly_device_name', name); } catch (e) {}
+  }
+
+  function currentRole() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      if (sess && sess.role) return sess.role;
+    } catch (e) {}
+    return 'admin';
+  }
+
+  async function registerDevice() {
+    if (!online()) return;
+    try {
+      const token = await _getIdToken();
+      const body = {
+        name: getDeviceName(),
+        role: currentRole(),
+        lastSeen: Date.now(),
+        ua: (navigator.userAgent || '').slice(0, 80),
+      };
+      await fetch(`${BASE}/${DEVICES_NODE}/${getDeviceId()}.json?auth=${token}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      console.warn('[JollyCloud] Cihaz qeydiyyatı alınmadı:', e.message);
+    }
+  }
+
+  async function fetchDevices() {
+    if (!online()) return [];
+    try {
+      const token = await _getIdToken();
+      const res = await fetch(`${BASE}/${DEVICES_NODE}.json?auth=${token}`);
+      if (!res.ok) return [];
+      const obj = await res.json();
+      if (!obj) return [];
+      const myId = getDeviceId();
+      return Object.entries(obj)
+        .map(([id, d]) => ({ id, isThis: id === myId, ...(d || {}) }))
+        .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function escDev(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  function timeAgoDevice(ts) {
+    if (!ts) return 'naməlum';
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60) return 'indi';
+    if (diff < 3600) return Math.floor(diff / 60) + ' dəq əvvəl';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' saat əvvəl';
+    return Math.floor(diff / 86400) + ' gün əvvəl';
+  }
+
+  async function loadDevicesList() {
+    const zone = document.getElementById('devicesListZone');
+    if (!zone) return;
+    const devices = await fetchDevices();
+    if (!devices.length) {
+      zone.innerHTML = '<div class="muted" style="padding:14px;">Cihaz məlumatı yoxdur (hələ sinxron olmayıb)</div>';
+      return;
+    }
+    zone.innerHTML = devices.map(d => `
+      <div class="list-row">
+        <span>${d.isThis ? '📍 ' : '📱 '}${escDev(d.name || 'Naməlum cihaz')}${d.isThis ? ' <span class="muted" style="font-size:11px;">(bu cihaz)</span>' : ''}<br>
+          <span class="muted" style="font-size:11px;">${d.role === 'admin' ? '👑 Admin' : '👤 User'} · ${timeAgoDevice(d.lastSeen)}</span>
+        </span>
+      </div>
+    `).join('');
+  }
+
+  function renameThisDevice() {
+    const current = getDeviceName();
+    const name = prompt('Bu cihaza ad ver (məs. "Esqinin telefonu"):', current);
+    if (!name || !name.trim()) return;
+    setDeviceName(name.trim());
+    Toast.success('Cihaz adı yeniləndi');
+    registerDevice().then(loadDevicesList);
+  }
 
   /* ---------- Kiçik thumbnail yaratmaq (yalnız buluda getmək üçün) ---------- */
   // Nəticələri keşləyirik ki, hər sinxronda eyni şəkli təkrar sıxmayaq
@@ -148,6 +269,7 @@ const JollyCloud = (() => {
     });
     if (!res.ok) throw new Error('Buluda yazıla bilmədi: ' + res.status);
     JollyDB.setSettings({ lastCloudSync: Date.now() });
+    registerDevice(); // öz cihazını "aktiv" kimi qeydə al — göndərməyi gözləmə
     return thumbStats;
   }
 
@@ -203,6 +325,7 @@ const JollyCloud = (() => {
 
   function initAutoSync() {
     if (!enabled()) return;
+    registerDevice(); // dəyişiklik olmasa belə, bu cihazı "aktiv" kimi qeydə al
     // hər DB yazısında sinxron planla — JollyDB.write-ı sarıyırıq
     const origWrite = JollyDB.write;
     JollyDB.write = function (key, value) {
@@ -233,6 +356,7 @@ const JollyCloud = (() => {
     const last = s.lastCloudSync;
     const lastText = last ? new Date(last).toLocaleString('az-AZ') : 'Heç vaxt';
     const isOn = enabled();
+    setTimeout(() => loadDevicesList(), 0);
     return `
       <div class="back-btn anim-slide" onclick="JollyApp.goBack()">‹ Geri</div>
       <h2 style="font-family:var(--font-display);margin:0 0 6px;font-size:19px;">☁️ Cloud Studio</h2>
@@ -258,6 +382,13 @@ const JollyCloud = (() => {
           <label style="display:flex;align-items:center;"><input type="checkbox" ${isOn ? 'checked' : ''} onchange="JollyCloud.toggle(this.checked)"></label>
         </div>
       </div>
+
+      <div class="section-title">📱 Qoşulan cihazlar</div>
+      <div class="glass" style="padding:4px 14px;" id="devicesListZone">
+        <div class="muted" style="padding:14px;">Yüklənir...</div>
+      </div>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="JollyCloud.renameThisDevice()">✏️ Bu cihazın adını dəyiş</button>
+
       <p class="muted" style="font-size:11.5px;margin-top:10px;padding:0 4px;">⚠️ Qeyd: şəkillərin ƏSLİ buluda göndərilmir (böyük həcm) — yalnız məhsul məlumatları + kiçik "baxış" nüsxəsi (Telegram botu üçün). Əsl, böyük şəkillər bu telefonda qalır. Yeni telefona keçəndə məlumatlar buluddan gələcək, şəkilləri yenidən çəkərsən və ya JSON backup ilə köçürərsən.</p>
     `;
   }
@@ -279,5 +410,8 @@ const JollyCloud = (() => {
     if (on) scheduleSync();
   }
 
-  return { push, pull, restoreFromCloud, manualPush, toggle, initAutoSync, renderStudio, scheduleSync, enabled };
+  return {
+    push, pull, restoreFromCloud, manualPush, toggle, initAutoSync, renderStudio, scheduleSync, enabled,
+    getDeviceId, getDeviceName, renameThisDevice, loadDevicesList, fetchDevices,
+  };
 })();
