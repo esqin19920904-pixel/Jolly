@@ -15,6 +15,85 @@ if (typeof JollyIcons === 'undefined') { window.JollyIcons = { get: function(){ 
 const JollyDashboard = (() => {
   const CFG_KEY = 'jolly_dashboard_config';
 
+  // ── Daxili "Nə dəyişdi?" bülleteni — hər yeni əlavə edilən funksiyada
+  // ən yuxarıya bir qeyd əlavə et. Dashboard-a girəndə, ən son versiya
+  // görülməyibsə avtomatik kart kimi çıxır; "🆕" düyməsi ilə istənilən
+  // vaxt tam tarixçəni görmək olar. ──
+  const APP_CHANGELOG = [
+    { version: '2026-07-21', items: [
+      'Zəncirvari axtarış — istənilən sözü ard-arda əlavə edib nəticəni daralt',
+      '"⚙️ Ətraflı Axtarış" paneli — bütün axtarış üsulları bir yerdə',
+      'Uzun-bas ilə məhsul kartında sürətli önizləmə',
+      'Backup faylının bütövlüyünü yoxlayan checksum',
+      '"📱 Qoşulan cihazlar" siyahısı (Cloud Studio)',
+      '"Undo" — silinən məhsulu 10 saniyə ərzində bir toxunuşla geri qaytar',
+      'Backup xəbərdarlığı indi dəqiq gün sayını göstərir',
+      'Axtarış tarixçəsi, "bunu demək istədin?" təklifi, şəkil döndərmə',
+      'Şəkilləri sürüşdürüb sıralamaq, yadda saxlanan filtr dəstləri',
+    ]},
+  ];
+
+  function getLatestChangelogVersion() {
+    return APP_CHANGELOG[0] ? APP_CHANGELOG[0].version : null;
+  }
+
+  function hasUnseenChangelog() {
+    const latest = getLatestChangelogVersion();
+    if (!latest) return false;
+    let seen = null;
+    try { seen = localStorage.getItem('jolly_changelog_seen'); } catch (e) {}
+    return seen !== latest;
+  }
+
+  function renderChangelogCard() {
+    if (!hasUnseenChangelog()) return '';
+    const latest = APP_CHANGELOG[0];
+    return `
+      <div class="glass anim-pop" style="padding:14px 16px;margin-bottom:14px;border:1px solid rgba(124,138,255,0.4);background:rgba(124,138,255,0.08);">
+        <div class="row between" style="margin-bottom:8px;">
+          <span style="font-weight:700;">🆕 Nə dəyişdi? <span class="muted" style="font-weight:400;font-size:11px;">(${latest.version})</span></span>
+          <span class="icon-btn" style="width:26px;height:26px;font-size:13px;" onclick="JollyDashboard.dismissChangelog()">✕</span>
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.6;">
+          ${latest.items.map(i => `<li>${i}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  function dismissChangelog() {
+    const latest = getLatestChangelogVersion();
+    if (latest) { try { localStorage.setItem('jolly_changelog_seen', latest); } catch (e) {} }
+    JollyApp.render();
+  }
+
+  function openChangelogHistory() {
+    let overlay = document.getElementById('changelogOverlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'changelogOverlay';
+    overlay.className = 'qa-overlay';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('on'); });
+    overlay.innerHTML = `
+      <div class="glass qa-sheet" style="max-height:80vh;overflow-y:auto;">
+        <div class="row between" style="margin-bottom:10px;">
+          <div class="qa-title" style="margin:0;">🆕 Yeniliklər tarixçəsi</div>
+          <button class="icon-btn" onclick="document.getElementById('changelogOverlay').classList.remove('on')">✕</button>
+        </div>
+        ${APP_CHANGELOG.map(v => `
+          <div style="margin-bottom:14px;">
+            <div style="font-weight:700;color:var(--accent-1);margin-bottom:4px;">${v.version}</div>
+            <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.6;">
+              ${v.items.map(i => `<li>${i}</li>`).join('')}
+            </ul>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('on'));
+  }
+
   /* Kart kataloqu — Dashboard Studio bunlardan seçir */
   const CATALOG = [
     { id: 'quickPhoto', icon: '📷', label: 'Tez şəkil çək', sub: 'Yeni gələn mal', action: 'JollyDashboard.quickPhoto()', badge: null, neon: 'blue' },
@@ -191,8 +270,13 @@ const JollyDashboard = (() => {
             <h2 style="font-family:var(--font-display);margin:0;font-size:22px;">İş masası</h2>
             <div class="muted" style="font-size:12.5px;">JOLLY ilə mağazanı ağıllı idarə et</div>
           </div>
-          <span class="icon-btn" style="width:36px;height:36px;" onclick="JollyRouter.go('#/dashboard/studio')" title="Dashboard Studio">${JollyIcons.get('gear')}</span>
+          <div class="row" style="gap:8px;">
+            <span class="icon-btn" style="width:36px;height:36px;font-size:16px;" onclick="JollyDashboard.openChangelogHistory()" title="Yeniliklər">🆕</span>
+            <span class="icon-btn" style="width:36px;height:36px;" onclick="JollyRouter.go('#/dashboard/studio')" title="Dashboard Studio">${JollyIcons.get('gear')}</span>
+          </div>
         </div>
+
+        ${renderChangelogCard()}
 
         ${(() => {
           if (!backupOk && s.backupReminder !== false && total > 0) {
@@ -712,5 +796,6 @@ const JollyDashboard = (() => {
     renderTrash, renderFavorites, restoreTrash, purgeTrash, emptyTrash,
     quickPhoto, toggleFab, fabAction, addItem, removeItem, toggleAttention, getConfig, CATALOG,
     openSmartSearch, closeSmartSearch, smartSearch,
+    dismissChangelog, openChangelogHistory,
   };
 })();
