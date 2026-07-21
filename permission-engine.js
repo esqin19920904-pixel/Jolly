@@ -5,10 +5,12 @@
  *
  * DƏYİŞİKLİK (2026-07-21):
  * - Live Lens (livelens.use) və Səsli axtarış (search.voice) üçün icazə
- *   qeydiyyatı əlavə olundu — əvvəllər bu alətlərin heç icazə açarı
- *   olmadığı üçün İcazə Mərkəzində heç görünmürdülər.
- * - İcazə siyahısı indi 2 sütunlu şəbəkə (grid) formatında — uzun tək
- *   sütun siyahı əvəzinə, az aşağı düşmək lazımdır.
+ *   qeydiyyatı əlavə olundu.
+ * - İcazə siyahısı 2 sütunlu şəbəkə (grid) formatındadır.
+ * - YENİ: "🧩 Öz İcazələrim" — admin kod yazmadan, birbaşa İcazə
+ *   Mərkəzindən yeni icazə açarı yarada bilər (localStorage-da saxlanır,
+ *   `jolly_perm_custom_defs`). Gələcəkdə yeni bir alət qurulanda, onun
+ *   kodu `POS.can('custom.xxx')` yoxlaması ilə bu açara bağlana bilər.
  */
 (function() {
 'use strict';
@@ -16,6 +18,7 @@
 const STORAGE_KEY = 'jolly_perm_os_v2';
 const SIG_KEY     = 'jolly_perm_os_v2_sig';
 const AUDIT_KEY   = 'jolly_perm_audit_v2';
+const CUSTOM_KEY  = 'jolly_perm_custom_defs';
 
 // ── Tag-lar ──────────────────────────────────────────────
 const TAGS = {
@@ -39,6 +42,23 @@ function _sig(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
   return h.toString(36);
+}
+
+function _slugify(s) {
+  const map = { ə:'e',ı:'i',ö:'o',ü:'u',ç:'c',ş:'s',ğ:'g',Ə:'e',İ:'i',Ö:'o',Ü:'u',Ç:'c',Ş:'s',Ğ:'g' };
+  return String(s).trim().toLowerCase()
+    .replace(/[əıöüçşğƏİÖÜÇŞĞ]/g, ch => map[ch] || ch)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 30) || 'perm';
+}
+
+// ── Custom icazə saxlama (kod yazmadan əlavə olunanlar) ──
+function _loadCustomDefs() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); } catch(e) { return []; }
+}
+function _saveCustomDefs(list) {
+  try { Object.getPrototypeOf(localStorage).setItem.call(localStorage, CUSTOM_KEY, JSON.stringify(list)); } catch(e) {}
 }
 
 // ── Store ────────────────────────────────────────────────
@@ -130,6 +150,16 @@ class Registry {
   getAll()        { return [...this.mods.values()]; }
   allPerms()      { const r=[]; this.mods.forEach(m=>r.push(...m.perms)); return r; }
   modPerms(id)    { return (this.mods.get(id)||{perms:[]}).perms; }
+
+  // Custom (kod yazmadan əlavə olunan) icazələri "custom" modulu kimi
+  // qeydiyyata al/təzələ
+  refreshCustomModule() {
+    const defs = _loadCustomDefs();
+    this.register({
+      id: 'custom', name: '🧩 Öz İcazələrim', icon: '🧩',
+      permissions: defs.map(d => ({ key: d.key, label: d.label, tag: d.tag || 'edit', default: false })),
+    });
+  }
 }
 
 // ── Engine ───────────────────────────────────────────────
@@ -215,6 +245,7 @@ class AdminUI {
     if (typeof el === 'string') el = document.querySelector(el);
     if (!el) return;
     this._el = el;
+    this.os.reg.refreshCustomModule();
     const users = (window.JollyUsers ? JollyUsers.list() : []).filter(u => u.status === 'active');
     if (!this._selectedUserId && users.length) this._selectedUserId = users[0].id;
     this._draw();
@@ -274,6 +305,23 @@ class AdminUI {
               ${v.name}
             </button>
           `).join('')}
+        </div>
+
+        <!-- Öz icazəni əlavə et -->
+        <div class="section-title">🧩 Yeni icazə əlavə et</div>
+        <div class="glass" style="padding:12px;margin-bottom:14px;">
+          <p style="font-size:11px;color:var(--text-3,#64748b);margin:0 0 8px;">
+            Gələcəkdə qurduğun/qurulacaq yeni bir alət üçün — kod yazmadan, ad ver, siyahıya düşsün.
+            Sonra o alətin kodu <code>POS.can('${'{açar}'}')</code> ilə buna bağlanmalıdır.
+          </p>
+          <div style="display:flex;gap:8px;">
+            <input id="pos-custom-label" type="text" placeholder="Məs: Fotoşop Alətı"
+              style="flex:1;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:var(--text-1,#fff);font-size:13px;box-sizing:border-box;">
+            <button onclick="POS.admin._addCustom()"
+              style="padding:9px 16px;border-radius:10px;background:linear-gradient(135deg,#d4af37,#b8912b);border:none;color:#1a1206;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
+              + Əlavə et
+            </button>
+          </div>
         </div>
 
         <!-- Tag filter -->
@@ -355,6 +403,34 @@ class AdminUI {
     this._draw();
   }
 
+  _addCustom() {
+    const input = document.getElementById('pos-custom-label');
+    const label = input && input.value.trim();
+    if (!label) { if (window.Toast) Toast.error('Ad yaz'); return; }
+
+    const defs = _loadCustomDefs();
+    let key = 'custom.' + _slugify(label);
+    // eynilə adlı olsa, sona rəqəm əlavə et
+    let n = 2;
+    while (defs.some(d => d.key === key)) { key = 'custom.' + _slugify(label) + '_' + n; n++; }
+
+    defs.push({ key, label, tag: 'edit' });
+    _saveCustomDefs(defs);
+    this.os.reg.refreshCustomModule();
+    _audit('custom_permission_added', { label, key });
+    if (window.Toast) Toast.success(`✅ "${label}" icazəsi əlavə olundu — açarı: ${key}`);
+    this._draw();
+  }
+
+  _removeCustom(key) {
+    if (!confirm('Bu icazəni silmək istəyirsən?')) return;
+    const defs = _loadCustomDefs().filter(d => d.key !== key);
+    _saveCustomDefs(defs);
+    this.os.reg.refreshCustomModule();
+    _audit('custom_permission_removed', { key });
+    this._draw();
+  }
+
   _buildList(perms) {
     // Modul üzrə qruplaşdır
     const groups = {};
@@ -378,13 +454,16 @@ class AdminUI {
             ${g.items.map(p => {
               const tag = TAGS[p.tag]||TAGS.view;
               const checked = this.os.engine.resolveFor(this._selectedUserId, p.key);
+              const delBtn = mid === 'custom'
+                ? `<span onclick="event.stopPropagation();event.preventDefault();POS.admin._removeCustom('${p.key}')" style="cursor:pointer;color:#ef4444;font-size:12px;margin-left:6px;">✕</span>`
+                : '';
               return `<div class="pos-row" data-key="${p.key}" data-tag="${p.tag}" data-label="${p.label.toLowerCase()}"
                   style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:8px 9px;">
                 <label style="display:flex;align-items:flex-start;gap:8px;width:100%;cursor:pointer;">
                   <input type="checkbox" class="pos-cb" data-key="${p.key}" ${checked?'checked':''}
                     onchange="POS.admin._onChange('${p.key}', this.checked)"
                     style="width:16px;height:16px;accent-color:var(--accent-1,#00d4ff);cursor:pointer;flex-shrink:0;margin-top:2px;">
-                  <span style="flex:1;font-size:12px;line-height:1.3;">${p.label}</span>
+                  <span style="flex:1;font-size:12px;line-height:1.3;">${p.label}${delBtn}</span>
                 </label>
                 <div style="margin-top:6px;text-align:right;">
                   <span style="font-size:9px;padding:2px 7px;border-radius:10px;background:${tag.bg};color:${tag.color};">${tag.emoji} ${tag.label}</span>
@@ -484,6 +563,7 @@ class AdminUI {
       version: 2, app: 'JOLLY',
       exported: new Date().toISOString(),
       overrides: this.os.store.load().overrides,
+      customDefs: _loadCustomDefs(),
     };
     const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -502,6 +582,8 @@ class AdminUI {
         const data = JSON.parse(text);
         if (!data.overrides) throw new Error('Yanlış format');
         this.os.store.setOverrides(data.overrides);
+        if (Array.isArray(data.customDefs)) _saveCustomDefs(data.customDefs);
+        this.os.reg.refreshCustomModule();
         _audit('permissions_imported', {});
         this.os.syncUI();
         if (window.Toast) Toast.success('✅ Import edildi');
@@ -689,5 +771,8 @@ document.addEventListener('DOMContentLoaded', function() {
   POS.register({ id:'storemap', name:'Mağaza Xəritəsi', icon:'🗺️', permissions:[
     { key:'storemap.view', label:'Xəritəyə bax', tag:'view', default:true },
   ]});
+
+  // Kod yazmadan (İcazə Mərkəzindən) əlavə olunan icazələr
+  POS.reg.refreshCustomModule();
 
 });
