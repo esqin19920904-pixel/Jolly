@@ -1,5 +1,9 @@
 /* ============================================================
    JOLLY Admin Studio — Firma, Qrup, Yer, Status, Tədarükçü idarəetməsi
+
+   YENİ (2026-07-21): Kateqoriya (Qrup) ikonu fərdiləşdirmə — hər
+   qrupun yanında emoji ikon göstərilir, 🎨 düyməsi ilə dəyişdirilə
+   bilər (editIcon).
    ============================================================ */
 
 const JollyAdminStudio = (() => {
@@ -68,15 +72,28 @@ const JollyAdminStudio = (() => {
   function renderRow(key, it) {
     const colorDot = it.color ? `<span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${it.color};margin-right:8px;"></span>` : '';
     const codePrefix = it.code ? `<span class="mono muted" style="margin-right:6px;">${JollyProducts.escapeHtml(it.code)} ·</span>` : '';
+    const groupIcon = (key === 'groups') ? `<span style="margin-right:6px;">${it.icon ? JollyProducts.escapeHtml(it.icon) : '📦'}</span>` : '';
     return `
       <div class="list-row" draggable="true" data-id="${it.id}">
-        <span>${colorDot}${codePrefix}${JollyProducts.escapeHtml(it.name)}</span>
+        <span>${groupIcon}${colorDot}${codePrefix}${JollyProducts.escapeHtml(it.name)}</span>
         <span class="actions">
+          ${key === 'groups' ? `<span onclick="JollyAdminStudio.editIcon('${it.id}')">🎨</span>` : ''}
           <span onclick="JollyAdminStudio.editItem('${key}','${it.id}')">✏️</span>
           <span onclick="JollyAdminStudio.deleteItem('${key}','${it.id}')">🗑️</span>
         </span>
       </div>
     `;
+  }
+
+  // ── Kateqoriya (Qrup) ikonunu fərdiləşdirmə — #35 ──
+  function editIcon(id) {
+    const item = JollyDB.Groups.get(id);
+    if (!item) return;
+    const icon = prompt(`"${item.name}" qrupu üçün emoji ikon (məs. 🧦, 🧴, 🧼):`, item.icon || '📦');
+    if (icon === null) return;
+    JollyDB.Groups.update(id, { icon: icon.trim() || '📦' });
+    Toast.success('İkon yeniləndi');
+    JollyRouter.go('#/studios/admin/groups');
   }
 
   function attachListeners(key) {
@@ -128,6 +145,10 @@ const JollyAdminStudio = (() => {
       const code = prompt('Tədarükçü kodu (məs. 504) — boş buraxıla bilər:');
       if (code && code.trim()) extra.code = code.trim();
     }
+    if (key === 'groups') {
+      const icon = prompt('Bu qrup üçün emoji ikon (könüllü, məs. 🧦):', '📦');
+      extra.icon = (icon || '📦').trim() || '📦';
+    }
     cfg.store.add({ name: name.trim(), ...extra });
     Toast.success(`"${name}" əlavə olundu`);
     JollyRouter.go(`#/studios/admin/${key}`);
@@ -165,5 +186,5 @@ const JollyAdminStudio = (() => {
     }
   }
 
-  return { renderHome, renderList, addItem, editItem, deleteItem, STORE_MAP };
+  return { renderHome, renderList, addItem, editItem, deleteItem, editIcon, STORE_MAP };
 })();
