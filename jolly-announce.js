@@ -3,13 +3,15 @@
    OTA-dan asılı deyil (ayrıca Firebase node), amma düyməsi
    Studio → Yeniləmələr panelinin içindədir (jolly-ota.js-də).
    Admin göndərəndə bütün açıq telefonlarda tam ekran animasiya
-   açılır: Matrix yağışı arxa planda + mətn yazı maşını effekti.
+   açılır: Matrix yağışı arxa planda + mətn yazı maşını effekti,
+   üstünə "jolly-nagarajax.mp4" faylının səsi çalınır.
    ============================================================ */
 const JollyAnnounce = (() => {
   const DB_URL = "https://jolly2026-b3c06-default-rtdb.europe-west1.firebasedatabase.app";
   const API_KEY = "AIzaSyAhv-ZFTTNeyoXIDjn3VrVcknPKor4kZvw";
   const SIGNAL_NODE = 'jolly_announce_signal';
   const POLL_MS = 8000;
+  const SOUND_URL = 'jolly-nagarajax.mp4';
 
   let _token = null, _tokenExpiry = 0;
   async function _getToken() {
@@ -48,7 +50,7 @@ const JollyAnnounce = (() => {
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       if (typeof Toast !== 'undefined') Toast.success('Elan göndərildi 📢');
-      playOverlay(); // admin özündə də görsün
+      playOverlay(); // admin özündə də görsün (toxunma ilə başladığı üçün səs bloklanmır)
     } catch (e) {
       if (typeof Toast !== 'undefined') Toast.error('Göndərilmədi: ' + (e.message || e));
     }
@@ -83,6 +85,21 @@ const JollyAnnounce = (() => {
       } catch (e) {}
       _pollTimer = setInterval(poll, POLL_MS);
     })();
+  }
+
+  /* ---------------- Səs ---------------- */
+  function playSound() {
+    try {
+      const audio = new Audio(SOUND_URL);
+      audio.volume = 1.0;
+      const p = audio.play();
+      if (p && p.catch) {
+        p.catch(() => {
+          // brauzer avtomatik çalmağı bloklayıb (toxunma olmadan gələn siqnal) —
+          // sakit keç, animasiya səssiz davam edir
+        });
+      }
+    } catch (e) {}
   }
 
   /* ---------------- Tam ekran animasiya: Matrix + Yazı maşını ---------------- */
@@ -167,6 +184,7 @@ const JollyAnnounce = (() => {
     }
 
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+    playSound();
 
     spawnRain(el.querySelector('#jaRain'));
     const rainRefresh = setInterval(() => {
