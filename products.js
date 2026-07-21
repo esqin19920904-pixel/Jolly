@@ -4,6 +4,11 @@
    YENİ: renderCard-a "+" düyməsi əlavə olundu — kartın üstündən,
    Qəbul Studio-ya girmədən, birbaşa "Mal Qəbul" səbətinə əlavə
    etmək üçün (JollyReceiving.quickAddToBasket çağırır).
+
+   YENİ (2026-07-21): Zəncirvari axtarış filtri — axtarış qutusuna
+   "corab" yazanda nəticələr çıxır, altında YALNIZ o nəticələrin
+   içindəki firmaların çipləri görünür (məs. "Mariya"); ona basanda
+   nəticələr daha da daralır. "Daxilində filtrlə" zolağı.
    ============================================================ */
 
 const JollyProducts = (() => {
@@ -111,7 +116,7 @@ const JollyProducts = (() => {
     if (sc) { const s = SORTS.find(x => x.key === homeState.sort); if (s) sc.textContent = s.label; }
   }
 
-  let homeState = { filter: null, sort: 'new' };
+  let homeState = { filter: null, sort: 'new', chainBrand: null, baseResults: null };
   const SORTS = [
     { key: 'new', label: '↕️ Sıra: Yeni', fn: (a,b) => (b.createdAt||0)-(a.createdAt||0) },
     { key: 'name', label: '↕️ Sıra: Ad (A-Z)', fn: (a,b) => String(a.name||'').localeCompare(String(b.name||''), 'az') },
@@ -144,6 +149,8 @@ const JollyProducts = (() => {
 
   function homeFilter(f, chipEl) {
     homeState.filter = (homeState.filter === f) ? null : f;
+    homeState.chainBrand = null;
+    removeChainBar();
     document.querySelectorAll('#homeFilterChips .chip').forEach(c => c.classList.remove('chip-active'));
     if (homeState.filter && chipEl) chipEl.classList.add('chip-active');
     if (typeof JollySound !== 'undefined') JollySound.tap();
@@ -168,14 +175,58 @@ const JollyProducts = (() => {
   function runSearch(q) {
     const container = document.getElementById('homeProductList');
     const titleEl = document.querySelector('.section-title');
+    homeState.chainBrand = null; // yeni axtarışda əvvəlki zəncir sıfırlanır
     if (!q) {
       if (titleEl) titleEl.firstChild.textContent = 'Son əlavə edilənlər ';
+      removeChainBar();
       afterHomeRender();
       return;
     }
     const results = JollyDB.Products.search(q);
+    renderChainBar(results);
     if (titleEl) titleEl.firstChild.textContent = `Nəticələr (${results.length}) `;
     renderList(container, results);
+  }
+
+  // ── Zəncirvari filtr: axtarış nəticəsinin İÇİNDƏKİ firmalar üzrə
+  // əlavə çip zolağı göstərir. Bir firmaya basanda nəticə daha da
+  // daralır ("corab" axtar → "Mariya" bas → yalnız Mariya corabları). ──
+  function renderChainBar(results) {
+    homeState.baseResults = results;
+    const brandCounts = {};
+    (results || []).forEach(p => { if (p.brand) brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1; });
+    const brands = Object.entries(brandCounts).sort((a, b) => b[1] - a[1]);
+    const existing = document.getElementById('chainFilterBar');
+    if (!brands.length) { if (existing) existing.remove(); return; }
+    const html = `
+      <div class="chip-row" id="chainFilterBar" style="margin-bottom:6px;align-items:center;">
+        <span class="muted" style="font-size:11px;margin-right:2px;">Daxilində filtrlə:</span>
+        ${brands.map(([b, c]) => `<span class="chip ${homeState.chainBrand === b ? 'chip-active' : ''}" onclick="JollyProducts.applyChainBrand('${escapeHtml(b)}', this)">🏭 ${escapeHtml(b)} (${c})</span>`).join('')}
+      </div>`;
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      const searchBar = document.querySelector('.command-bar');
+      if (searchBar) searchBar.insertAdjacentHTML('afterend', html);
+    }
+  }
+
+  function removeChainBar() {
+    const bar = document.getElementById('chainFilterBar');
+    if (bar) bar.remove();
+  }
+
+  function applyChainBrand(brand, chipEl) {
+    homeState.chainBrand = (homeState.chainBrand === brand) ? null : brand;
+    document.querySelectorAll('#chainFilterBar .chip').forEach(c => c.classList.remove('chip-active'));
+    if (homeState.chainBrand && chipEl) chipEl.classList.add('chip-active');
+    if (typeof JollySound !== 'undefined') JollySound.tap();
+
+    const base = homeState.baseResults || [];
+    const filtered = homeState.chainBrand ? base.filter(p => p.brand === homeState.chainBrand) : base;
+    const titleEl = document.querySelector('.section-title');
+    if (titleEl) titleEl.firstChild.textContent = `Nəticələr (${filtered.length}) `;
+    renderList(document.getElementById('homeProductList'), filtered);
   }
 
   function voiceSearch() {
@@ -1280,6 +1331,7 @@ const JollyProducts = (() => {
     renderFormPage, afterFormRender, handleImageUpload, removeImage, cleanImageAt,
     addBarcodeField, removeBarcode, scanIntoForm, galleryScanIntoForm, selectStatus, handleInlineAdd,
     applySuggestion, ocrFill, toggleFav, homeFilter, cycleSort,
+    applyChainBrand,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
     smartProductParse, smartFill, aiCameraFill, whatsappShare, moreMenu, copyProductText,
