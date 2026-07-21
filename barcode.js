@@ -12,6 +12,13 @@ const JollyBarcode = (() => {
   }
 
   async function open(callback) {
+    // İcazə yoxlaması — barcode.scan
+    if (typeof POS !== 'undefined' && !POS.can('barcode.scan')) {
+      if (window.Toast) Toast.error('❌ Barkod skan üçün icazəniz yoxdur');
+      if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+      return;
+    }
+
     onResult = callback;
     const overlay = document.createElement('div');
     overlay.className = 'scan-overlay';
