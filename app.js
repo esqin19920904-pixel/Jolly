@@ -297,7 +297,12 @@ const JollyApp = (() => {
         if (!Array.isArray(cloudArr)) return;
         const local = JollyDB.read(key, []);
         const localIds = new Set(local.map(x => x && x.id));
-        const missing = cloudArr.filter(x => x && x.id && !localIds.has(x.id) && !(key === JollyDB.KEYS.products && trashIds.has(x.id)));
+        const missing = cloudArr.filter(x => {
+          if (!x || !x.id || localIds.has(x.id)) return false;
+          if (key === JollyDB.KEYS.products && trashIds.has(x.id)) return false;
+          if (JollyDB.isTombstoned && JollyDB.isTombstoned(key, x.id)) return false;
+          return true;
+        });
         if (missing.length) {
           JollyDB.write(key, [...local, ...missing]);
           if (key === JollyDB.KEYS.products) addedProducts += missing.length;
@@ -309,8 +314,12 @@ const JollyApp = (() => {
       mergeArray(JollyDB.KEYS.locations, payload.data.locations);
       mergeArray(JollyDB.KEYS.statuses, payload.data.statuses);
       // İcazələr — Admin mənbədir, birbaşa yenisi ilə əvəz edilir (əlavə
-      // deyil), ona görə ayrıca (ID əsaslı deyil).
-      if (payload.data.permissions) {
+      // deyil), ona görə ayrıca (ID əsaslı deyil). AMMA: lokalda hələ
+      // buluda göndərilməmiş (pending) dəyişiklik varsa, ÜSTÜNƏ YAZMA —
+      // yoxsa indicə verilmiş icazə dəyişikliyi köhnə bulud versiyası
+      // ilə səssizcə geri qayıdar.
+      const pending = typeof JollyCloud.isPendingSync === 'function' && JollyCloud.isPendingSync();
+      if (payload.data.permissions && !pending) {
         try { JollyDB.write(JollyDB.KEYS.permissions, payload.data.permissions); } catch (e) {}
       }
       if (addedProducts > 0) {
