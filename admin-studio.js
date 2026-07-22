@@ -360,6 +360,7 @@ const JollyAdminStudio = (() => {
     const warn = usageCount > 0 ? `\n\nDİQQƏT: bu, ${usageCount} məhsulda istifadə olunur.` : '';
     if (confirm(`"${item.name}" silinsin?${warn}`)) {
       cfg.store.remove(id);
+      if (JollyDB.KEYS[key]) JollyDB.addTombstone(JollyDB.KEYS[key], id);
       Toast.success('Silindi');
       JollyRouter.go(`#/studios/admin/${key}`);
     }
