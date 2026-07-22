@@ -287,11 +287,37 @@ const JollyDB = (() => {
     return read(KEYS.products, []).filter(p => p.favorite);
   }
 
+  /* ---------- Tombstone-lar (2026-07-22) ----------
+     Products üçün Trash var, amma Qrup/Firma/Yer/Status/Tədarükçü
+     silinəndə heç bir "səbət" yoxdur — bu, silinmiş bir Qrup/Firma-nın
+     da eynilə bulud sinxronu ilə geri qayıtma riski daşıdığı deməkdir
+     (silentCloudMerge). Buna görə bu ümumi "tombstone" siyahısı: hər
+     hansı bir key/id silinəndə burda 7 gün saxlanılır, sinxron bu
+     müddətdə həmin ID-ni "yeni/əskik" sanıb geri əlavə etmir. */
+  const TOMBSTONE_KEY = 'jolly_tombstones';
+  const TOMBSTONE_TTL_MS = 7 * 864e5; // 7 gün
+
+  function addTombstone(storeKey, id) {
+    try {
+      const list = read(TOMBSTONE_KEY, []);
+      list.push({ key: storeKey, id, deletedAt: Date.now() });
+      write(TOMBSTONE_KEY, list);
+    } catch (e) {}
+  }
+  function isTombstoned(storeKey, id) {
+    try {
+      const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+      const list = read(TOMBSTONE_KEY, []);
+      return list.some(t => t && t.key === storeKey && t.id === id && (t.deletedAt || 0) > cutoff);
+    } catch (e) { return false; }
+  }
+
   return {
     KEYS, uid, read, write, logActivity, seedIfEmpty, repairIds,
     Trash, toggleFavorite, getFavorites,
     Brands, Groups, Locations, Statuses, Suppliers, Tags, Products, Drafts,
     exportAll, importAll,
+    addTombstone, isTombstoned,
     getActivity: () => read(KEYS.activity, []),
     getSettings: () => read(KEYS.settings, {}) || {},
     setSettings: (patch) => write(KEYS.settings, { ...(read(KEYS.settings, {}) || {}), ...patch }),
