@@ -1860,7 +1860,7 @@ body.fx-off .sm-cell.sm-hi { animation: none; }
 .lock-bio-zone.scanning .lock-bio-svg { animation: lockBioScanning 0.6s ease-in-out infinite; }
 @keyframes lockBioScanning { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
 .lock-bio-zone:active { transform: scale(0.96); }
-.lock-forgot:active { co
+.lock-forgot:active { opacity: 0.7; }
 /* ============================================================
    JOLLY — 4 Düzülüş (Sıra / Şəbəkə / Tək / 4-lü) — 2026-07-22
    Hər yerdə (Ana səhifə, Qrup, filtrlənmiş siyahılar) eyni
