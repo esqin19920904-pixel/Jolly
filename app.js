@@ -281,17 +281,23 @@ const JollyApp = (() => {
 
   /* --- Backup göstəricisi: yaşıl=qaydasında, sarı=dəyişiklik var, qırmızı=çoxdan yoxdur --- */
   /* --- Arxa plan sinxronu: başqa cihazlarda əlavə olunan yeni qeydləri
-     sakitcə çəkir, mövcud lokal datanı əvəz etmir --- */
+     sakitcə çəkir, mövcud lokal datanı əvəz etmir ---
+     DÜZƏLİŞ (2026-07-22): silinmiş (Trash-dəki) məhsulları TƏKRAR
+     əlavə ETMİR — əvvəl bu, silinən kimi məhsulu "yeni/əskik" sanıb
+     geri qaytarırdı, çünki bulud silinməni hələ görməmiş olur (push
+     4 saniyəlik gecikmə ilə gedir). İndi Trash-də olan ID-lər həmişə
+     istisna edilir, silinmə bulud tərəfə çatana qədər. */
   function silentCloudMerge() {
     if (typeof JollyCloud === 'undefined' || !JollyCloud.enabled() || !navigator.onLine) return;
     JollyCloud.pull().then(payload => {
       if (!payload || !payload.data) return;
       let addedProducts = 0;
+      const trashIds = new Set((JollyDB.read(JollyDB.KEYS.trash, []) || []).map(x => x && x.id));
       const mergeArray = (key, cloudArr) => {
         if (!Array.isArray(cloudArr)) return;
         const local = JollyDB.read(key, []);
         const localIds = new Set(local.map(x => x && x.id));
-        const missing = cloudArr.filter(x => x && x.id && !localIds.has(x.id));
+        const missing = cloudArr.filter(x => x && x.id && !localIds.has(x.id) && !(key === JollyDB.KEYS.products && trashIds.has(x.id)));
         if (missing.length) {
           JollyDB.write(key, [...local, ...missing]);
           if (key === JollyDB.KEYS.products) addedProducts += missing.length;
