@@ -19,6 +19,8 @@ const JollyDB = (() => {
     trash: 'jolly_trash',
     users: 'jolly_users_v1',
     permissions: 'jolly_perm_os_v2',
+    changelog: 'jolly_changelog',
+    changelogReads: 'jolly_changelog_reads',
   };
 
   function uid(prefix = 'p') {
