@@ -52,6 +52,16 @@ const JollyDB = (() => {
      (ən köhnə/ağır massivləri qısaldıb) YENİDƏN yazmağa cəhd edir.
      Yalnız bu təkrar cəhd də uğursuz olarsa, istifadəçiyə xəbərdarlıq
      göstərilir. `retrying` bayrağı sonsuz dövrənin qarşısını alır. */
+  /* DÜZƏLİŞ (2026-07-23, yaddaş kvotası — 3-cü tur):
+     Xəbərdarlıq çox az məhsulla (2-3 ədəd) belə təkrarlanır — bu, əsl
+     kvota dolması ola bilməz (localStorage adətən 5MB+ tutur). Deməli
+     `catch` bloku başqa bir xətanı da "Yaddaş dolub" kimi göstərir və
+     bizi yanlış istiqamətə aparır. İndi əsl xəta növünü (`e.name`)
+     ayırd edirik: yalnız həqiqi QuotaExceededError-da köhnə "təmizlə+
+     yenidən cəhd et" məntiqi işə düşür və "Yaddaş dolub" mesajı
+     göstərilir. Başqa hər hansı xəta (SecurityError — inkoqnito/
+     data-saver rejimində storage tam bağlıdır, və s.) fərqli, addım
+     göstərən mesajla bildirilir ki, əsl səbəb aydın olsun. */
   function write(key, value, _retrying) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
@@ -61,8 +71,9 @@ const JollyDB = (() => {
       }
       return true;
     } catch (e) {
-      console.error('JollyDB write error', key, e);
-      if (!_retrying) {
+      console.error('JollyDB write error', key, e.name, e.message, e);
+      const isQuota = e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
+      if (isQuota && !_retrying) {
         const freed = emergencyFreeSpace();
         if (freed) {
           console.log('JOLLY: yaddaş kvotası doldu, avtomatik təmizləndi, yenidən yazılır...');
@@ -70,7 +81,11 @@ const JollyDB = (() => {
         }
       }
       if (typeof Toast !== 'undefined') {
-        Toast.error('⚠️ Yaddaş dolub — məlumat saxlanmadı! Data Studio-dan backup çıxar.');
+        if (isQuota) {
+          Toast.error('⚠️ Yaddaş dolub — məlumat saxlanmadı! Data Studio-dan backup çıxar.');
+        } else {
+          Toast.error(`⚠️ Saxlama xətası (${e && e.name ? e.name : 'naməlum'}) — brauzer storage-ı bloklayır. Detallar konsolda.`);
+        }
       }
       return false;
     }
