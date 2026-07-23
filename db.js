@@ -44,7 +44,15 @@ const JollyDB = (() => {
     }
   }
 
-  function write(key, value) {
+  /* DÜZƏLİŞ (2026-07-23, yaddaş kvotası — 2-ci tur):
+     "Yaddaş dolub" xətası snapshot-u yüngülləşdirdikdən SONRA da təkrar
+     olundu — səbəb köhnədən yığılmış ağır massivlər idi (aşağıya bax:
+     runHousekeeping). İndi write() özü də özünü qoruyur: kvota xətası
+     tutulanda, PANİKƏ ETMƏDƏN əvvəl bir dəfə avtomatik yer boşaldıb
+     (ən köhnə/ağır massivləri qısaldıb) YENİDƏN yazmağa cəhd edir.
+     Yalnız bu təkrar cəhd də uğursuz olarsa, istifadəçiyə xəbərdarlıq
+     göstərilir. `retrying` bayrağı sonsuz dövrənin qarşısını alır. */
+  function write(key, value, _retrying) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
       if (key === 'jolly_products' || key === 'jolly_drafts' || key === 'jolly_brands' || key === 'jolly_groups' || key === 'jolly_locations' || key === 'jolly_statuses' || key === 'jolly_suppliers') {
@@ -54,11 +62,56 @@ const JollyDB = (() => {
       return true;
     } catch (e) {
       console.error('JollyDB write error', key, e);
+      if (!_retrying) {
+        const freed = emergencyFreeSpace();
+        if (freed) {
+          console.log('JOLLY: yaddaş kvotası doldu, avtomatik təmizləndi, yenidən yazılır...');
+          return write(key, value, true);
+        }
+      }
       if (typeof Toast !== 'undefined') {
         Toast.error('⚠️ Yaddaş dolub — məlumat saxlanmadı! Data Studio-dan backup çıxar.');
       }
       return false;
     }
+  }
+
+  // Kvota dolanda çağırılır — ən köhnə/ağır məlumatları budayır (silinmir,
+  // sadəcə qısaldılır) ki, təzə yazı üçün yer açılsın. Trash-in özü
+  // 30 gündən köhnə qeydləri silir, digərləri ölçü limitinə salınır.
+  function emergencyFreeSpace() {
+    let didSomething = false;
+    try {
+      const trash = read(KEYS.trash, []);
+      if (trash.length > 20) {
+        const cutoff = Date.now() - 30 * 864e5;
+        let kept = trash.filter(x => (x.deletedAt || 0) > cutoff);
+        if (kept.length > 50) kept = kept.slice(0, 50);
+        if (kept.length !== trash.length) {
+          localStorage.setItem(KEYS.trash, JSON.stringify(kept));
+          didSomething = true;
+        }
+      }
+    } catch (e) {}
+    try {
+      const tomb = read(KEYS.tombstones, []);
+      if (tomb.length > 50) {
+        localStorage.setItem(KEYS.tombstones, JSON.stringify(tomb.slice(0, 50)));
+        didSomething = true;
+      }
+    } catch (e) {}
+    try {
+      const act = read(KEYS.activity, []);
+      if (act.length > 100) {
+        localStorage.setItem(KEYS.activity, JSON.stringify(act.slice(0, 100)));
+        didSomething = true;
+      }
+    } catch (e) {}
+    try {
+      localStorage.removeItem('jolly_snapshot');
+      didSomething = true;
+    } catch (e) {}
+    return didSomething;
   }
 
   function logActivity(action, entity, details) {
@@ -122,6 +175,15 @@ const JollyDB = (() => {
     if (read(KEYS.drafts, null) === null) {
       write(KEYS.drafts, []);
     }
+    // Hər açılışda 30 gündən köhnə silinmiş məhsulları avtomatik təmizlə —
+    // əvvəllər bu heç yerdən çağırılmırdı, Trash sonsuza qədər böyüyürdü
+    // və bu, "Yaddaş dolub" xətasının əsl səbəblərindən biri idi.
+    try {
+      const trash = read(KEYS.trash, []);
+      const cutoff = Date.now() - 30 * 864e5;
+      const kept = trash.filter(x => (x && x.deletedAt || 0) > cutoff);
+      if (kept.length !== trash.length) write(KEYS.trash, kept);
+    } catch (e) {}
   }
 
   /* ---------- Generic CRUD factory ---------- */
