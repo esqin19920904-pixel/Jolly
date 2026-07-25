@@ -1,113 +1,234 @@
 /* ╔══════════════════════════════════════════════════════════════════╗
-   ║  JOLLY EDGE NEON FX — Ripple + Haptic + Sound                   ║
-   ║  Mövcud edge cell-lərə toxunma effektləri əlavə edir            ║
+   ║  JOLLY EDGE NEON FX v2.0                                       ║
+   ║  Ripple + Haptic + Sound + Pointer Support                     ║
    ╚══════════════════════════════════════════════════════════════════╝ */
 
-(function() {
-  'use strict';
+(function () {
+  "use strict";
 
-  // Haptic helper
+  // --------------------------------------------------
+  // Haptic
+  // --------------------------------------------------
   function haptic(pattern) {
-    if (navigator.vibrate) navigator.vibrate(pattern);
-  }
-
-  // Sound helper
-  function playSound(type) {
-    if (typeof JollySound === 'undefined') return;
-    const sounds = { tap: 'tap', success: 'success' };
-    const name = sounds[type] || 'tap';
-    if (typeof JollySound.play === 'function') {
-      JollySound.play(name);
-    } else if (typeof JollySound[name] === 'function') {
-      JollySound[name]();
+    if ("vibrate" in navigator) {
+      navigator.vibrate(pattern);
     }
   }
 
-  // Ripple effekti
-  function createRipple(e) {
-    const cell = e.currentTarget;
+  // --------------------------------------------------
+  // Sound
+  // --------------------------------------------------
+  function playSound(type) {
+    if (typeof JollySound === "undefined") return;
+
+    const sound = type || "tap";
+
+    try {
+      if (typeof JollySound.play === "function") {
+        JollySound.play(sound);
+      } else if (typeof JollySound[sound] === "function") {
+        JollySound[sound]();
+      }
+    } catch (e) {}
+  }
+
+  // --------------------------------------------------
+  // Ripple
+  // --------------------------------------------------
+  function createRipple(event) {
+
+    if (!event) return;
+
+    const cell = event.currentTarget;
+
     if (!cell) return;
 
-    const ripple = document.createElement('div');
-    ripple.className = 'edge-ripple';
-    
     const rect = cell.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height) * 1.5;
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
 
-    ripple.style.width = ripple.style.height = size + 'px';
-    ripple.style.left = (x - size/2) + 'px';
-    ripple.style.top = (y - size/2) + 'px';
-    
-    // Rəngi cell-dən al
-    const color = getComputedStyle(cell).getPropertyValue('--cell-color').trim() || '#f5c563';
-    ripple.style.setProperty('--cell-color', color);
+    let clientX = null;
+    let clientY = null;
+
+    // Touch End
+    if (event.changedTouches && event.changedTouches.length) {
+
+      clientX = event.changedTouches[0].clientX;
+      clientY = event.changedTouches[0].clientY;
+
+    }
+
+    // Touch Start
+    else if (event.touches && event.touches.length) {
+
+      clientX = event.touches[0].clientX;
+      clientY = event.touches[0].clientY;
+
+    }
+
+    // Mouse / Pointer
+    else if (
+      typeof event.clientX === "number" &&
+      typeof event.clientY === "number"
+    ) {
+
+      clientX = event.clientX;
+      clientY = event.clientY;
+
+    }
+
+    // Koordinat tapılmadı
+    else {
+
+      clientX = rect.left + rect.width / 2;
+      clientY = rect.top + rect.height / 2;
+
+    }
+
+    const size = Math.max(rect.width, rect.height) * 1.6;
+
+    const ripple = document.createElement("div");
+    ripple.className = "edge-ripple";
+
+    ripple.style.width = size + "px";
+    ripple.style.height = size + "px";
+
+    ripple.style.left = (clientX - rect.left - size / 2) + "px";
+    ripple.style.top = (clientY - rect.top - size / 2) + "px";
+
+    const color =
+      getComputedStyle(cell)
+        .getPropertyValue("--cell-color")
+        .trim() || "#f5c563";
+
+    ripple.style.setProperty("--cell-color", color);
 
     cell.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 500);
+
+    ripple.addEventListener("animationend", function () {
+      ripple.remove();
+    });
+
+    setTimeout(function () {
+      ripple.remove();
+    }, 600);
   }
 
-  // Edge cell-ləri tap və event listener əlavə et
+  // --------------------------------------------------
+  // Init
+  // --------------------------------------------------
   function initEdgeNeon() {
-    const selectors = [
-      '.edge-cell',
-      '.ec-cell',
-      '[class*="edge-cell"]',
-      '[class*="ec-cell"]'
-    ];
 
-    const cells = document.querySelectorAll(selectors.join(', '));
-    
-    cells.forEach(cell => {
-      // Təkrar əlavə etmə
-      if (cell.dataset.neonInit === 'true') return;
-      cell.dataset.neonInit = 'true';
+    const cells = document.querySelectorAll(
+      ".edge-cell,.ec-cell,[class*='edge-cell'],[class*='ec-cell']"
+    );
 
-      // Touch events
-      cell.addEventListener('touchstart', function(e) {
-        haptic([15]);
-        this.classList.add('neon-active');
-      }, {passive: true});
+    cells.forEach(function (cell) {
 
-      cell.addEventListener('touchend', function(e) {
-        createRipple(e);
-        playSound('tap');
-        haptic([20, 10]);
-        this.classList.remove('neon-active');
-      }, {passive: true});
+      if (cell.dataset.neonInit === "1") return;
 
-      // Mouse events (desktop test üçün)
-      cell.addEventListener('mousedown', function(e) {
-        this.classList.add('neon-active');
-      });
+      cell.dataset.neonInit = "1";
 
-      cell.addEventListener('mouseup', function(e) {
-        createRipple(e);
-        playSound('tap');
-        this.classList.remove('neon-active');
-      });
-    });
+      // Pointer Events (ən yaxşı seçim)
 
-    console.log('⚡ JOLLY Edge Neon FX aktivləşdi:', cells.length, 'cell');
-  }
+      if (window.PointerEvent) {
 
-  // İlk yüklənmədə
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initEdgeNeon);
-  } else {
-    initEdgeNeon();
-  }
+        cell.addEventListener("pointerdown", function () {
 
-  // Edge panel açılanda yenidən yoxla (lazy loaded ola bilər)
-  const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-      if (mutation.addedNodes.length > 0) {
-        setTimeout(initEdgeNeon, 100);
+          this.classList.add("neon-active");
+          haptic(15);
+
+        });
+
+        cell.addEventListener("pointerup", function (e) {
+
+          createRipple(e);
+          playSound("tap");
+          haptic([20,10]);
+
+          this.classList.remove("neon-active");
+
+        });
+
+        cell.addEventListener("pointercancel", function () {
+
+          this.classList.remove("neon-active");
+
+        });
+
       }
+
+      // Köhnə brauzerlər
+
+      else {
+
+        cell.addEventListener("touchstart", function () {
+
+          this.classList.add("neon-active");
+          haptic(15);
+
+        }, { passive:true });
+
+        cell.addEventListener("touchend", function (e) {
+
+          createRipple(e);
+          playSound("tap");
+          haptic([20,10]);
+
+          this.classList.remove("neon-active");
+
+        }, { passive:true });
+
+        cell.addEventListener("mousedown", function () {
+
+          this.classList.add("neon-active");
+
+        });
+
+        cell.addEventListener("mouseup", function (e) {
+
+          createRipple(e);
+          playSound("tap");
+
+          this.classList.remove("neon-active");
+
+        });
+
+      }
+
     });
+
+    console.log("⚡ JOLLY Edge Neon FX v2 aktivdir. Cell sayı:", cells.length);
+
+  }
+
+  // --------------------------------------------------
+  // Start
+  // --------------------------------------------------
+
+  if (document.readyState === "loading") {
+
+    document.addEventListener("DOMContentLoaded", initEdgeNeon);
+
+  } else {
+
+    initEdgeNeon();
+
+  }
+
+  // --------------------------------------------------
+  // Dynamic DOM
+  // --------------------------------------------------
+
+  const observer = new MutationObserver(function () {
+
+    clearTimeout(observer._timer);
+
+    observer._timer = setTimeout(initEdgeNeon, 80);
+
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
 
 })();
