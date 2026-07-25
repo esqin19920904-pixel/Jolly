@@ -109,6 +109,7 @@ const JollyProducts = (() => {
     const rec = JollyDB.Products.add(copy);
     const overlay = document.getElementById('quickMenuOverlay');
     if (overlay) overlay.classList.remove('on');
+    if (!rec) { Toast.error('⚠️ Kopyalanmadı — yaddaş dolu ola bilər. Yer boşalt və yenidən sına.'); return; }
     Toast.success('Kopyalandı — indi redaktə edə bilərsən');
     JollyRouter.go(`#/product/${rec.id}`);
   }
@@ -2606,11 +2607,19 @@ const JollyProducts = (() => {
     }
 
     if (formState.id) {
-      JollyDB.Products.update(formState.id, payload);
+      const saved = JollyDB.Products.update(formState.id, payload);
+      if (!saved) {
+        Toast.error('⚠️ Yadda saxlanmadı — yaddaş dolu ola bilər! Studios → Data-dan yer boşalt və yenidən sına.');
+        return false; // formu bağlama, məlumatı itirmə — istifadəçi yenidən sınaya bilsin
+      }
       Toast.success('Məhsul yeniləndi');
       if (window.JollyEvents) JollyEvents.emit('product.saved', { id: formState.id, product: payload, isNew: false });
     } else {
-      JollyDB.Products.add(payload);
+      const saved = JollyDB.Products.add(payload);
+      if (!saved) {
+        Toast.error('⚠️ Yadda saxlanmadı — yaddaş dolu ola bilər! Studios → Data-dan yer boşalt və yenidən sına.');
+        return false; // formu bağlama, məlumatı itirmə — istifadəçi yenidən sınaya bilsin
+      }
       Toast.success('Məhsul əlavə olundu');
       if (typeof JollyApp !== 'undefined' && JollyApp.celebrate) JollyApp.celebrate();
       if (window.JollyEvents) JollyEvents.emit('product.saved', { id: payload.id, product: payload, isNew: true });
@@ -2637,10 +2646,15 @@ const JollyProducts = (() => {
     const draftId = payload._draftId;
     delete payload._draftId;
     delete payload.id;
+    let saved;
     if (draftId) {
-      JollyDB.Drafts.update(draftId, payload);
+      saved = JollyDB.Drafts.update(draftId, payload);
     } else {
-      JollyDB.Drafts.add(payload);
+      saved = JollyDB.Drafts.add(payload);
+    }
+    if (!saved) {
+      Toast.error('⚠️ Qaralama saxlanmadı — yaddaş dolu ola bilər! Studios → Data-dan yer boşalt və yenidən sına.');
+      return; // formu tərk etmə — istifadəçi yenidən sınaya bilsin
     }
     Toast.success('Qaralama saxlanıldı');
     JollyRouter.go('#/home');
