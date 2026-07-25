@@ -201,7 +201,16 @@ const JollyDB = (() => {
     } catch (e) {}
   }
 
-  /* ---------- Generic CRUD factory ---------- */
+  /* ---------- Generic CRUD factory ----------
+     DÜZƏLİŞ (2026-07-25, "product kəsilib, tam verilməyib"):
+     Əvvəl add()/update() write()-un nəticəsinə (uğurlu/uğursuz) heç
+     baxmadan HƏMİŞƏ record-u qaytarırdı — hətta localStorage yazısı
+     kvota xətası ilə SƏSSİZCƏ uğursuz olsa belə. Çağıran kod (məs.
+     submitForm) bunu "uğurlu" sanıb "Məhsul əlavə olundu ✓" göstərir
+     və istifadəçini formadan çıxarırdı — halbuki məhsul əslində ya
+     heç saxlanmamışdı, ya da yarımçıq qalmışdı. İndi write()-un
+     nəticəsi yoxlanılır və uğursuz olanda `null` qaytarılır ki,
+     çağıran kod bunu bilə və istifadəçini xəbərdar edə bilsin. */
   function makeStore(key, entityName) {
     const prefix = entityName.slice(0, 3).replace(/[^a-z0-9]/gi, 'x');
     return {
@@ -213,7 +222,8 @@ const JollyDB = (() => {
         if (clean.id == null || clean.id === '') delete clean.id; // boş id yeni id-ni əzməsin
         const record = { id: uid(prefix), createdAt: Date.now(), updatedAt: Date.now(), ...clean };
         list.push(record);
-        write(key, list);
+        const ok = write(key, list);
+        if (!ok) return null; // yazı uğursuz oldu — çağıran kod bunu yoxlamalıdır
         logActivity('add', entityName, record.name || record.id);
         return record;
       },
@@ -221,8 +231,10 @@ const JollyDB = (() => {
         const list = read(key, []);
         const idx = list.findIndex(x => x.id === id);
         if (idx === -1) return null;
-        list[idx] = { ...list[idx], ...patch, updatedAt: Date.now() };
-        write(key, list);
+        const updated = { ...list[idx], ...patch, updatedAt: Date.now() };
+        list[idx] = updated;
+        const ok = write(key, list);
+        if (!ok) return null; // yazı uğursuz oldu — çağıran kod bunu yoxlamalıdır
         logActivity('update', entityName, list[idx].name || id);
         return list[idx];
       },
@@ -230,7 +242,8 @@ const JollyDB = (() => {
         const list = read(key, []);
         const item = list.find(x => x.id === id);
         const filtered = list.filter(x => x.id !== id);
-        write(key, filtered);
+        const ok = write(key, filtered);
+        if (!ok) return false;
         if (item) logActivity('delete', entityName, item.name || id);
         return true;
       },
