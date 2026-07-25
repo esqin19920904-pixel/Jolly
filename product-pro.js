@@ -104,6 +104,7 @@ const JollyProductPro = (() => {
     delete copy.id; delete copy.createdAt; delete copy.updatedAt;
     copy.name = (p.name || 'Adsız') + ' (kopya)';
     const created = JollyDB.Products.add(copy);
+    if (!created) { Toast.error('⚠️ Klonlanmadı — yaddaş dolu ola bilər. Yer boşalt və yenidən sına.'); return; }
     if (typeof JollySound !== 'undefined') JollySound.success();
     if (typeof JollyApp !== 'undefined' && JollyApp.celebrate) JollyApp.celebrate();
     Toast.success('Klonlandı — indi redaktə et');
