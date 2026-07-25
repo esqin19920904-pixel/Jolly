@@ -153,7 +153,32 @@ const JollyStorage = (() => {
   }
 
   /* Köhnə localStorage şəkillərini IndexedDB-yə köçür (bir dəfə).
-     Həm də hər açılışda Daimi Yaddaş sorğusunu (sükutla) təkrar edir. */
+     Həm də hər açılışda Daimi Yaddaş sorğusunu (sükutla) təkrar edir.
+
+     DÜZƏLİŞ (2026-07-25, "Yaddaş dolub" hər girişdə təkrarlanması):
+     Əvvəl bu funksiya HƏR məhsulu ayrı-ayrı `store.update()` ilə
+     yazırdı — bu da öz növbəsində HƏM məhsul siyahısını, HƏM DƏ
+     activity jurnalını (logActivity) ayrıca yazırdı. Əgər localStorage
+     artıq köhnə base64 şəkillərlə dolu idisə, bu ara-yazıların HƏR
+     BİRİ quota xətası ilə uğursuz olur və hər uğursuzluqda görünən bir
+     "Yaddaş dolub" xəbərdarlığı göstərirdi — bəzən onlarla dəfə arxa-
+     arxaya, tətbiq açılan kimi. Daha pisi: yazı uğursuz olduğu üçün
+     dəyişiklik həqiqətən localStorage-a yazılmırdı (yalnız IndexedDB
+     tərəfi uğurlu olurdu), ona görə də sonrakı hər açılışda EYNİ
+     şəkillər YENİDƏN köçürülməyə cəhd olunurdu — problem heç vaxt
+     düzəlmirdi, hər girişdə təkrarlanırdı.
+
+     İndi: bütün şəkillər əvvəlcə YADDAŞDA (RAM-da) IndexedDB-yə
+     köçürülür, sonra DƏYİŞƏN siyahı BİR DƏFƏYƏ yazılır (activity
+     jurnalı olmadan — bu, istifadəçi əməliyyatı deyil, arxa fon
+     köçürməsidir). Beləliklə ən pis halda BİR yazı cəhdi olur, BİR
+     mümkün xəbərdarlıq — onlarla yox. Əgər bu tək yazı da uğursuz
+     olsa belə, artıq bütün şəkillər IndexedDB-də uğurla saxlanıb;
+     `idbMigrated` işarələnmir ki, növbəti açılışda YENİDƏN cəhd
+     olunsun (bu dəfə localStorage-da daha az yer tutaraq, çünki hər
+     `saveImage` çağırışı ayrıca IndexedDB-yə yazır, localStorage-a
+     toxunmur) — sonda öz-özünü düzəldir, sonsuz təkrar-uğursuzluq
+     yaratmır. */
   async function migrateOldImages() {
     // Daimi yaddaş sorğusu — hər sessiyada, səssiz, ayrıca xəta üçün gözləmir
     try { requestPersistence(); } catch (e) {}
@@ -161,33 +186,47 @@ const JollyStorage = (() => {
     if (!isSupported()) return;
     const s = JollyDB.getSettings();
     if (s.idbMigrated) return;
-    let changed = false;
+    let anyChanged = false;
+    let allOk = true;
 
     async function migrateList(store) {
-      const items = store.all();
+      const key = store === JollyDB.Products ? JollyDB.KEYS.products : JollyDB.KEYS.drafts;
+      const items = JollyDB.read(key, []);
+      let listChanged = false;
       for (const item of items) {
         if (!item.images || !item.images.length) continue;
         let itemChanged = false;
         const newImages = [];
         for (const img of item.images) {
           if (img && img.startsWith('data:')) {
-            const ref = await saveImage(img);
+            const ref = await saveImage(img); // IndexedDB-yə yazır, localStorage-a toxunmur
             newImages.push(ref);
             itemChanged = true;
           } else newImages.push(img);
         }
         if (itemChanged) {
-          store.update(item.id, { images: newImages });
-          changed = true;
+          item.images = newImages;
+          listChanged = true;
         }
+      }
+      if (listChanged) {
+        // Bütün siyahı üçün YALNIZ BİR yazı — ara-yazı yoxdur, ona görə
+        // ara-quota-xətası da yoxdur. Activity jurnalına yazılmır (bu,
+        // arxa fon köçürməsidir, istifadəçi əməliyyatı deyil).
+        const ok = JollyDB.write(key, items);
+        anyChanged = true;
+        if (!ok) allOk = false;
       }
     }
 
     try {
       await migrateList(JollyDB.Products);
       await migrateList(JollyDB.Drafts);
-      JollyDB.setSettings({ idbMigrated: true });
-      if (changed) console.log('JOLLY: şəkillər IndexedDB-yə köçürüldü');
+      // Yalnız localStorage yazısı da uğurlu olubsa "bitdi" işarələ —
+      // əks halda növbəti açılışda (bu dəfə daha yüngül halda) yenidən
+      // cəhd olunsun ki, problem özü-özünü düzəltsin.
+      if (allOk) JollyDB.setSettings({ idbMigrated: true });
+      if (anyChanged) console.log('JOLLY: şəkillər IndexedDB-yə köçürüldü' + (allOk ? '' : ' (qismən — növbəti açılışda davam edəcək)'));
     } catch (e) { console.error('Migration error', e); }
   }
 
