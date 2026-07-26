@@ -1,0 +1,79 @@
+═══════════════════════════════════════════════════════════════════
+🔧 PRODUCTS.JS PATCH INSTRUCTIONS
+RED BARKOD VURĞULAMASI — Acode-da Find/Replace istifadə et
+═══════════════════════════════════════════════════════════════════
+
+📝 STEP 1: Find/Replace açılışı (Acode)
+────────────────────────────────────────
+- Dosya açılıb: products.js
+- Ctrl+H (və ya menyudan: Edit → Find and Replace)
+
+═══════════════════════════════════════════════════════════════════
+🔴 REPLACEMENT #1 (Line ~1284-1298): _renderFilteredList() funksiyası
+═══════════════════════════════════════════════════════════════════
+
+FIND (KÖHNÜ KOD):
+────────────────
+  function _renderFilteredList() {
+    const el = document.getElementById('filteredList');
+    if (!el) return;
+    const q = (_filteredQuery || '').toLowerCase().trim();
+    let list = _filteredAll;
+    if (q) {
+      list = list.filter(p => {
+        const hay = [p.name, p.mainCode, p.extraCodeValue, p.color, p.note, ...(p.barcodes || [])].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    const countEl = document.getElementById('filteredCount');
+    if (countEl) countEl.textContent = String(list.length);
+    renderList(el, list);
+  }
+
+REPLACE WITH (YENİ KOD):
+───────────────────────
+  function _renderFilteredList() {
+    const el = document.getElementById('filteredList');
+    if (!el) return;
+    const q = (_filteredQuery || '').toLowerCase().trim();
+    let list = _filteredAll;
+    if (q) {
+      list = list.filter(p => {
+        const hay = [p.name, p.mainCode, p.extraCodeValue, p.color, p.note, ...(p.barcodes || [])].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+      // RED VURĞULAMA: barkodları highlight et
+      list.forEach(p => {
+        if (p.barcodes) {
+          p._highlightedBarcodes = p.barcodes.map(b => 
+            typeof JollyBarcodeFolder !== 'undefined' && JollyBarcodeFolder.highlightDigits 
+              ? JollyBarcodeFolder.highlightDigits(b, q.replace(/\D/g, ''))
+              : b
+          );
+        }
+      });
+    }
+    const countEl = document.getElementById('filteredCount');
+    if (countEl) countEl.textContent = String(list.length);
+    renderList(el, list);
+  }
+
+═══════════════════════════════════════════════════════════════════
+🔴 REPLACEMENT #2 (Line ~76-77): renderCard() funksiyasında barkod göstəriliş
+═══════════════════════════════════════════════════════════════════
+
+FIND (KÖHNÜ KOD):
+────────────────
+        ${(p.barcodes && p.barcodes.length) ? `<div class="mono" style="font-size:10.5px;color:var(--accent-2);letter-spacing:0.3px;opacity:.85;">🏷️ ${escapeHtml(p.barcodes[0])}${p.barcodes.length > 1 ? ` +${p.barcodes.length - 1}` : ''}</div>` : ''}
+
+REPLACE WITH (YENİ KOD):
+───────────────────────
+        ${(p.barcodes && p.barcodes.length) ? `<div class="mono" style="font-size:10.5px;color:var(--accent-2);letter-spacing:0.3px;opacity:.85;">🏷️ ${p._highlightedBarcodes ? p._highlightedBarcodes[0] : escapeHtml(p.barcodes[0])}${p.barcodes.length > 1 ? ` +${p.barcodes.length - 1}` : ''}</div>` : ''}
+
+═══════════════════════════════════════════════════════════════════
+🔴 REPLACEMENT #3 (Line ~149-151): renderMarkedForDeletionPage() 
+─ Əgər "İşarəli Məhsullar" ekranı işləmir problemləri varsa, 
+  bu funksiyaya bax. Amma artıq hazırdı, ehtimal ki problem olmayacaq!
+═══════════════════════════════════════════════════════════════════
+
+✅ BITDI! Indi Products.js-ə RED vurğulama əlavə oldu.

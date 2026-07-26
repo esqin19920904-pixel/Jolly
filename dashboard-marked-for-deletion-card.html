@@ -1,0 +1,26 @@
+<!-- 
+  Dashboard-da əlavə ediləcək kart — işarəli məhsullar (Admin-only)
+  Bu HTML-i dashboard.js render funksiyasına əlavə et
+-->
+
+<!-- YENİ (2026-07-27, #2): İşarəli məhsullar qısayolu -->
+<!-- Yalnız Admin sessiyasında göstəril -->
+<div id="marked-for-deletion-card" data-perm="products.delete" class="dash-card" onclick="JollyRouter.go('#/marked-for-deletion')" style="position:relative;background:linear-gradient(135deg, rgba(255,92,108,0.12) 0%, rgba(255,92,108,0.04) 100%);border-left-color:#ff5c6c;">
+  <div style="font-size:32px;margin-bottom:8px;">✕</div>
+  <div class="dash-label">İşarəli Məhsullar</div>
+  <div class="muted" style="font-size:11px;">Silinmə üçün işarələnmiş məhsullar — yalnız Admin təsdiqləyə bilər</div>
+  <div id="marked-count" class="dash-meta" style="margin-top:8px;font-weight:700;">—</div>
+</div>
+
+<script>
+// Şəkil yüklənəndən sonra işarəli məhsul sayını göstər
+setTimeout(function() {
+  if (typeof JollyDB === 'undefined') return;
+  const count = JollyDB.getMarkedForDeletion().length;
+  const countEl = document.getElementById('marked-count');
+  if (countEl) {
+    countEl.textContent = count > 0 ? (count + ' məhsul') : 'Heç biri';
+    countEl.style.color = count > 0 ? '#ff5c6c' : 'var(--text-low)';
+  }
+}, 200);
+</script>

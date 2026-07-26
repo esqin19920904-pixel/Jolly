@@ -1,0 +1,38 @@
+═══════════════════════════════════════════════════════════════════
+🔧 APP.JS PATCH INSTRUCTIONS
+İŞARƏLİ MƏHSULLAR ROUTE-U — Acode-da Find/Replace istifadə et
+═══════════════════════════════════════════════════════════════════
+
+📝 STEP 1: Find/Replace açılışı (Acode)
+────────────────────────────────────────
+- Dosya açılıb: app.js
+- Ctrl+H (və ya menyudan: Edit → Find and Replace)
+
+═══════════════════════════════════════════════════════════════════
+🔴 REPLACEMENT: marked-for-deletion ROUTE-u əlavə et
+═══════════════════════════════════════════════════════════════════
+
+FIND (KÖHNÜ KOD - Line ~136-139 ətrafında):
+────────────────────────────────────────────
+    } else if (segments[0] === 'drafts') {
+      html = JollyProducts.renderDraftsPage();
+    } else if (segments[0] === 'marked-for-deletion') {
+
+İS LAR BOŞDUR — BU ROUTE ARTIQ VARMIDIRSA, HEÇNE ETMƏYİN!
+
+Əgər YOXDURSA, bu kodu tap:
+    } else if (segments[0] === 'drafts') {
+      html = JollyProducts.renderDraftsPage();
+    } else if (segments[0] === 'product' && segments[1] === 'new') {
+
+REPLACE WITH:
+─────────────
+    } else if (segments[0] === 'drafts') {
+      html = JollyProducts.renderDraftsPage();
+    } else if (segments[0] === 'marked-for-deletion') {
+      html = JollyProducts.renderMarkedForDeletionPage();
+    } else if (segments[0] === 'product' && segments[1] === 'new') {
+
+═══════════════════════════════════════════════════════════════════
+
+✅ BITDI! İşarəli məhsullar ekranına #/marked-for-deletion-dən girə bilərsiniz.
