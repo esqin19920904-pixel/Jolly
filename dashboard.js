@@ -317,6 +317,9 @@ const JollyDashboard = (() => {
     { icon: 'boxplus', label: 'Məhsul yarat', sub: 'Tam məhsul kartı', neon: 'pink', route: '#/product/new' },
     { icon: 'scancenter', label: 'Skan mərkəzi', sub: 'Barkodla tap', neon: 'teal', action: "JollyProducts.scanSearch()" },
     { icon: 'shield', label: 'Düzəldiləcək', sub: 'Tamamlanmamışlar', neon: 'purple', route: '#/dashboard/incomplete', badgeFn: 'incompleteCount' },
+    // BÖYÜK kart (2026-07-27): Barkod Qovluğu kiçik qısayoldan böyük
+    // əməliyyat kartına keçirildi — gündəlik ən çox işlənən bölmədir.
+    { icon: 'barcode', label: 'Barkod Qovluğu', sub: 'Bütün barkodlar · tap və yarat', neon: 'blue', route: '#/barcode-folder' },
   ];
   const MORE = [
     { icon: 'image', label: 'Qalereya', neon: 'teal', route: '#/dashboard/gallery' },
@@ -332,7 +335,6 @@ const JollyDashboard = (() => {
     { icon: 'inbox', label: 'Qəbul Studio', neon: 'green', route: '#/receiving' },
     { icon: 'scancenter', label: 'Skan ilə Qəbul', neon: 'gold', route: '#/scan-receiving' },
     { icon: 'shield', label: 'SKT bitir', neon: 'red', route: '#/products?filter=expiring' },
-    { icon: 'barcode', label: 'Barkod Qovluğu', neon: 'blue', route: '#/barcode-folder' },
     { icon: 'camera', label: 'Şəkillə axtar', sub: 'Bazadan tap', neon: 'blue', action: "JollyProducts.photoSearch()" },
     { icon: 'box', label: 'Qruplar', neon: 'gold', route: '#/studios/admin/groups', perm: 'groups.manage' },
     { icon: 'trash', label: '✕ İşarəli Məhsullar', neon: 'red', route: '#/marked-for-deletion', perm: 'products.admin', badgeFn: 'markedCount' },
