@@ -31,14 +31,34 @@ const JollyDB = (() => {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
+  /* ── SÜRƏT KEŞİ (2026-07-27) ────────────────────────────────
+     Bir render zamanı Products.all() onlarla dəfə çağırılırdı və hər
+     dəfə bütün məhsul cədvəli localStorage-dan oxunub JSON.parse
+     edilirdi. Aşağıdakı keş cəmi 150 ms yaşayır: eyni render
+     daxilindəki təkrar oxumaları kəsir, amma məlumat köhnəlmir —
+     hər yazıda dərhal təmizlənir. */
+  const _rcache = new Map();
+  const RCACHE_MS = 150;
+  function _cacheInvalidate(key) {
+    if (key) _rcache.delete(key); else _rcache.clear();
+  }
+  try {
+    window.addEventListener('storage', () => _cacheInvalidate());
+  } catch (e) {}
+
   function read(key, fallback) {
+    const hit = _rcache.get(key);
+    if (hit && (Date.now() - hit.t) < RCACHE_MS) {
+      return hit.missing ? fallback : hit.v;
+    }
     try {
       const raw = localStorage.getItem(key);
-      if (!raw) return fallback;
+      if (!raw) { _rcache.set(key, { t: Date.now(), missing: true }); return fallback; }
       const parsed = JSON.parse(raw);
       // localStorage-da hərfi "null" kimi yazılmış qeydlər (köhnə bug) —
       // fallback-ə qayıt, çökməyə qoyma.
-      if (parsed === null || parsed === undefined) return fallback;
+      if (parsed === null || parsed === undefined) { _rcache.set(key, { t: Date.now(), missing: true }); return fallback; }
+      _rcache.set(key, { t: Date.now(), v: parsed });
       return parsed;
     } catch (e) {
       console.error('JollyDB read error', key, e);
@@ -65,6 +85,7 @@ const JollyDB = (() => {
      data-saver rejimində storage tam bağlıdır, və s.) fərqli, addım
      göstərən mesajla bildirilir ki, əsl səbəb aydın olsun. */
   function write(key, value, _retrying) {
+    _cacheInvalidate(key);
     try {
       localStorage.setItem(key, JSON.stringify(value));
       if (key === 'jolly_products' || key === 'jolly_drafts' || key === 'jolly_brands' || key === 'jolly_groups' || key === 'jolly_locations' || key === 'jolly_statuses' || key === 'jolly_suppliers') {
@@ -97,6 +118,7 @@ const JollyDB = (() => {
   // sadəcə qısaldılır) ki, təzə yazı üçün yer açılsın. Trash-in özü
   // 30 gündən köhnə qeydləri silir, digərləri ölçü limitinə salınır.
   function emergencyFreeSpace() {
+    _cacheInvalidate();
     let didSomething = false;
     try {
       const trash = read(KEYS.trash, []);
@@ -481,8 +503,7 @@ const JollyDB = (() => {
     getSettings: () => read(KEYS.settings, {}) || {},
     setSettings: (patch) => write(KEYS.settings, { ...(read(KEYS.settings, {}) || {}), ...patch }),
     /* Bütün settings obyektini olduğu kimi yazır. app.js və jolly-ota.js
-       bunu çağırırdı, amma funksiya yox idi — fallback isə səhv açara
-       ('settings') yazırdı, ona görə PIN sıfırlama heç nə etmirdi. */
+       bunu çağırırdı, amma funksiya yox idi. */
     saveSettings: (obj) => write(KEYS.settings, obj || {}),
     getEdgeConfig: () => read(KEYS.edge, { items: [] }),
     setEdgeConfig: (cfg) => write(KEYS.edge, cfg),

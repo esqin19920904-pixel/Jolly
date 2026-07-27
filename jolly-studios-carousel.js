@@ -76,10 +76,20 @@
     });
   }
 
-  setInterval(pollAndApply, 600);
+  /* SÜRƏT (2026-07-27): əvvəl hər 600 ms-də bir bütün DOM taranırdı —
+     hətta Studios ekranı açıq olmayanda da. İndi yalnız ekran
+     dəyişəndə və render bitəndə bir neçə dəfə işləyir. */
+  let _passes = null;
+  function schedulePasses() {
+    if (_passes) { _passes.forEach(clearTimeout); }
+    _passes = [0, 150, 400, 900].map(ms => setTimeout(pollAndApply, ms));
+  }
+
+  window.addEventListener("hashchange", schedulePasses);
+  document.addEventListener("jolly:rendered", schedulePasses);
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", pollAndApply);
+    document.addEventListener("DOMContentLoaded", schedulePasses);
   } else {
-    pollAndApply();
+    schedulePasses();
   }
 })();

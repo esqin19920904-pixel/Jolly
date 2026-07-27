@@ -133,7 +133,7 @@ const JollyApp = (() => {
     } else if (segments[0] === 'barcode-folder') {
       html = (typeof JollyBarcodeFolder !== 'undefined')
         ? JollyBarcodeFolder.render()
-        : '<div class="empty-state"><div class="big-icon">\u{1F4C1}</div><h3>Barkod Qovlu\u011fu y\u00fckl\u0259nm\u0259yib</h3><p class="muted" style="font-size:12px;">index.html-d\u0259 &lt;script defer src="jolly-barcode-folder.js"&gt;&lt;/script&gt; s\u0259tri yoxdur.</p></div>';
+        : '<div class="empty-state"><div class="big-icon">\u{1F4C1}</div><h3>Barkod Qovlu\u011fu y\u00fckl\u0259nm\u0259yib</h3></div>';
     } else if (segments[0] === 'chat') {
       html = (typeof JollyChat !== 'undefined') ? JollyChat.render() : '<div class="empty-state"><div class="big-icon">💬</div><h3>Chat yüklənməyib</h3></div>';
     } else if (segments[0] === 'data-doctor') {
@@ -233,11 +233,11 @@ const JollyApp = (() => {
     window.scrollTo(0, 0);
   }
 
-  /* data-perm / data-perm-module atributlarını hər render-dən sonra tətbiq et.
-     Əvvəl bu yalnız studios.js-də çağırılırdı — İş masasındakı admin
-     kartları adi işçiyə də görünürdü. */
+  /* data-perm atributlarını hər render-dən sonra tətbiq et. */
   function applyPermissionsToDOM() {
     try { if (typeof POS !== 'undefined' && POS.syncUI) POS.syncUI(); } catch (e) {}
+    // Render bitdi — digər modullar (məs. Studios karuseli) buna qulaq asır
+    try { document.dispatchEvent(new CustomEvent('jolly:rendered')); } catch (e) {}
   }
 
   // Ripple click effekti

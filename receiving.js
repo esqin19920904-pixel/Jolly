@@ -722,7 +722,16 @@ const JollyReceiving = (() => {
     if (window.__recvFocusInterval) clearInterval(window.__recvFocusInterval);
     window.__recvFocusInterval = setInterval(() => {
       const i = document.getElementById('recvCapture');
-      if (i && document.activeElement !== i) i.focus();
+      // DÜZƏLİŞ (2026-07-27): skan ekranından çıxdıqda taymer özünü
+      // dayandırır. Əvvəl işləməyə davam edirdi və proqramın hər
+      // yerində hər 1.5 saniyədə fokusu oğurlamağa çalışırdı —
+      // axtarış qutusuna yazmağı pozurdu və batareyanı yeyirdi.
+      if (!i) {
+        clearInterval(window.__recvFocusInterval);
+        window.__recvFocusInterval = null;
+        return;
+      }
+      if (document.activeElement !== i) i.focus();
     }, 1500);
   }
 
