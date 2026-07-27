@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>JOLLY — Kodsuz Mallar Pro</title>
+<meta name="theme-color" content="#06070d">
+<meta name="description" content="JOLLY — mağaza məhsullarının ağıllı idarəetmə sistemi">
+<meta name="format-detection" content="telephone=no">
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JOLLY">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="msapplication-TileColor" content="#06070d">
+<meta name="msapplication-TileImage" content="icon-144.png">
+
+<link rel="preconnect" href="https://accounts.google.com">
+<link rel="dns-prefetch" href="https://accounts.google.com">
+
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="jolly-edge-neon.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div class="ambient-bg"></div>
+
+  <div id="app">
+    <div class="topbar topbar-pro">
+      <button class="icon-btn" id="globalBackBtn" title="Geri" style="display:none;">‹</button>
+      <div class="brand" id="logoHome" title="Ana menyu">
+        <div class="brand-logo">👑 JOLLY</div>
+        <div class="brand-sub">Kodsuz Mallar Pro</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="icon-btn hidden-btn" id="cmdBtn" title="Sürətli əmr">⌘</button>
+      <button class="icon-btn hidden-btn" id="backupPill" title="Backup" style="position:relative;">💾<span id="backupDot" class="backup-dot"></span></button>
+      <div class="top-actions">
+        <button class="top-act" id="notifBell" title="Bildirişlər">
+          <span class="ta-icon" id="taBellIcon"></span><span class="ta-badge" id="notifBadge" style="display:none;">0</span>
+          <span class="ta-label">Bildiriş</span>
+        </button>
+        <button class="top-act" id="topAiBtn" title="AI Brain">
+          <span class="ta-icon ta-purple" id="taBrainIcon"></span>
+          <span class="ta-label">AI Brain</span>
+        </button>
+        <button class="top-act" id="topStudiosBtn" title="Studio">
+          <span class="ta-icon" id="taGearIcon"></span>
+          <span class="ta-label">Studio</span>
+        </button>
+      </div>
+    </div>
+
+    <main id="main"></main>
+
+    <nav class="bottom-nav" id="bottomNav"></nav>
+  </div>
+
+  <div class="edge-tab" id="edgeTab">›</div>
+  <div class="edge-scrim" id="edgeScrim"></div>
+  <aside class="edge-panel" id="edgePanel"></aside>
+
+  <script defer src="jolly-blackbox.js?v=2"></script>
+  <script defer src="jolly-diag.js"></script>
+  <script defer src="db.js"></script>
+  <script defer src="module-registry.js"></script>
+  <script defer src="night-mode.js"></script>
+  <script defer src="storage.js"></script>
+  <script defer src="cloud.js?v=4"></script>
+  <script defer src="toast.js"></script>
+  <script defer src="cleanup.js"></script>
+  <script defer src="sound.js"></script>
+  <script defer src="haptic-fx.js"></script>
+  <script defer src="barcode.js"></script>
+  <script defer src="barcode-gen.js"></script>
+  <script defer src="share.js"></script>
+  <script defer src="gallery.js"></script>
+  <script defer src="voice.js"></script>
+  <script defer src="viewer.js"></script>
+  <script defer src="ai.js?v=2"></script>
+  <script defer src="ai-shortcuts.js"></script>
+  <script defer src="jolly-ai-dictionary.js"></script>
+  <script defer src="jolly-ai-typo.js"></script>
+  <script defer src="jolly-ai-search.js"></script>
+  <script defer src="jolly-ai-intent.js"></script>
+  <script defer src="jolly-ai-health.js"></script>
+  <script defer src="jolly-ai-actions.js"></script>
+  <script defer src="jolly-ai-voice.js"></script>
+  <script defer src="jolly-ai-ui.js"></script>
+  <script defer src="jolly-ai-core.js"></script>
+  <script defer src="jolly-gemini.js"></script>
+  <script defer src="jolly-ai-studio.js"></script>
+  <script defer src="brain.js"></script>
+  <script defer src="command.js"></script>
+  <script defer src="product-pro.js"></script>
+  <script defer src="ux-pro.js"></script>
+  <script defer src="insight.js"></script>
+  <script defer src="bulk.js"></script>
+  <script defer src="fx-engine.js"></script>
+  <script defer src="reveal.js"></script>
+  <script defer src="quick.js"></script>
+  <script defer src="history.js"></script>
+  <script defer src="data-doctor.js"></script>
+  <script defer src="products.js"></script>
+  <script defer src="chat.js?v=2"></script>
+  <script defer src="admin-studio.js"></script>
+  <script defer src="workflow.js"></script>
+  <script defer src="code-studio.js"></script>
+  <script defer src="jolly-ota.js"></script>
+  <script defer src="jolly-icons.js"></script>
+  <script defer src="jolly-ai-daily.js"></script>
+  <script defer src="jolly-product-dna.js"></script>
+  <script defer src="jolly-fix-mode.js"></script>
+  <script defer src="jolly-health-report.js"></script>
+  <script defer src="jolly-import.js"></script>
+  <script defer src="jolly-store-map.js"></script>
+  <script defer src="jolly-barcode-folder.js"></script>
+  <script defer src="dashboard.js"></script>
+  <script defer src="studios.js?v=2"></script>
+  <script defer src="edge-panel.js"></script>
+  <script defer src="jolly-edge-neon.js"></script>
+  <script defer src="map.js"></script>
+  <script defer src="receiving.js"></script>
+  <script defer src="scan-receiving.js"></script>
+  <script defer src="quick-menu.js"></script>
+  <script defer src="radial-fab.js"></script>
+  <script defer src="jolly-users.js"></script>
+  <script defer src="permission-engine.js"></script>
+  <script defer src="security.js"></script>
+  <script defer src="admin-permissions.js"></script>
+  <script defer src="jolly-users-studio.js"></script>
+  <script defer src="filter-studio.js"></script>
+  <script defer src="supplier-order.js"></script>
+  <script defer src="bottom-dock.js"></script>
+  <script defer src="jolly-events.js"></script>
+  <script defer src="jolly-biometric.js"></script>
+  <script defer src="jolly-devmode.js"></script>
+  <!-- YENİ (2026-07-27, #5 + #4): Samsung Swipe Menü + Offline Diaqnoz -->
+  <script defer src="offline-diagnostic.js"></script>
+  <!-- YENİ SONU -->
+  <script defer src="app.js"></script>
+  <script defer src="jolly-lazy-loader.js"></script>
+  <script defer src="jolly-particles.js"></script>
+  <script defer src="jolly-transitions.js"></script>
+  <script defer src="jolly-fx-polish.js"></script>
+  <script defer src="jolly-back-guard.js?v=3"></script>
+  <script defer src="tools-menu.js?v=2"></script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").then((reg) => {
+          console.log("[JOLLY] Service Worker qeydiyyatdan keçdi — offline dəstək aktivdir");
+          reg.addEventListener("updatefound", () => {
+            const nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener("statechange", () => {
+              if (nw.state === "installed" && navigator.serviceWorker.controller) {
+                if (typeof Toast !== "undefined") Toast.info("😅 Gör indi qadan najarax — yeniləmə gəlir, bir az gözlə bala 🔄");
+              }
+            });
+          });
+        }).catch((e) => {
+          console.warn("[JOLLY] Service Worker qeydiyyata alınmadı:", e);
+        });
+      });
+    }
+  </script>
+
+
+</body>
+</html>
