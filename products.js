@@ -35,8 +35,31 @@ const JollyProducts = (() => {
     return `hsl(${h % 360}, 65%, 58%)`;
   }
 
+  /* ── AXTARIŞ VURĞULAMASI (2026-07-27) ──────────────────────────
+     Axtarışda tapılan hissə bütün siyahılarda QIRMIZI göstərilir. */
+  let _hlTerms = [];
+
+  function setHighlightTerms(terms) {
+    _hlTerms = (terms || []).map(t => String(t || '').trim()).filter(t => t.length >= 1);
+  }
+  function clearHighlightTerms() { _hlTerms = []; }
+
+  function hl(text) {
+    const safe = escapeHtml(text == null ? '' : text);
+    if (!_hlTerms.length || !safe) return safe;
+    let out = safe;
+    const terms = _hlTerms.slice().sort((a, b) => b.length - a.length);
+    terms.forEach(term => {
+      const esc = escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (!esc) return;
+      out = out.replace(new RegExp('(' + esc + ')(?![^<]*>)', 'gi'),
+        '<span style="color:#ff5c6c;font-weight:800;">$1</span>');
+    });
+    return out;
+  }
+
   function renderCard(p) {
-    const thumb = (p.images && p.images[0]) ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} alt="">` : '🧴';
+    const thumb = (p.images && p.images[0]) ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0], true) : 'src="' + p.images[0] + '"'} alt="">` : '🧴';
     const pki = escapeHtml(JSON.stringify(p.images || []));
     const st = (p.status || '').toLowerCase();
     const glowClass = st.includes('problem') ? 'card-glow-danger' : (st.includes('yeni') ? 'card-glow-new' : '');
@@ -72,9 +95,9 @@ const JollyProducts = (() => {
         ${isMarked ? `<div style="position:absolute;top:38px;left:6px;z-index:6;background:var(--accent-danger,#ff5c6c);color:#fff;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:8px;">SİLİNMƏLİ</div>` : ''}
         ${p.alertFlag ? `<div style="position:absolute;top:38px;right:6px;z-index:6;background:var(--accent-danger,#ff5c6c);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;display:flex;align-items:center;gap:4px;">🚨 XƏBƏRDARLIQ</div>` : ''}
         <div class="thumb peekable" data-pki='${pki}' data-pkx="0">${thumb}</div>
-        <div class="p-name">${escapeHtml(p.name || 'Adsız məhsul')}</div>
-        <div class="p-meta">${escapeHtml(p.mainCode || '')}${p.extraCodeValue ? ' · ' + escapeHtml(p.extraCodeType || '') + ' ' + escapeHtml(p.extraCodeValue) : ''}</div>
-        ${(p.barcodes && p.barcodes.length) ? `<div class="mono" style="font-size:10.5px;color:var(--accent-2);letter-spacing:0.3px;opacity:.85;">🏷️ ${escapeHtml(p.barcodes[0])}${p.barcodes.length > 1 ? ` +${p.barcodes.length - 1}` : ''}</div>` : ''}
+        <div class="p-name">${hl(p.name || 'Adsız məhsul')}</div>
+        <div class="p-meta">${hl(p.mainCode || '')}${p.extraCodeValue ? ' · ' + escapeHtml(p.extraCodeType || '') + ' ' + escapeHtml(p.extraCodeValue) : ''}</div>
+        ${(p.barcodes && p.barcodes.length) ? `<div class="mono" style="font-size:10.5px;color:var(--accent-2);letter-spacing:0.3px;opacity:.85;">🏷️ ${hl(p.barcodes[0])}${p.barcodes.length > 1 ? ` +${p.barcodes.length - 1}` : ''}</div>` : ''}
         <div class="row between">
           <span class="p-price" onclick="event.stopPropagation();JollyProducts.quickEditPrice('${p.id}', this)" title="Tez qiymət dəyiş">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'} ✎</span>
           ${p.status ? `<span class="status-pill" onclick="event.stopPropagation();JollyProducts.quickEditStatus('${p.id}', this)" title="Tez status dəyiş" style="cursor:pointer;"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)} ✎</span>` : `<span class="status-pill" onclick="event.stopPropagation();JollyProducts.quickEditStatus('${p.id}', this)" style="cursor:pointer;opacity:.6;">— status seç</span>`}
@@ -322,8 +345,10 @@ const JollyProducts = (() => {
     return `<div class="view-toggle-jolly">${b('row', '☰ Sıra')}${b('grid', '▦ Şəbəkə')}${b('single', '🖼️ Tək')}${b('quad', '🔳 4-lü')}</div>`;
   }
 
+  /* Siyahı görünüşləri kiçik nüsxəni (thumbnail) istəyir — tam ölçülü
+     şəkil yalnız məhsulun öz səhifəsində açılır. */
   function _thumbHtml(p) {
-    return (p.images && p.images[0]) ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} alt="">` : '🧴';
+    return (p.images && p.images[0]) ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0], true) : 'src="' + p.images[0] + '"'} alt="">` : '🧴';
   }
   function _priceHtml(p) {
     return p.price != null && p.price !== '' ? p.price + ' ₼' : '—';
@@ -336,12 +361,12 @@ const JollyProducts = (() => {
         <span class="rowdel-btn" onclick="event.stopPropagation();JollyProducts.deleteFromFilteredView('${p.id}')" title="Sil">🗑️</span>
         <div class="prow-thumb press-zone" data-id="${p.id}" data-kind="image">${_thumbHtml(p)}</div>
         <div class="prow-mid">
-          <div class="prow-name">${escapeHtml(p.name || 'Adsız məhsul')}</div>
-          <div class="prow-meta">${escapeHtml(p.mainCode || '')}</div>
+          <div class="prow-name">${hl(p.name || 'Adsız məhsul')}</div>
+          <div class="prow-meta">${hl(p.mainCode || '')}</div>
         </div>
         <div class="prow-right">
           <div class="prow-price">${_priceHtml(p)}</div>
-          ${bc ? `<div class="prow-barcode press-zone" data-id="${p.id}" data-kind="barcode">📷 ${escapeHtml(bc)}</div>` : ''}
+          ${bc ? `<div class="prow-barcode press-zone" data-id="${p.id}" data-kind="barcode">📷 ${hl(bc)}</div>` : ''}
         </div>
       </div>
     `;
@@ -353,11 +378,11 @@ const JollyProducts = (() => {
       <div class="qcard" data-id="${p.id}" onclick="JollyRouter.go('#/product/${p.id}')">
         <span class="rowdel-btn" onclick="event.stopPropagation();JollyProducts.deleteFromFilteredView('${p.id}')" title="Sil">🗑️</span>
         <div class="qcard-photo press-zone" data-id="${p.id}" data-kind="image">${_thumbHtml(p)}</div>
-        <div class="qcard-name">${escapeHtml(p.name || 'Adsız məhsul')}</div>
-        <div class="qcard-code">${escapeHtml(p.mainCode || '')}</div>
+        <div class="qcard-name">${hl(p.name || 'Adsız məhsul')}</div>
+        <div class="qcard-code">${hl(p.mainCode || '')}</div>
         <div class="qcard-row">
           <span class="qcard-price">${_priceHtml(p)}</span>
-          ${bc ? `<span class="qcard-barcode press-zone" data-id="${p.id}" data-kind="barcode">📷 ${escapeHtml(bc)}</span>` : ''}
+          ${bc ? `<span class="qcard-barcode press-zone" data-id="${p.id}" data-kind="barcode">📷 ${hl(bc)}</span>` : ''}
         </div>
       </div>
     `;
@@ -389,11 +414,11 @@ const JollyProducts = (() => {
         <div class="vcard ${cls}" onclick="JollyRouter.go('#/product/${p.id}')">
           <span class="rowdel-btn" onclick="event.stopPropagation();JollyProducts.deleteFromVitrin('${p.id}')" title="Sil">🗑️</span>
           <div class="vcard-photo press-zone" data-id="${p.id}" data-kind="image">${_thumbHtml(p)}</div>
-          <div class="vcard-name">${escapeHtml(p.name || 'Adsız məhsul')}</div>
-          <div class="vcard-code">${escapeHtml(p.mainCode || '')}</div>
+          <div class="vcard-name">${hl(p.name || 'Adsız məhsul')}</div>
+          <div class="vcard-code">${hl(p.mainCode || '')}</div>
           <div class="vcard-row">
             <span class="vcard-price">${_priceHtml(p)}</span>
-            ${bc ? `<span class="vcard-barcode press-zone" data-id="${p.id}" data-kind="barcode">📷 ${escapeHtml(bc)}</span>` : ''}
+            ${bc ? `<span class="vcard-barcode press-zone" data-id="${p.id}" data-kind="barcode">📷 ${hl(bc)}</span>` : ''}
           </div>
         </div>
       `;
@@ -409,6 +434,7 @@ const JollyProducts = (() => {
     renderVitrinCards();
   }
   function deleteFromVitrin(id) {
+    if (!_isAdminSession()) { toggleMarkForDeletion(id); return; }
     if (!confirm('Məhsul silinsin? (Silinənlər səbətinə düşəcək, 30 gün ərzində bərpa edə bilərsən)')) return;
     if (!checkPinForDelete()) return;
     const p = JollyDB.Products.get(id);
@@ -608,6 +634,15 @@ const JollyProducts = (() => {
 
   function bulkDeleteSelected() {
     if (!bulkSelectedIds.size) return;
+    if (!_isAdminSession()) {
+      bulkSelectedIds.forEach(id => {
+        if (!JollyDB.isMarkedForDeletion(id)) JollyDB.markForDeletion(id, _currentActorName());
+      });
+      Toast.info('\u2715 Se\u00e7il\u0259nl\u0259r silinm\u0259k \u00fc\u00e7\u00fcn i\u015far\u0259l\u0259ndi \u2014 Admin t\u0259sdiql\u0259m\u0259lidir');
+      bulkSelectedIds.clear();
+      if (typeof JollyApp !== 'undefined') JollyApp.render();
+      return;
+    }
     if (window.JollyAuth && !JollyAuth.can('products.delete')) {
       Toast.error('🔒 Silmə icazən yoxdur — Admin-dən istə');
       return;
@@ -722,7 +757,8 @@ const JollyProducts = (() => {
     if (_searchDebounce) clearTimeout(_searchDebounce);
     _searchDebounce = setTimeout(() => {
       if (!q && !homeState.chain.length) {
-        removeChainBar(); removeSuggestBar();
+        clearHighlightTerms();
+        removeChainBar(); removeSuggestBar(); removeMatchSuggestBar();
         afterHomeRender();
         return;
       }
@@ -750,6 +786,8 @@ const JollyProducts = (() => {
 
   function applyChainSearch(liveTerm) {
     const results = chainedProducts(liveTerm);
+    setHighlightTerms(homeState.chain.concat(liveTerm && liveTerm.trim() ? [liveTerm.trim()] : []));
+    setTimeout(() => renderMatchSuggestChips(results, liveTerm), 0);
     renderChainSuggestChips(results);
     const titleEl = document.querySelector('.section-title');
     if (titleEl) {
@@ -1014,6 +1052,69 @@ const JollyProducts = (() => {
       if (anchor) anchor.insertAdjacentHTML('afterend', html);
     }
   }
+
+  /* ── DƏQİQ UYĞUNLUQ TƏKLİFLƏRİ (2026-07-27) ──────────────────
+     Barkod Qovluğundakı davranışın eynisi ana axtarışda da:
+     2+ rəqəm/hərf yazan kimi uyğun gələn barkod və adlar düymə
+     kimi çıxır, tapılan hissə qırmızı olur. Toxunanda birbaşa
+     həmin məhsul açılır — tam nömrəni yazmaq lazım deyil. */
+  const MATCH_SUGGEST_MAX = 8;
+
+  function _matchHighlight(text, term) {
+    const c = String(text || '');
+    const t = String(term || '').trim();
+    if (!t) return escapeHtml(c);
+    const i = c.toLowerCase().indexOf(t.toLowerCase());
+    if (i === -1) return escapeHtml(c);
+    return escapeHtml(c.slice(0, i)) +
+      '<span style="color:#ff5c6c;font-weight:800;">' + escapeHtml(c.slice(i, i + t.length)) + '</span>' +
+      escapeHtml(c.slice(i + t.length));
+  }
+
+  function renderMatchSuggestChips(results, term) {
+    const existing = document.getElementById('matchSuggestBar');
+    const t = String(term || '').trim();
+    if (t.length < 2 || !results || !results.length) { if (existing) existing.remove(); return; }
+
+    const digits = t.replace(/\D/g, '');
+    const byBarcode = digits.length >= 2;
+    const items = [];
+    const seen = new Set();
+
+    results.forEach(p => {
+      if (items.length >= MATCH_SUGGEST_MAX) return;
+      if (byBarcode) {
+        (p.barcodes || []).forEach(bc => {
+          if (items.length >= MATCH_SUGGEST_MAX) return;
+          const code = String(bc);
+          if (code.includes(digits) && !seen.has(code)) {
+            seen.add(code);
+            items.push({ id: p.id, icon: '🏷️', text: code, term: digits, title: p.name || '' });
+          }
+        });
+      }
+      if (items.length >= MATCH_SUGGEST_MAX) return;
+      const nm = p.name || '';
+      if (nm.toLowerCase().includes(t.toLowerCase()) && !seen.has('n' + p.id)) {
+        seen.add('n' + p.id);
+        items.push({ id: p.id, icon: '📦', text: nm, term: t, title: nm });
+      }
+    });
+
+    if (!items.length) { if (existing) existing.remove(); return; }
+
+    const html = `
+      <div class="chip-row" id="matchSuggestBar" style="margin-bottom:6px;">
+        <span class="muted" style="font-size:11px;margin-right:2px;">Tapıldı:</span>
+        ${items.map(it => `<span class="chip" title="${escapeHtml(it.title)}" onclick="JollyRouter.go('#/product/${it.id}')">${it.icon} <span class="mono">${_matchHighlight(it.text, it.term)}</span></span>`).join('')}
+      </div>`;
+
+    if (existing) { existing.outerHTML = html; return; }
+    const searchBar = document.querySelector('.command-bar');
+    if (searchBar) searchBar.insertAdjacentHTML('afterend', html);
+  }
+
+  function removeMatchSuggestBar() { const b = document.getElementById('matchSuggestBar'); if (b) b.remove(); }
 
   function removeChainBar() { const b = document.getElementById('chainFilterBar'); if (b) b.remove(); }
   function removeSuggestBar() { const b = document.getElementById('suggestFilterBar'); if (b) b.remove(); }
@@ -1752,6 +1853,7 @@ const JollyProducts = (() => {
   }
 
   function deleteFromFilteredView(id) {
+    if (!_isAdminSession()) { toggleMarkForDeletion(id); return; }
     if (!confirm('Məhsul silinsin? (Silinənlər səbətinə düşəcək, 30 gün ərzində bərpa edə bilərsən)')) return;
     if (!checkPinForDelete()) return;
     const p = JollyDB.Products.get(id);
@@ -1772,6 +1874,7 @@ const JollyProducts = (() => {
   }
 
   function deleteProduct(id) {
+    if (!_isAdminSession()) { toggleMarkForDeletion(id); return; }
     if (!confirm('Məhsul silinsin? (Silinənlər səbətinə düşəcək, 30 gün ərzində bərpa edə bilərsən)')) return;
     if (!checkPinForDelete()) return;
     const p = JollyDB.Products.get(id);
@@ -2863,7 +2966,7 @@ const JollyProducts = (() => {
           <span style="font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--accent-2);">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'}</span>
           ${p.status ? `<span class="status-pill"><span class="dot" style="background:${statusColor(p.status)}"></span>${escapeHtml(p.status)}</span>` : ''}
         </div>
-        ${(p.barcodes && p.barcodes[0]) ? `<div class="mono" style="font-size:12px;color:var(--accent-2);margin-top:6px;">🏷️ ${escapeHtml(p.barcodes[0])}</div>` : ''}
+        ${(p.barcodes && p.barcodes[0]) ? `<div class="mono" style="font-size:12px;color:var(--accent-2);margin-top:6px;">🏷️ ${hl(p.barcodes[0])}</div>` : ''}
         ${p.brand ? `<div class="muted" style="font-size:12px;margin-top:4px;">🏭 ${escapeHtml(p.brand)}</div>` : ''}
         <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="document.getElementById('quickPreviewOverlay').classList.remove('on');JollyRouter.go('#/product/${p.id}')">Tam kartı aç ›</button>
       </div>
@@ -2927,6 +3030,7 @@ const JollyProducts = (() => {
     openSearchHistory, clearSearchHistory, applyDidYouMean,
     saveCurrentFilterSet, openSavedFilters, applySavedFilter, deleteSavedFilter,
     toggleBulkSelectMode, toggleBulkSelect, shareSelectedViaWhatsApp, bulkDeleteSelected,
+    setHighlightTerms, clearHighlightTerms, hl, renderMatchSuggestChips,
     openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,
