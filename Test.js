@@ -1,1 +1,0 @@
-// Əskik modulları index.html-də <script> kimi əlavə et
