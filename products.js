@@ -1323,6 +1323,31 @@ const JollyProducts = (() => {
     });
   }
 
+  /* Tanınmayan skan → Barkod Qovluğu ("Yaradılanlar").
+     Qovluq modulu ilə eyni açardan istifadə edir ki, orada dərhal görünsün.
+     Artıq varsa təkrar yazmır. Qaytarır: yeni yazıldımı? */
+  function _parkUnknownBarcode(code) {
+    try {
+      const KEY = 'jolly_barcode_folder_generated';
+      const c = String(code || '').replace(/\D/g, '');
+      if (!c) return false;
+      const list = JollyDB.read(KEY, []) || [];
+      if (list.some(g => String(g.code) === c)) return false;
+      list.unshift({
+        id: 'bcg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        code: c,
+        label: '',
+        source: 'scan',
+        createdAt: Date.now()
+      });
+      JollyDB.write(KEY, list);
+      return true;
+    } catch (e) {
+      console.warn('[Products] _parkUnknownBarcode:', e);
+      return false;
+    }
+  }
+
   function scanSearch() {
     JollyBarcode.open((code) => {
       const found = JollyDB.Products.findByBarcode(code);
@@ -1337,8 +1362,12 @@ const JollyProducts = (() => {
         document.getElementById('homeSearch').value = code;
         liveSearch(code);
       } else {
+        // Tanınmayan kod itməsin — dərhal Barkod Qovluğunun
+        // "Yaradılanlar" bölməsinə yazılır (tarixi ilə). İstifadəçi
+        // indi məhsul yaratmasa da, axşam qovluqdan tamamlaya bilər.
+        const parked = _parkUnknownBarcode(code);
         Toast.error(`Barkod tapılmadı: ${code}`);
-        if (confirm(`"${code}" barkodu heç bir məhsulda yoxdur. Yeni məhsul yaratmaq istəyirsən?`)) {
+        if (confirm(`"${code}" heç bir məhsulda yoxdur.\n\n${parked ? 'Barkod Qovluğuna yazıldı — sonra da tamamlaya bilərsən.' : 'Bu kod artıq Barkod Qovluğundadır.'}\n\nİndi məhsul yaratmaq istəyirsən?`)) {
           sessionStorage.setItem('jolly_prefill_barcode', code);
           JollyRouter.go('#/product/new');
         }

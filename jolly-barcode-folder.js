@@ -78,7 +78,8 @@ const JollyBarcodeFolder = (() => {
       productId: null,
       generated: true,
       genId: g.id,
-      createdAt: g.createdAt
+      createdAt: g.createdAt,
+      source: g.source || 'manual'
     }));
   }
 
@@ -128,7 +129,7 @@ const JollyBarcodeFolder = (() => {
           <div style="flex:1;min-width:0;">
             <div style="font-size:13.5px;font-weight:600;">${name}</div>
             <div class="mono" style="font-size:11.5px;color:var(--text-low,#6c7192);margin-top:2px;">${highlightDigits(entry.code, query)}</div>
-            ${when ? `<div class="muted" style="font-size:10.5px;margin-top:2px;">🆕 ${when}</div>` : ''}
+            ${when ? `<div class="muted" style="font-size:10.5px;margin-top:2px;">${entry.source === 'scan' ? '📷 Skanda tapılmadı' : '🆕'} · ${when}</div>` : ''}
           </div>
         </div>
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
@@ -209,7 +210,7 @@ const JollyBarcodeFolder = (() => {
       el.className = '';
       el.innerHTML = created.length
         ? created.map(e => _generatedRow(e, q)).join('')
-        : `<div class="empty-state"><div class="big-icon">🆕</div><h3>Hələ yaradılmış barkod yoxdur</h3><p class="muted" style="font-size:12px;">Yuxarıda sistemdə olmayan bir rəqəm yaz — avtomatik bura düşəcək.</p></div>`;
+        : `<div class="empty-state"><div class="big-icon">🆕</div><h3>Hələ yaradılmış barkod yoxdur</h3><p class="muted" style="font-size:12px;">Yuxarıda sistemdə olmayan bir rəqəm yaz — və ya kassada tanınmayan bir kod skan et — avtomatik bura düşəcək.</p></div>`;
       return;
     }
 
