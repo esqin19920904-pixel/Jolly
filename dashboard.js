@@ -317,9 +317,6 @@ const JollyDashboard = (() => {
     { icon: 'boxplus', label: 'Məhsul yarat', sub: 'Tam məhsul kartı', neon: 'pink', route: '#/product/new' },
     { icon: 'scancenter', label: 'Skan mərkəzi', sub: 'Barkodla tap', neon: 'teal', action: "JollyProducts.scanSearch()" },
     { icon: 'shield', label: 'Düzəldiləcək', sub: 'Tamamlanmamışlar', neon: 'purple', route: '#/dashboard/incomplete', badgeFn: 'incompleteCount' },
-    // BÖYÜK kart (2026-07-27): Barkod Qovluğu kiçik qısayoldan böyük
-    // əməliyyat kartına keçirildi — gündəlik ən çox işlənən bölmədir.
-    { icon: 'barcode', label: 'Barkod Qovluğu', sub: 'Bütün barkodlar · tap və yarat', neon: 'blue', route: '#/barcode-folder' },
   ];
   const MORE = [
     { icon: 'image', label: 'Qalereya', neon: 'teal', route: '#/dashboard/gallery' },
@@ -389,6 +386,9 @@ const JollyDashboard = (() => {
     const inc = BADGES.incompleteCount();
     const noImg = JollyDB.Products.all().filter(p => !p.images || !p.images.length).length;
     const noBc = JollyDB.Products.all().filter(p => !p.barcodes || !p.barcodes.length).length;
+    // Barkod Qovluğu paneli üçün sayğaclar (2026-07-27)
+    const bcTotal = JollyDB.Products.all().reduce((n, p) => n + ((p.barcodes || []).length), 0);
+    const bcNew = (JollyDB.read('jolly_barcode_folder_generated', []) || []).length;
     const health = (typeof JollyAIHealth !== 'undefined') ? JollyAIHealth.getCatalogScore() : (total ? Math.round((total - inc) / total * 100) : 100);
     const s = JollyDB.getSettings();
     const backupOk = s.lastBackup && (Date.now() - s.lastBackup) < 7 * 864e5;
@@ -552,22 +552,22 @@ const JollyDashboard = (() => {
         </div>
 
         <div class="ai-advice-card gold-ai">
-          <div class="aac-head">${JollyIcons.get('brain', '#c86bff')} <span>JOLLLY AI KÖMƏKÇI</span></div>
+          <div class="aac-head">${JollyIcons.get('barcode', '#4f9fff')} <span>BARKOD QOVLUĞU</span></div>
           <div class="aac-body">
-            <div class="aac-robot aac-sphere">🔮</div>
+            <div class="aac-robot aac-sphere">🏷️</div>
             <div class="aac-stats">
-              <div><span class="sp-dot" style="background:#ff9d5c;"></span> ${inc} tamamlanmamış mal</div>
-              <div><span class="sp-dot" style="background:#ff5c6c;"></span> ${noImg} şəkilsiz məhsul</div>
-              <div><span class="sp-dot" style="background:#4f9fff;"></span> ${noBc} barkodsuz məhsul</div>
+              <div><span class="sp-dot" style="background:#4f9fff;"></span> ${bcTotal} barkod kataloqda</div>
+              <div><span class="sp-dot" style="background:#ffc86b;"></span> ${bcNew} yaradılmış barkod</div>
+              <div><span class="sp-dot" style="background:#ff5c6c;"></span> ${noBc} barkodsuz məhsul</div>
             </div>
             <div class="aac-advice">
-              <div style="color:#c86bff;font-weight:700;font-size:12px;margin-bottom:2px;">Tövsiyə:</div>
-              <div class="muted" style="font-size:12px;">Əvvəl tamamlanmamış malları düzəlt.</div>
+              <div style="color:#4f9fff;font-weight:700;font-size:12px;margin-bottom:2px;">Necə işləyir:</div>
+              <div class="muted" style="font-size:12px;">Rəqəm yaz — varsa tapır, yoxdursa yeni barkod yaradır.</div>
             </div>
           </div>
           <div class="aac-buttons">
-            <button class="aac-btn aac-primary" onclick="JollyRouter.go('#/studios/ai-brain')">AI ilə yoxla ✨</button>
-            <button class="aac-btn aac-gold" onclick="JollyRouter.go('#/data-doctor')">Smart Fix aç ✨</button>
+            <button class="aac-btn aac-primary" onclick="JollyRouter.go('#/barcode-folder')">📁 Qovluğu aç</button>
+            <button class="aac-btn aac-gold" onclick="JollyRouter.go('#/barcode-folder')">✨ Tap / Yarat</button>
           </div>
         </div>
 
