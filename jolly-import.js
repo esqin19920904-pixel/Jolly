@@ -13,6 +13,9 @@ const JollyImport = (() => {
   let headerRow = true;
   let map = { name: -1, barcode: -1, price: -1, group: -1 };
   let fileName = '';
+  let _error = '';
+  let _encoding = '';
+  let _delimiter = '';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -88,23 +91,62 @@ const JollyImport = (() => {
     }
   }
 
+  /* Kodlaşdırma tapıcısı — 1C/Excel Azərbaycanda faylı çox vaxt
+     Windows-1254 və ya Windows-1251 ilə verir. UTF-8 kimi oxusaq
+     adlar əcaib simvollara çevrilir. Ona görə üç variantı sınayıb
+     ən az pozulmuş olanı seçirik. */
+  function _decodeBest(buffer) {
+    const tries = ['utf-8', 'windows-1254', 'windows-1251'];
+    let best = null, bestScore = -1;
+    tries.forEach(enc => {
+      let text;
+      try { text = new TextDecoder(enc).decode(buffer); } catch (e) { return; }
+      const bad = (text.match(/\uFFFD/g) || []).length;          // pozulmuş simvol
+      const good = (text.match(/[a-zA-ZəçğıöşüƏÇĞİÖŞÜ]/g) || []).length;
+      const score = good - bad * 50;
+      if (score > bestScore) { bestScore = score; best = { text, enc, bad }; }
+    });
+    return best;
+  }
+
   async function onFile(event) {
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
     if (!file) return;
     fileName = file.name;
+
+    // Excel faylı birbaşa oxunmur — səssizcə uğursuz olmasın
+    if (/\.(xlsx|xls|ods)$/i.test(file.name)) {
+      _error = 'Bu Excel faylıdır (' + file.name.split('.').pop() + '). Birbaşa oxuya bilmirəm.\n\nExcel-də faylı aç → Fayl → Farklı saxla → növ olaraq <b>CSV UTF-8 (vergüllə ayrılmış)</b> seç → yenidən bura yüklə.';
+      rows = [];
+      _paint();
+      return;
+    }
+
     try {
-      let text = await file.text();
+      const buf = await file.arrayBuffer();
+      const dec = _decodeBest(buf);
+      if (!dec) { _error = 'Faylın kodlaşdırmasını tanıya bilmədim.'; _paint(); return; }
+      let text = dec.text;
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);   // BOM
       const delim = _detectDelimiter(text);
       rows = _parse(text, delim);
-      if (!rows.length) { Toast.error('Fayl boşdur'); return; }
+      if (!rows.length) {
+        _error = 'Faylda oxunacaq sətir tapılmadı. Boş ola bilər, ya da fərqli formatdadır.';
+        _paint();
+        return;
+      }
+      _error = '';
+      _encoding = dec.enc;
+      _delimiter = delim === '\t' ? 'TAB' : delim;
       headerRow = rows[0].some(c => /[a-zəçğıöşüA-ZƏÇĞIÖŞÜ]/.test(String(c)) && String(c).replace(/\D/g, '').length < 5);
       _autoMap();
       _paint();
     } catch (e) {
       console.error('[Import]', e);
-      Toast.error('Fayl oxunmadı');
+      _error = 'Fayl oxunmadı: ' + (e && e.message ? e.message : 'naməlum xəta');
+      rows = [];
+      _paint();
     }
   }
 
@@ -161,6 +203,7 @@ const JollyImport = (() => {
     if (!rows.length) {
       const last = JollyDB.read(LAST_KEY, null);
       el.innerHTML = `
+        ${_error ? `<div class="glass" style="padding:12px;margin-bottom:12px;border-left:3px solid #ff5c6c;font-size:12.5px;line-height:1.5;">${_error.replace(/\n/g, '<br>')}</div>` : ''}
         <div class="glass" style="padding:18px;text-align:center;">
           <div style="font-size:34px;margin-bottom:8px;">📄</div>
           <button class="btn btn-primary btn-block" onclick="document.getElementById('importFile').click()">Fayl seç</button>
@@ -201,6 +244,7 @@ const JollyImport = (() => {
           <span style="flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${esc(fileName)}</span>
           <span class="muted" style="font-size:11.5px;">${rows.length} sətir</span>
         </div>
+        <div class="muted" style="font-size:11px;margin-top:4px;">Kodlaşdırma: ${esc(_encoding)} · Ayırıcı: ${esc(_delimiter)}</div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;cursor:pointer;">
           <input type="checkbox" ${headerRow ? 'checked' : ''} onchange="JollyImport.setHeader(this.checked)"> Birinci sətir başlıqdır
         </label>
@@ -246,7 +290,7 @@ const JollyImport = (() => {
 
   function setHeader(v) { headerRow = !!v; _autoMap(); _paint(); }
   function setMap(k, v) { map[k] = parseInt(v, 10); _paint(); }
-  function reset() { rows = []; fileName = ''; _paint(); }
+  function reset() { rows = []; fileName = ''; _error = ''; _paint(); }
 
   /* ---------- İdxal ---------- */
   function run() {
