@@ -31,8 +31,6 @@
     'price-advisor.js',
     'bg-remove.js?v=2',
     'jolly-announce.js?v=2',
-    'jolly-ai-daily.js',
-    'jolly-product-dna.js',
     'dead-zone.js',
     'jolly-telegram.js',
     'jolly-diagnostics.js?v=2',
