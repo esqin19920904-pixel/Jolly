@@ -293,6 +293,17 @@ const JollyDB = (() => {
     return list.filter(p => (p.barcodes || []).includes(code));
   };
 
+  /* Eyni barkod başqa məhsulda varmı? (products.js submitForm çağırır)
+     Tapılsa həmin məhsulu, tapılmasa null qaytarır. */
+  Products.checkBarcodeConflict = function (code, excludeId) {
+    const c = String(code || '').trim();
+    if (!c) return null;
+    const hit = read(KEYS.products, []).find(p =>
+      p && p.id !== excludeId && (p.barcodes || []).some(b => String(b).trim() === c)
+    );
+    return hit || null;
+  };
+
   Products.filter = function (criteria = {}) {
     let list = read(KEYS.products, []);
     if (criteria.brand) list = list.filter(p => p.brand === criteria.brand);
@@ -469,6 +480,10 @@ const JollyDB = (() => {
     getActivity: () => read(KEYS.activity, []),
     getSettings: () => read(KEYS.settings, {}) || {},
     setSettings: (patch) => write(KEYS.settings, { ...(read(KEYS.settings, {}) || {}), ...patch }),
+    /* Bütün settings obyektini olduğu kimi yazır. app.js və jolly-ota.js
+       bunu çağırırdı, amma funksiya yox idi — fallback isə səhv açara
+       ('settings') yazırdı, ona görə PIN sıfırlama heç nə etmirdi. */
+    saveSettings: (obj) => write(KEYS.settings, obj || {}),
     getEdgeConfig: () => read(KEYS.edge, { items: [] }),
     setEdgeConfig: (cfg) => write(KEYS.edge, cfg),
   };

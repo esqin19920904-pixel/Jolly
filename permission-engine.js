@@ -682,6 +682,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // "barcode.folder.view" olmadan işçi bu bölməni ümumiyyətlə görmür;
   // "barcode.folder.generate" olmadan görə bilir amma yeni barkod yarada bilmir.
   POS.register({ id:'barcodeFolder', name:'Barkod Qovluğu', icon:'📁', permissions:[
+    { key:'products.admin',          label:'Silinmə təsdiqi (Admin)',   tag:'edit', default:false },
     { key:'barcode.folder.view',     label:'Barkod Qovluğuna bax',      tag:'view', default:true  },
     { key:'barcode.folder.generate', label:'Yeni barkod yarat / tap',   tag:'edit', default:false },
   ]});
