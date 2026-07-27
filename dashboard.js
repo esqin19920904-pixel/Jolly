@@ -304,6 +304,8 @@ const JollyDashboard = (() => {
     if (inc > 0) list.push({ text: `⚠️ ${inc} tamamlanmamış mal`, route: '#/dashboard/incomplete' });
     const drafts = BADGES.draftCount();
     if (drafts > 0) list.push({ text: `📝 ${drafts} qaralama gözləyir`, route: '#/drafts' });
+    const waitBc = (JollyDB.read('jolly_barcode_folder_generated', []) || []).length;
+    if (waitBc > 0) list.push({ text: `🏷️ ${waitBc} barkod tamamlanmayıb`, route: '#/barcode-folder' });
     if (BADGES.backupDue()) list.push({ text: '💾 Backup vaxtıdır', route: '#/studios/data' });
     if (typeof JollyBrain !== 'undefined') {
       const dups = JollyBrain.findDuplicates();
@@ -456,6 +458,20 @@ const JollyDashboard = (() => {
             <div class="glass anim-pop" style="padding:10px 14px;margin-bottom:14px;border:1px solid rgba(124,138,255,0.4);background:rgba(124,138,255,0.08);display:flex;align-items:center;gap:10px;">
               <span style="font-size:20px;">🔄</span>
               <span style="flex:1;font-size:12.5px;">Dəyişikliklər sinxronizasiya gözləyir...</span>
+            </div>
+          `;
+        })()}
+
+        ${(() => {
+          // Barkod Qovluğunda gözləyən (əsasən skanda tanınmayan) kodlar
+          const waiting = (JollyDB.read('jolly_barcode_folder_generated', []) || []);
+          if (waiting.length < 5) return '';
+          const scanned = waiting.filter(g => g.source === 'scan').length;
+          return `
+            <div class="glass anim-pop" style="padding:10px 14px;margin-bottom:14px;border:1px solid rgba(255,92,108,0.45);background:rgba(255,92,108,0.09);display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="JollyRouter.go('#/barcode-folder')">
+              <span style="font-size:20px;">🏷️</span>
+              <span style="flex:1;font-size:12.5px;">${waiting.length} barkod tamamlanmamış gözləyir${scanned ? ` (${scanned}-i skanda tapılmayıb)` : ''} — aç</span>
+              <span style="color:#ff5c6c;">›</span>
             </div>
           `;
         })()}
