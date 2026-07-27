@@ -159,6 +159,7 @@ const JollyBarcodeFolder = (() => {
                  onkeydown="if(event.key==='Enter'){event.preventDefault();JollyBarcodeFolder.searchOrCreate();}">
           <button class="icon-btn" title="Kamera ilə skan" onclick="JollyBarcodeFolder.scanIntoSearch()">📷</button>
         </div>
+        <div id="bcfSuggest" style="margin-top:8px;"></div>
         <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="JollyBarcodeFolder.searchOrCreate()">🔍 Tap / Yarat</button>
         <div id="bcfGenResult" style="margin-top:10px;"></div>
       </div>
@@ -219,11 +220,67 @@ const JollyBarcodeFolder = (() => {
       : `<div class="empty-state" style="grid-column:1/-1;"><div class="big-icon">🏷️</div><h3>Barkod tapılmadı</h3><p class="muted" style="font-size:12px;">"Tap / Yarat" düyməsi ilə bu barkodu yarada bilərsən.</p></div>`;
   }
 
+  /* ── AXTARIŞ TƏKLİFİ (2026-07-27) ───────────────────────────
+     "333" yazan kimi bu rəqəmləri ehtiva edən mövcud barkodlar
+     düymə kimi çıxır. Toxunanda dərhal həmin barkoda keçir —
+     tam nömrəni yazmağa ehtiyac qalmır. */
+  const SUGGEST_MAX = 8;
+
+  function _suggestions(q) {
+    if (!q || q.length < 2) return [];
+    const seen = new Set();
+    const out = [];
+    const push = (code, label, isNew) => {
+      if (seen.has(code)) return;
+      seen.add(code);
+      out.push({ code, label, isNew });
+    };
+    _catalogEntries().forEach(e => {
+      const i = String(e.code).indexOf(q);
+      if (i !== -1) push(e.code, e.label, false);
+    });
+    _generatedEntries().forEach(e => {
+      if (String(e.code).indexOf(q) !== -1) push(e.code, e.label, true);
+    });
+    // Uyğunluq nə qədər əvvəldədirsə, o qədər yuxarıda olsun
+    out.sort((a, b) => String(a.code).indexOf(q) - String(b.code).indexOf(q));
+    return out.slice(0, SUGGEST_MAX);
+  }
+
+  function _renderSuggest(q) {
+    const zone = document.getElementById('bcfSuggest');
+    if (!zone) return;
+    const list = _suggestions(q);
+    if (!list.length) { zone.innerHTML = ''; return; }
+    zone.innerHTML = `
+      <div class="muted" style="font-size:10.5px;margin-bottom:5px;">Təkliflər — toxun və aç:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${list.map(e => `
+          <span class="chip" style="cursor:pointer;font-size:11.5px;${e.isNew ? 'border-color:#ffc86b;' : ''}"
+                onclick="JollyBarcodeFolder.pickSuggestion('${_escape(e.code)}')"
+                title="${_escape(e.label || '')}">
+            ${e.isNew ? '🆕 ' : ''}<span class="mono">${highlightDigits(e.code, q)}</span>
+          </span>`).join('')}
+      </div>`;
+  }
+
+  function pickSuggestion(code) {
+    const input = document.getElementById('bcfSearch');
+    if (input) input.value = code;
+    _query = code;
+    const zone = document.getElementById('bcfSuggest');
+    if (zone) zone.innerHTML = '';
+    searchOrCreate();
+  }
+
   let _debounce = null;
   function liveSearch(q) {
     _query = q;
     if (_debounce) clearTimeout(_debounce);
-    _debounce = setTimeout(() => _renderList(), 120);
+    _debounce = setTimeout(() => {
+      _renderSuggest(String(_query || '').replace(/\D/g, ''));
+      _renderList();
+    }, 120);
   }
 
   function scanIntoSearch() {
@@ -249,6 +306,8 @@ const JollyBarcodeFolder = (() => {
       return;
     }
     _query = raw;
+    const sz = document.getElementById('bcfSuggest');
+    if (sz) sz.innerHTML = '';
 
     // 1) Kataloqda tam uyğun barkod varmı?
     const found = (typeof JollyDB !== 'undefined') ? JollyDB.Products.findByBarcode(raw) : [];
@@ -353,7 +412,7 @@ const JollyBarcodeFolder = (() => {
   }
 
   return {
-    render, setTab, liveSearch, searchOrCreate, scanIntoSearch,
+    render, setTab, liveSearch, searchOrCreate, scanIntoSearch, pickSuggestion,
     openScanReady, renameGenerated, deleteGenerated, convertToProduct,
     highlightDigits
   };
