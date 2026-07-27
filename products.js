@@ -1410,6 +1410,8 @@ const JollyProducts = (() => {
       if (_handleBridgeCode(code)) return;
       const found = JollyDB.Products.findByBarcode(code);
       if (found.length === 1) {
+        // Skaner bu kodu oxudu → artıq "təsdiqlənmiş" sayılır
+        try { JollyDB.Products.markBarcodeVerified(found[0].id, code, _currentActorName()); } catch (e) {}
         const cfg = (typeof JollyQuickMenu !== 'undefined') ? JollyQuickMenu.getConfig() : null;
         if (cfg && cfg.enabledOnScan !== false) {
           JollyQuickMenu.open(found[0].id);
@@ -1730,12 +1732,15 @@ const JollyProducts = (() => {
         <div class="glass barcode-scanbox" style="padding:14px;text-align:center;cursor:pointer;background:rgba(255,255,255,0.9);" onclick="JollyProducts.showBarcode('${escapeHtml(firstBarcode)}')">
           <img src="${barcodeImg}" style="width:100%;max-width:320px;border-radius:6px;">
           <div class="mono" style="color:#000;font-size:15px;margin-top:6px;font-weight:700;">${escapeHtml(firstBarcode)}</div>
+          <div style="font-size:11px;margin-top:3px;color:${JollyDB.Products.isBarcodeVerified(p, firstBarcode) ? '#1a7f4b' : '#a05a00'};">
+            ${JollyDB.Products.isBarcodeVerified(p, firstBarcode) ? '✓ Skanerlə təsdiqlənib' : '✎ Əldən yazılıb — hələ skan edilməyib'}
+          </div>
           ${p.last4 ? `<div style="color:#555;font-size:11px;margin-top:2px;">Son 4: ${escapeHtml(p.last4)}</div>` : ''}
         </div>
         ${checksumWarning ? `<p class="muted" style="font-size:11px;color:var(--accent-warn);margin-top:6px;">${escapeHtml(checksumWarning)}</p>` : ''}
         ${p.barcodes.length > 1 ? `
           <div class="glass" style="padding:4px 14px;margin-top:8px;">
-            ${p.barcodes.slice(1).map(b => `<div class="list-row" onclick="JollyProducts.showBarcode('${escapeHtml(b)}')" style="cursor:pointer;"><span class="mono">${escapeHtml(b)}</span><span style="color:var(--accent-1);">⛶ böyüt</span></div>`).join('')}
+            ${p.barcodes.slice(1).map(b => `<div class="list-row" onclick="JollyProducts.showBarcode('${escapeHtml(b)}')" style="cursor:pointer;"><span class="mono">${escapeHtml(b)} ${JollyDB.Products.isBarcodeVerified(p, b) ? '<span style="color:#4ade80;">✓</span>' : '<span style="color:var(--accent-warn);">✎</span>'}</span><span style="color:var(--accent-1);">⛶ böyüt</span></div>`).join('')}
           </div>` : ''}
         ` : `<div class="section-title">Barkod</div><div class="muted">Barkod yoxdur</div>`}
 

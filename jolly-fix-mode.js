@@ -283,12 +283,25 @@ const JollyFixMode = (() => {
     }
 
     JollyDB.Products.update(p.id, patch);
+    // Skanla gələn barkod dərhal təsdiqlənmiş sayılır
+    if (field === 'barcode' && _lastFromScan && JollyDB.Products.markBarcodeVerified) {
+      try { JollyDB.Products.markBarcodeVerified(p.id, patch.barcodes[patch.barcodes.length - 1], _actorName()); } catch (e) {}
+    }
+    _lastFromScan = false;
     fixedCount++;
     if (typeof JollySound !== 'undefined') JollySound.success();
     if (typeof Toast !== 'undefined') Toast.success('Yadda saxlanıldı');
     _afterFix(p.id);
   }
 
+  let _lastFromScan = false;
+
+  function _actorName() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      return (sess && (sess.name || sess.userName)) || '';
+    } catch (e) { return ''; }
+  }
   function scan() {
     if (typeof JollyBarcode === 'undefined') {
       if (typeof Toast !== 'undefined') Toast.error('Skan modulu yoxdur');
@@ -297,6 +310,7 @@ const JollyFixMode = (() => {
     JollyBarcode.open((code) => {
       const el = document.getElementById('fixModeInput');
       if (el) el.value = code;
+      _lastFromScan = true;
       save();
     });
   }

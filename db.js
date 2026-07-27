@@ -326,6 +326,28 @@ const JollyDB = (() => {
     return hit || null;
   };
 
+  /* ── BARKOD ETİBARLILIĞI ──────────────────────────────────
+     Əldən yazılan barkod səhv olur, skanerlə oxunan olmur.
+     Barkod skanerdə tanınanda həmin məhsulda "təsdiqləndi" damğası
+     qoyulur. Damğa məhsulun içində saxlanılır: barcodeMeta[kod]. */
+  Products.markBarcodeVerified = function (productId, code, by) {
+    const c = String(code || '').trim();
+    if (!c) return false;
+    const p = Products.get(productId);
+    if (!p) return false;
+    const meta = { ...(p.barcodeMeta || {}) };
+    if (meta[c] && meta[c].verified) return false;   // artıq təsdiqlənib
+    meta[c] = { verified: true, at: Date.now(), by: by || '' };
+    Products.update(productId, { barcodeMeta: meta });
+    return true;
+  };
+
+  Products.isBarcodeVerified = function (p, code) {
+    if (!p || !p.barcodeMeta) return false;
+    const m = p.barcodeMeta[String(code || '').trim()];
+    return !!(m && m.verified);
+  };
+
   Products.filter = function (criteria = {}) {
     let list = read(KEYS.products, []);
     if (criteria.brand) list = list.filter(p => p.brand === criteria.brand);

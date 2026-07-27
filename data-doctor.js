@@ -83,6 +83,11 @@ const JollyDataDoctor = (() => {
       if (p.barcodes && p.barcodes.some(b => !OK_LENGTHS.includes(String(b).replace(/\D/g, '').length))) {
         push('badLength', '📏 Barkodun uzunluğu standart deyil (8/12/13/14 olmalıdır)', p);
       }
+      // Heç vaxt skanerdə oxunmamış barkodlar — səhv yazılma ehtimalı yüksəkdir
+      if (p.barcodes && p.barcodes.length && JollyDB.Products.isBarcodeVerified &&
+          !p.barcodes.some(b => JollyDB.Products.isBarcodeVerified(p, b))) {
+        push('unverified', '✎ Barkod heç vaxt skanerdə oxunmayıb', p);
+      }
       if (p.barcodes && p.barcodes.length && typeof JollyBarcodeGen !== 'undefined') {
         const badChecksum = p.barcodes.some(b => !JollyBarcodeGen.validate(b).checksumOk);
         if (badChecksum) push('badChecksum', '🧮 Barkod checksum-u səhvdir (skaner oxumaya bilər)', p);
