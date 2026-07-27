@@ -1348,8 +1348,66 @@ const JollyProducts = (() => {
     }
   }
 
+  /* ══════════════════════════════════════════════════════════
+     KOMPÜTER ↔ TELEFON KÖRPÜSÜ
+     Kompüterdə məhsulu açırsan → ekranda böyük kod çıxır.
+     Telefonda JOLLY-ni aç → Skan → ekrana tut → həmin məhsul açılır.
+     Şəkil çəkmək telefonun işidir, qalan hər şey kompüterin.
+     Kod formatı: JLY<id> — adi barkodla qarışmasın deyə prefiksli.
+     ══════════════════════════════════════════════════════════ */
+  const BRIDGE_PREFIX = 'JLY';
+
+  function showDeviceBridge(id) {
+    const p = JollyDB.Products.get(id);
+    if (!p) return;
+    const payload = BRIDGE_PREFIX + String(id).replace(/[^A-Za-z0-9]/g, '');
+    let img = null;
+    try {
+      if (typeof JollyBarcodeGen !== 'undefined') img = JollyBarcodeGen.toDataURL(payload, 'code128');
+    } catch (e) {}
+
+    let ov = document.getElementById('deviceBridgeOverlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'deviceBridgeOverlay';
+      ov.className = 'qa-overlay';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('on'); });
+    }
+    ov.innerHTML = `
+      <div class="qa-sheet" style="padding:18px;text-align:center;">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px;">📱 Telefonda aç</div>
+        <div class="muted" style="font-size:12px;margin-bottom:14px;">
+          Telefonda JOLLY → Skan → bu ekrana tut. Məhsul telefonda açılacaq.
+        </div>
+        <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;">
+          ${img ? `<img src="${img}" style="width:100%;max-height:130px;object-fit:contain;">`
+                : `<div style="font-family:monospace;font-size:18px;color:#111;">${escapeHtml(payload)}</div>`}
+        </div>
+        <div style="font-size:13px;font-weight:600;">${escapeHtml(p.name || 'Adsız məhsul')}</div>
+        <div class="muted mono" style="font-size:11px;margin-top:2px;">${escapeHtml(payload)}</div>
+        <button class="btn btn-ghost btn-block" style="margin-top:14px;" onclick="document.getElementById('deviceBridgeOverlay').classList.remove('on')">Bağla</button>
+      </div>`;
+    setTimeout(() => ov.classList.add('on'), 10);
+  }
+
+  /* Skan edilən dəyər körpü kodudursa — həmin məhsulu aç */
+  function _handleBridgeCode(code) {
+    const c = String(code || '').trim();
+    if (!c.toUpperCase().startsWith(BRIDGE_PREFIX)) return false;
+    const raw = c.slice(BRIDGE_PREFIX.length);
+    const hit = JollyDB.Products.all().find(p =>
+      String(p.id).replace(/[^A-Za-z0-9]/g, '') === raw
+    );
+    if (!hit) { Toast.error('Bu kodun məhsulu tapılmadı'); return true; }
+    if (typeof JollySound !== 'undefined') JollySound.success();
+    JollyRouter.go('#/product/' + hit.id);
+    return true;
+  }
+
   function scanSearch() {
     JollyBarcode.open((code) => {
+      if (_handleBridgeCode(code)) return;
       const found = JollyDB.Products.findByBarcode(code);
       if (found.length === 1) {
         const cfg = (typeof JollyQuickMenu !== 'undefined') ? JollyQuickMenu.getConfig() : null;
@@ -1957,6 +2015,7 @@ const JollyProducts = (() => {
       { icon: '📋', label: 'Mətni kopyala', run: () => copyProductText(id) },
       { icon: '🧬', label: 'Dublikat yarat', run: () => { if (typeof JollyProductPro !== 'undefined') JollyProductPro.clone(id); else Toast.error('Modul yoxdur'); } },
       { icon: p.favorite ? '⭐' : '☆', label: p.favorite ? 'Favoridən çıxar' : 'Seçilmiş et', run: () => toggleFav(id) },
+      { icon: '📱', label: 'Telefonda aç (kod göstər)', run: () => showDeviceBridge(id) },
       { icon: '🗑️', label: 'Sil (PIN tələb oluna bilər)', danger: true, run: () => deleteProduct(id) },
     ];
     overlay.innerHTML = `
@@ -3059,7 +3118,7 @@ const JollyProducts = (() => {
     openSearchHistory, clearSearchHistory, applyDidYouMean,
     saveCurrentFilterSet, openSavedFilters, applySavedFilter, deleteSavedFilter,
     toggleBulkSelectMode, toggleBulkSelect, shareSelectedViaWhatsApp, bulkDeleteSelected,
-    setHighlightTerms, clearHighlightTerms, hl, renderMatchSuggestChips,
+    setHighlightTerms, clearHighlightTerms, hl, renderMatchSuggestChips, showDeviceBridge,
     openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,

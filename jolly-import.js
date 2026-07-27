@@ -11,7 +11,7 @@ const JollyImport = (() => {
 
   let rows = [];        // [[hüceyrə, ...], ...]
   let headerRow = true;
-  let map = { name: -1, barcode: -1, price: -1, group: -1 };
+  let map = { id: -1, name: -1, barcode: -1, price: -1, group: -1 };
   let fileName = '';
   let _error = '';
   let _encoding = '';
@@ -56,10 +56,11 @@ const JollyImport = (() => {
 
   /* Başlıq adlarından sütunları özü tapmağa çalışır */
   function _autoMap() {
-    map = { name: -1, barcode: -1, price: -1, group: -1 };
+    map = { id: -1, name: -1, barcode: -1, price: -1, group: -1 };
     if (!rows.length) return;
     const head = rows[0].map(h => String(h).toLowerCase());
     head.forEach((h, i) => {
+      if (map.id < 0 && /^id$/.test(h.trim())) map.id = i;
       if (map.barcode < 0 && /barkod|ştrix|strix|штрих|ean|barcode/.test(h)) map.barcode = i;
       if (map.name < 0 && /ad|nomenkl|наимен|название|name|mal/.test(h)) map.name = i;
       if (map.price < 0 && /qiym|цена|price|məbləğ/.test(h)) map.price = i;
@@ -159,6 +160,7 @@ const JollyImport = (() => {
       const name = map.name >= 0 ? String(r[map.name] || '').trim() : '';
       if (!code && !name) return;
       const rec = { code, name };
+      if (map.id >= 0) rec.id = String(r[map.id] || '').trim();
       if (map.price >= 0) {
         const n = parseFloat(String(r[map.price] || '').replace(',', '.').replace(/[^\d.]/g, ''));
         if (!isNaN(n)) rec.price = n;
@@ -173,14 +175,16 @@ const JollyImport = (() => {
     const recs = _records();
     const byCode = {};
     JollyDB.Products.all().forEach(p => (p.barcodes || []).forEach(b => { byCode[String(b)] = p; }));
-    let willCreate = 0, willUpdate = 0, noCode = 0, seen = new Set();
+    let willCreate = 0, willUpdate = 0, noCode = 0, byIdCount = 0;
+    const seen = new Set();
     recs.forEach(r => {
+      if (r.id && JollyDB.Products.get(r.id)) { byIdCount++; willUpdate++; return; }
       if (!r.code) { noCode++; return; }
       if (seen.has(r.code)) return;
       seen.add(r.code);
       if (byCode[r.code]) willUpdate++; else willCreate++;
     });
-    return { recs, willCreate, willUpdate, noCode, total: recs.length };
+    return { recs, willCreate, willUpdate, noCode, byIdCount, total: recs.length };
   }
 
   /* ---------- Ekran ---------- */
@@ -252,6 +256,8 @@ const JollyImport = (() => {
 
       <div class="section-title">Sütunları uyğunlaşdır</div>
       <div class="glass" style="padding:12px;margin-bottom:12px;">
+        <div style="margin-bottom:10px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">🆔 ID (Cədvəl Körpüsündən gələn fayllarda olur)</div>
+          <select style="${selStyle}" onchange="JollyImport.setMap('id',this.value)">${colOptions(map.id)}</select></div>
         <div style="margin-bottom:10px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">🏷️ Barkod</div>
           <select style="${selStyle}" onchange="JollyImport.setMap('barcode',this.value)">${colOptions(map.barcode)}</select></div>
         <div style="margin-bottom:10px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">📛 Ad</div>
@@ -277,12 +283,14 @@ const JollyImport = (() => {
           <span>🆕 Yeni yaradılacaq</span><b style="color:#4ade80;">${a.willCreate}</b></div>
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;">
           <span>✏️ Mövcud məhsul tamamlanacaq</span><b style="color:#4f9fff;">${a.willUpdate}</b></div>
+        ${a.byIdCount ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;">
+          <span>🆔 ID ilə tanınan (cədvəldən qayıdan)</span><b style="color:#ffc86b;">${a.byIdCount}</b></div>` : ''}
         ${a.noCode ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;">
           <span class="muted">⏭️ Barkodsuz sətir (keçiləcək)</span><b class="muted">${a.noCode}</b></div>` : ''}
       </div>
 
-      ${map.barcode < 0
-        ? `<div class="glass" style="padding:12px;border-left:3px solid #ff5c6c;font-size:12.5px;">Barkod sütununu seç — onsuz idxal edə bilmərəm.</div>`
+      ${(map.barcode < 0 && map.id < 0)
+        ? `<div class="glass" style="padding:12px;border-left:3px solid #ff5c6c;font-size:12.5px;">Barkod (və ya ID) sütununu seç — onsuz idxal edə bilmərəm.</div>`
         : `<button class="btn btn-primary btn-block" onclick="JollyImport.run()">📥 ${a.willCreate + a.willUpdate} sətri idxal et</button>`}
       <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="JollyImport.reset()">Ləğv et</button>
     `;
@@ -294,7 +302,7 @@ const JollyImport = (() => {
 
   /* ---------- İdxal ---------- */
   function run() {
-    if (map.barcode < 0) { Toast.error('Barkod sütununu seç'); return; }
+    if (map.barcode < 0 && map.id < 0) { Toast.error('Barkod və ya ID sütununu seç'); return; }
     const a = _analyze();
     if (!confirm(`${a.willCreate} yeni məhsul yaradılacaq, ${a.willUpdate} mövcud məhsul tamamlanacaq. Davam edim?`)) return;
 
@@ -306,9 +314,30 @@ const JollyImport = (() => {
     let skipped = 0;
 
     a.recs.forEach(r => {
-      if (!r.code) { skipped++; return; }
-      if (seen.has(r.code)) { skipped++; return; }
-      seen.add(r.code);
+      if (!r.code && !r.id) { skipped++; return; }
+      if (r.code) {
+        if (seen.has(r.code) && !r.id) { skipped++; return; }
+        seen.add(r.code);
+      }
+
+      // ID varsa — cədvəldən qayıdan sətirdir, dəqiq həmin məhsulu yenilə
+      if (r.id) {
+        const byId = JollyDB.Products.get(r.id);
+        if (byId) {
+          const patch = {};
+          if (r.name) patch.name = r.name;
+          if (r.price != null) patch.price = r.price;
+          if (r.group) patch.group = r.group;
+          if (r.code && !(byId.barcodes || []).some(b => String(b) === r.code)) {
+            patch.barcodes = (byId.barcodes || []).concat([r.code]);
+          }
+          if (Object.keys(patch).length) {
+            JollyDB.Products.update(byId.id, patch);
+            updatedIds.push(byId.id);
+          }
+          return;
+        }
+      }
 
       const existing = byCode[r.code];
       if (existing) {
