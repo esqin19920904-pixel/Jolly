@@ -330,6 +330,66 @@ const JollyDB = (() => {
      Əldən yazılan barkod səhv olur, skanerlə oxunan olmur.
      Barkod skanerdə tanınanda həmin məhsulda "təsdiqləndi" damğası
      qoyulur. Damğa məhsulun içində saxlanılır: barcodeMeta[kod]. */
+  /* ── BARKOD DƏYİŞİKLİK JURNALI ────────────────────────────
+     Barkod hansı yoldan dəyişirsə dəyişsin (forma, Fix Mode,
+     Doktor, idxal, qovluq), hamısı Products.update()-dən keçir.
+     Ona görə jurnalı burada tuturuq — hər çağırış yerinə ayrıca
+     kod yazmağa ehtiyac qalmır. */
+  const BARCODE_LOG_KEY = 'jolly_barcode_log';
+  const BARCODE_LOG_MAX = 400;
+
+  function _actorName() {
+    try {
+      const sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+      return (sess && (sess.name || sess.userName)) || 'Admin';
+    } catch (e) { return 'Admin'; }
+  }
+
+  function logBarcodeChange(entry) {
+    try {
+      const log = read(BARCODE_LOG_KEY, []) || [];
+      log.unshift({ at: Date.now(), by: _actorName(), ...entry });
+      write(BARCODE_LOG_KEY, log.slice(0, BARCODE_LOG_MAX));
+    } catch (e) {}
+  }
+
+  function getBarcodeLog() { return read(BARCODE_LOG_KEY, []) || []; }
+
+  const _origProductsUpdate = Products.update.bind(Products);
+  Products.update = function (id, patch) {
+    try {
+      if (patch && Object.prototype.hasOwnProperty.call(patch, 'barcodes')) {
+        const before = Products.get(id);
+        if (before) {
+          const oldList = (before.barcodes || []).map(String);
+          const newList = (patch.barcodes || []).map(String);
+          const added = newList.filter(b => !oldList.includes(b));
+          const removed = oldList.filter(b => !newList.includes(b));
+          if (added.length || removed.length) {
+            logBarcodeChange({
+              productId: id,
+              name: before.name || 'Adsız',
+              added, removed
+            });
+          }
+        }
+      }
+    } catch (e) {}
+    return _origProductsUpdate(id, patch);
+  };
+
+  const _origProductsAdd = Products.add.bind(Products);
+  Products.add = function (payload) {
+    const rec = _origProductsAdd(payload);
+    try {
+      const codes = ((payload && payload.barcodes) || []).map(String).filter(Boolean);
+      if (rec && rec.id && codes.length) {
+        logBarcodeChange({ productId: rec.id, name: rec.name || 'Adsız', added: codes, removed: [], created: true });
+      }
+    } catch (e) {}
+    return rec;
+  };
+
   Products.markBarcodeVerified = function (productId, code, by) {
     const c = String(code || '').trim();
     if (!c) return false;
@@ -521,6 +581,7 @@ const JollyDB = (() => {
     exportAll, importAll,
     addTombstone, isTombstoned, getTombstones, restoreTombstone,
     markForDeletion, unmarkForDeletion, isMarkedForDeletion, getMarkedForDeletion,
+    getBarcodeLog, logBarcodeChange,
     getActivity: () => read(KEYS.activity, []),
     getSettings: () => read(KEYS.settings, {}) || {},
     setSettings: (patch) => write(KEYS.settings, { ...(read(KEYS.settings, {}) || {}), ...patch }),
