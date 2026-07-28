@@ -778,6 +778,19 @@ document.addEventListener('DOMContentLoaded', function() {
     { key:'bulk.edit', label:'Seçilənlərə toplu sahə yaz', tag:'edit', default:false },
   ]});
 
+  POS.register({ id:'tasks', name:'Tapşırıqlar', icon:'✅', permissions:[
+    { key:'tasks.view',   label:'Öz tapşırıqlarını gör',  tag:'view', default:true  },
+    { key:'tasks.assign', label:'Tapşırıq ver / sil',     tag:'edit', default:false },
+  ]});
+
+  POS.register({ id:'perms', name:'İcazələr', icon:'👁️', permissions:[
+    { key:'perms.preview', label:'İcazə önbaxışı (kim nə görür)', tag:'view', default:false },
+  ]});
+
+  POS.register({ id:'grouphealth', name:'Qrup Sağlamlığı', icon:'📦', permissions:[
+    { key:'grouphealth.view', label:'Qrup üzrə sağlamlığa bax', tag:'view', default:false },
+  ]});
+
   POS.register({ id:'devtools', name:'Texniki Alətlər', icon:'🩻', permissions:[
     { key:'tools.selftest', label:'JOLLY Yoxlama ekranı', tag:'view', default:false },
     { key:'tools.testdata', label:'Sınaq məlumatı yarat/sil', tag:'edit', default:false },

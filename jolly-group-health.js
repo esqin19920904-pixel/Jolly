@@ -123,7 +123,7 @@ const JollyGroupHealth = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'group-health',
-      perm: 'health.view',
+      perm: 'grouphealth.view',
       name: 'Qrup Sağlamlığı',
       icon: '📦',
       route: '#/group-health',
