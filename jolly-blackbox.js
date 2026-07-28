@@ -11,6 +11,24 @@
   const MAX = 300;
   const t0 = Date.now();
 
+  /* ── DAVAMLI XƏTA JURNALI (2026-07-28) ──────────────────────
+     Əvvəl bütün jurnal yalnız yaddaşda idi — səhifə yenilənən
+     kimi itirdi. Ağ ekran olanda isə məhz o an baş verən xəta
+     lazımdır. Ona görə YALNIZ xətalar localStorage-a da yazılır
+     (son 50). JollyDB-dən asılı deyil, çünki xəta db.js
+     yüklənməmişdən əvvəl də baş verə bilər. */
+  const ERR_KEY = 'jolly_error_log';
+  const ERR_MAX = 50;
+
+  function saveError(entry) {
+    try {
+      const raw = localStorage.getItem(ERR_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      list.unshift(entry);
+      localStorage.setItem(ERR_KEY, JSON.stringify(list.slice(0, ERR_MAX)));
+    } catch (e) { /* yaddaş dolu ola bilər — susaq */ }
+  }
+
   function ts() { return '+' + ((Date.now() - t0) / 1000).toFixed(1) + 's'; }
   function push(type, msg) {
     LOG.push(`[${ts()}] ${type}: ${msg}`);
@@ -20,11 +38,39 @@
 
   // 1) Bütün xətaları tut
   window.addEventListener('error', function (e) {
-    push('❌XƏTA', (e.message || '') + ' @ ' + (e.filename ? e.filename.split('/').pop() : '?') + ':' + (e.lineno || '?'));
+    const file = e.filename ? e.filename.split('/').pop() : '?';
+    push('❌XƏTA', (e.message || '') + ' @ ' + file + ':' + (e.lineno || '?'));
+    saveError({
+      at: Date.now(),
+      kind: 'XƏTA',
+      msg: e.message || 'naməlum xəta',
+      file: file,
+      line: e.lineno || 0,
+      route: window.location.hash || '#/'
+    });
   });
   window.addEventListener('unhandledrejection', function (e) {
-    push('❌PROMISE', (e.reason && e.reason.message) || String(e.reason));
+    const msg = (e.reason && e.reason.message) || String(e.reason);
+    push('❌PROMISE', msg);
+    saveError({
+      at: Date.now(),
+      kind: 'PROMISE',
+      msg: msg,
+      file: '',
+      line: 0,
+      route: window.location.hash || '#/'
+    });
   });
+
+  // Xarici oxuma üçün
+  window.JollyErrors = {
+    list() {
+      try { return JSON.parse(localStorage.getItem(ERR_KEY) || '[]'); } catch (e) { return []; }
+    },
+    clear() {
+      try { localStorage.removeItem(ERR_KEY); } catch (e) {}
+    }
+  };
 
   // 2) Route dəyişmələri
   window.addEventListener('hashchange', function () {

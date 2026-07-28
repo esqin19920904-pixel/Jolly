@@ -623,6 +623,7 @@ const JollyProducts = (() => {
         <div id="bulkActionBar" style="position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:99997;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);font-size:13px;">
           <span>${bulkSelectedIds.size} seçildi</span>
           <button style="background:var(--accent-1,#7c8aff);border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkMoveToGroup()">📦 Qrupa köçür</button>
+          <button style="background:#ffc86b;border:none;color:#1a1a1a;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkEdit()">✏️ Toplu dəyiş</button>
           <button style="background:#25D366;border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.shareSelectedViaWhatsApp()">📤 WhatsApp</button>
           ${canDelete ? `<button style="background:var(--accent-danger,#ff5c6c);border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkDeleteSelected()">🗑️ Sil</button>` : ''}
         </div>`;
@@ -663,6 +664,83 @@ const JollyProducts = (() => {
       Toast.success('Hamısı bərpa olundu ♻️');
       redrawCurrentHomeList();
     });
+    redrawCurrentHomeList();
+    refreshBulkUI();
+  }
+
+  /* ── TOPLU DƏYİŞİKLİK (2026-07-27) ───────────────────────────
+     İdxaldan sonra yüzlərlə məhsulun yeri/firması/statusu boş qalır.
+     Bir-bir açıb doldurmaq günlərlə çəkir. Burada seçilənlərin
+     hamısına bir sahə birdən yazılır.
+
+     İki rejim var:
+       • Boşları doldur  — yalnız o sahəsi boş olanlar dəyişir (təhlükəsiz)
+       • Hamısını dəyiş  — mövcud dəyər də üstündən yazılır
+     Standart olaraq "boşları doldur" — səhvən məlumat əzilməsin. */
+  const BULK_FIELDS = [
+    { key: 'location', label: 'Yer / Rəf',   store: () => JollyDB.Locations },
+    { key: 'brand',    label: 'Firma',       store: () => JollyDB.Brands },
+    { key: 'status',   label: 'Status',      store: () => JollyDB.Statuses },
+    { key: 'supplier', label: 'Tədarükçü',   store: () => JollyDB.Suppliers },
+  ];
+
+  function bulkEdit() {
+    if (!bulkSelectedIds.size) return;
+    if (window.JollyAuth && !JollyAuth.can('products.edit')) {
+      Toast.error('🔒 Redaktə icazən yoxdur — Admin-dən istə');
+      return;
+    }
+
+    const n = bulkSelectedIds.size;
+    const fieldList = BULK_FIELDS.map((f, i) => `${i + 1}. ${f.label}`).join('\n');
+    const fAns = prompt(`Seçilmiş ${n} məhsulda hansı sahə dəyişsin?\n\n${fieldList}\n\nRəqəmi yaz:`);
+    if (fAns === null) return;
+    const field = BULK_FIELDS[parseInt(fAns, 10) - 1];
+    if (!field) { Toast.error('Düzgün rəqəm yazılmadı'); return; }
+
+    const store = field.store();
+    const list = store ? store.all() : [];
+    if (!list.length) {
+      Toast.error(`Əvvəlcə Admin Studio → ${field.label} bölməsindən əlavə et`);
+      return;
+    }
+    const names = list.map((x, i) => `${i + 1}. ${x.name}`).join('\n');
+    const vAns = prompt(`${field.label} — hansı dəyər?\n\n${names}\n\nRəqəmi yaz:`);
+    if (vAns === null) return;
+    const chosen = list[parseInt(vAns, 10) - 1];
+    if (!chosen) { Toast.error('Düzgün rəqəm yazılmadı'); return; }
+
+    // Neçəsində bu sahə artıq doludur?
+    let filled = 0;
+    bulkSelectedIds.forEach(id => {
+      const p = JollyDB.Products.get(id);
+      if (p && p[field.key]) filled++;
+    });
+
+    let overwrite = false;
+    if (filled) {
+      overwrite = confirm(
+        `${n} məhsuldan ${filled}-də "${field.label}" artıq doludur.\n\n` +
+        `OK = HAMISINI dəyiş (mövcud dəyər əzilir)\n` +
+        `Ləğv = yalnız BOŞ olanları doldur (${n - filled} məhsul)`
+      );
+    }
+
+    let count = 0;
+    bulkSelectedIds.forEach(id => {
+      const p = JollyDB.Products.get(id);
+      if (!p) return;
+      if (!overwrite && p[field.key]) return;
+      if (p[field.key] === chosen.name) return;
+      JollyDB.Products.update(id, { [field.key]: chosen.name });
+      count++;
+    });
+
+    if (!count) { Toast.info('Dəyişən olmadı'); return; }
+    bulkSelectedIds.clear();
+    bulkSelectMode = false;
+    if (typeof JollySound !== 'undefined') JollySound.success();
+    Toast.success(`${count} məhsulda "${field.label}" → ${chosen.name}`);
     redrawCurrentHomeList();
     refreshBulkUI();
   }
@@ -800,8 +878,13 @@ const JollyProducts = (() => {
 
   // ── "Bunu demək istədin?" — nəticə 0 olanda, kataloqdakı əsl sözlərə
   // görə ən yaxın uyğunluğu tapıb təklif edir (yazı səhvi ehtimalı). ──
+  function _fold(x) {
+    return (typeof JollyDB !== 'undefined' && JollyDB.foldText)
+      ? JollyDB.foldText(x) : String(x || '').toLowerCase();
+  }
+
   function _levenshtein(a, b) {
-    a = a.toLowerCase(); b = b.toLowerCase();
+    a = _fold(a); b = _fold(b);
     const m = a.length, n = b.length;
     if (!m) return n; if (!n) return m;
     const dp = new Array(n + 1);
@@ -827,22 +910,58 @@ const JollyProducts = (() => {
     return [...words];
   }
 
+  /* Barkodda bir-iki rəqəm səhvi — yaxın kodları tap */
+  function _nearBarcodes(digits) {
+    if (digits.length < 6) return [];
+    const out = [];
+    JollyDB.Products.all().forEach(p => {
+      (p.barcodes || []).forEach(b => {
+        const code = String(b);
+        if (code.includes(digits)) return;         // onsuz da tapılıb
+        if (Math.abs(code.length - digits.length) > 2) return;
+        const d = _levenshtein(code, digits);
+        if (d <= 2) out.push({ code, product: p, d });
+      });
+    });
+    return out.sort((x, y) => x.d - y.d).slice(0, 4);
+  }
+
   function renderDidYouMean(results, lastTerm) {
     const existing = document.getElementById('didYouMeanBar');
     const term = (homeState.chain.length ? homeState.chain[homeState.chain.length - 1] : lastTerm) || '';
     if (results.length !== 0 || !term || term.trim().length < 3) { if (existing) existing.remove(); return; }
-    const pool = _catalogWordPool();
-    let best = null, bestDist = Infinity;
-    pool.forEach(w => {
-      if (w.toLowerCase() === term.toLowerCase()) return;
-      const d = _levenshtein(term, w);
-      if (d < bestDist) { bestDist = d; best = w; }
-    });
-    const threshold = term.length <= 5 ? 2 : 3;
-    if (!best || bestDist === 0 || bestDist > threshold) { if (existing) existing.remove(); return; }
+
+    const chips = [];
+
+    // A) Rəqəm yazılıbsa — yaxın barkodlar
+    const digits = term.replace(/\D/g, '');
+    if (digits.length >= 6) {
+      _nearBarcodes(digits).forEach(n => {
+        chips.push(`<span class="chip" style="background:rgba(255,92,108,0.12);border-color:rgba(255,92,108,0.4);" onclick="JollyRouter.go('#/product/${n.product.id}')">🏷️ <span class="mono">${escapeHtml(n.code)}</span> · ${escapeHtml((n.product.name || 'Adsız').slice(0, 22))}</span>`);
+      });
+    }
+
+    // B) Sözdürsə — kataloqdakı yaxın sözlər (ən çox 3 dənə)
+    if (!digits || digits.length < 6) {
+      const pool = _catalogWordPool();
+      const scored = [];
+      pool.forEach(w => {
+        if (_fold(w) === _fold(term)) return;
+        const d = _levenshtein(term, w);
+        const threshold = term.length <= 5 ? 2 : 3;
+        if (d > 0 && d <= threshold) scored.push({ w, d });
+      });
+      scored.sort((a, b) => a.d - b.d).slice(0, 3).forEach(({ w }) => {
+        chips.push(`<span class="chip" style="background:rgba(255,184,77,0.14);border-color:rgba(255,184,77,0.4);" onclick="JollyProducts.applyDidYouMean('${escapeHtml(w).replace(/'/g, "\\'")}')">🤔 <b>${escapeHtml(w)}</b></span>`);
+      });
+    }
+
+    if (!chips.length) { if (existing) existing.remove(); return; }
+
     const html = `
       <div class="chip-row" id="didYouMeanBar" style="margin-bottom:6px;">
-        <span class="chip" style="background:rgba(255,184,77,0.14);border-color:rgba(255,184,77,0.4);" onclick="JollyProducts.applyDidYouMean('${escapeHtml(best).replace(/'/g, "\\'")}')">🤔 Bunu demək istədin: <b style="margin-left:4px;">${escapeHtml(best)}</b>?</span>
+        <span class="muted" style="font-size:11px;margin-right:2px;">Bunu nəzərdə tuturdun?</span>
+        ${chips.join('')}
       </div>`;
     if (existing) { existing.outerHTML = html; }
     else {
@@ -1452,6 +1571,7 @@ const JollyProducts = (() => {
     else if (params.brand) { products = JollyDB.Products.filter({ brand: params.brand }); title = `Firma: ${params.brand}`; }
     else if (params.group) { products = JollyDB.Products.filter({ group: params.group }); title = `Qrup: ${params.group}`; }
     else if (params.supplier) { products = JollyDB.Products.filter({ supplier: params.supplier }); title = `Tədarükçü: ${params.supplier}`; }
+    else if (params.location) { products = JollyDB.Products.filter({ location: params.location }); title = `📍 Yer: ${params.location}`; }
     else { products = JollyDB.Products.all(); }
 
     _filteredAll = products;
@@ -1681,6 +1801,46 @@ const JollyProducts = (() => {
     catch (e) { return '—'; }
   }
 
+  /* Bu məhsulda kim nə vaxt nəyi dəyişdi — db.js-dəki avtomatik
+     jurnaldan oxunur, ona görə hansı ekrandan dəyişilməsindən asılı deyil. */
+  function _changeHistoryHtml(productId) {
+    if (typeof JollyDB === 'undefined' || !JollyDB.getChangeLog) return '';
+    const log = JollyDB.getChangeLog(productId);
+    if (!log.length) return '';
+
+    const short = (v) => {
+      const t = String(v == null ? '' : v).trim();
+      if (!t) return '<span class="muted">boş</span>';
+      return escapeHtml(t.length > 26 ? t.slice(0, 26) + '…' : t);
+    };
+
+    const rows = log.slice(0, 12).map(e => {
+      if (e.created) {
+        return `<div class="list-row"><span style="font-size:12.5px;">🆕 Yaradıldı</span>
+          <span class="muted" style="font-size:11px;">${escapeHtml(e.by || '')} · ${fmtDate(e.at)}</span></div>`;
+      }
+      return `
+        <div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+            <span style="font-size:12.5px;font-weight:600;">${escapeHtml(e.label || e.field)}</span>
+            <span class="muted" style="font-size:10.5px;white-space:nowrap;">${escapeHtml(e.by || '')} · ${fmtDate(e.at)}</span>
+          </div>
+          <div style="font-size:12px;margin-top:3px;">
+            <span style="color:#ff5c6c;">${short(e.from)}</span>
+            <span class="muted" style="margin:0 5px;">→</span>
+            <span style="color:#4ade80;">${short(e.to)}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="section-title">🕐 Dəyişikliklər <span class="muted">(${log.length})</span></div>
+      <div class="glass" style="padding:4px 14px;">
+        ${rows}
+        ${log.length > 12 ? `<div class="muted" style="padding:8px 0;font-size:11px;">+${log.length - 12} dəyişiklik daha</div>` : ''}
+      </div>`;
+  }
+
   function renderDetailPage(id) {
     const p = JollyDB.Products.get(id);
     if (!p) return `<div class="empty-state"><div class="big-icon">❓</div><h3>Məhsul tapılmadı</h3></div>`;
@@ -1796,6 +1956,8 @@ const JollyProducts = (() => {
           <div class="list-row"><span class="muted" style="font-size:12px;">Son redaktə</span><span class="mono" style="font-size:12px;">${fmtDate(p.updatedAt)}</span></div>
           ${p.whatsappCount ? `<div class="list-row"><span class="muted" style="font-size:12px;">WhatsApp göndərildi</span><span class="mono" style="font-size:12px;">${p.whatsappCount} dəfə</span></div>` : ''}
         </div>
+
+        ${_changeHistoryHtml(p.id)}
 
         ${(() => {
           if (typeof JollyReceiving === 'undefined' || !JollyReceiving.docsForProduct) return '';
@@ -2176,7 +2338,8 @@ const JollyProducts = (() => {
 
         <div class="field">
           <label>Məhsulun adı *</label>
-          <input id="f_name" value="${escapeHtml(formState.name)}" placeholder="məs. Daraq" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
+          <input id="f_name" value="${escapeHtml(formState.name)}" placeholder="məs. Daraq" oninput="JollyProducts.onNameTyped(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();JollyProducts.focusNext(this);}" enterkeyhint="next">
+          <div id="groupGuessZone" style="margin-top:6px;"></div>
         </div>
         ${typeof JollyOCR !== 'undefined' ? `<button class="btn btn-ghost btn-sm" style="margin:-6px 0 12px;" onclick="JollyProducts.ocrFill()">📷 Şəkildən oxu (OCR)</button>` : ''}
         <div id="brainSuggestZone" style="margin:-6px 0 12px;"></div>
@@ -2398,6 +2561,80 @@ const JollyProducts = (() => {
     };
     if (choice) JollyOCR.captureAndRead(handle);
     else JollyOCR.pickAndRead(handle);
+  }
+
+  /* ── AĞILLI QRUP TƏKLİFİ (2026-07-27) ────────────────────────
+     Kataloqda "Daraq 656 no", "Daraq 700 no" varsa və hər ikisi
+     "Daraq" qrupundadırsa, "Daraq 812" yazan kimi JOLLY həmin qrupu
+     təklif edir. Ayrıca heç nə qurmaq lazım deyil — mövcud
+     məhsulların adlarından öyrənir. */
+  function _fold2(x) {
+    return (typeof JollyDB !== 'undefined' && JollyDB.foldText)
+      ? JollyDB.foldText(x) : String(x || '').toLowerCase();
+  }
+
+  function _nameWords(name) {
+    return _fold2(name).split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w));
+  }
+
+  /* Hər qrup üçün sözlərin neçə məhsulda keçdiyini yığır */
+  function _groupWordIndex() {
+    const idx = {};   // söz → { qrup: say }
+    JollyDB.Products.all().forEach(p => {
+      if (!p.group || !p.name) return;
+      new Set(_nameWords(p.name)).forEach(w => {
+        idx[w] = idx[w] || {};
+        idx[w][p.group] = (idx[w][p.group] || 0) + 1;
+      });
+    });
+    return idx;
+  }
+
+  function suggestGroupFromName(name) {
+    const words = _nameWords(name);
+    if (!words.length) return null;
+    const idx = _groupWordIndex();
+    const score = {};
+    words.forEach(w => {
+      const hits = idx[w];
+      if (!hits) return;
+      Object.entries(hits).forEach(([g, n]) => { score[g] = (score[g] || 0) + n; });
+    });
+    const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+    if (!ranked.length) return null;
+    const [best, n] = ranked[0];
+    if (n < 2) return null;                       // bir təsadüf kifayət deyil
+    if (ranked[1] && ranked[1][1] === n) return null;  // bərabərdirsə, təxmin etmə
+    return { group: best, hits: n };
+  }
+
+  let _guessTimer = null;
+  function onNameTyped(val) {
+    formState.name = val;
+    if (_guessTimer) clearTimeout(_guessTimer);
+    _guessTimer = setTimeout(() => _paintGroupGuess(val), 350);
+  }
+
+  function _paintGroupGuess(name) {
+    const zone = document.getElementById('groupGuessZone');
+    if (!zone) return;
+    if (formState.group) { zone.innerHTML = ''; return; }   // artıq seçilib
+    if (!name || name.trim().length < 3) { zone.innerHTML = ''; return; }
+    const g = suggestGroupFromName(name);
+    if (!g) { zone.innerHTML = ''; return; }
+    zone.innerHTML = `
+      <span class="chip" style="cursor:pointer;background:rgba(124,138,255,0.14);border-color:rgba(124,138,255,0.45);"
+            onclick="JollyProducts.applyGroupGuess('${escapeHtml(g.group).replace(/'/g, "\\'")}')">
+        📦 Qrup: <b style="margin-left:3px;">${escapeHtml(g.group)}</b>?
+      </span>`;
+  }
+
+  function applyGroupGuess(name) {
+    applySuggestion('group', name);
+    const zone = document.getElementById('groupGuessZone');
+    if (zone) zone.innerHTML = '';
+    // Qrup şablonu varsa, sahələr də dolsun
+    try { applyGroupDefaults(name); } catch (e) {}
   }
 
   function applySuggestion(kind, value) {
@@ -2829,6 +3066,31 @@ const JollyProducts = (() => {
       const priceEl = document.getElementById('f_price');
       if (priceEl) priceEl.value = g.price;
     }
+
+    /* Qrup şablonu (2026-07-27): firma / yer / status / tədarükçü.
+       Yalnız BOŞ sahələr doldurulur — yazdığını əzmir. */
+    const tpl = [
+      ['tplBrand', 'brand', 'f_brand'],
+      ['tplLocation', 'location', 'f_location'],
+      ['tplSupplier', 'supplier', 'f_supplier'],
+    ];
+    let filled = 0;
+    tpl.forEach(([src, field, elId]) => {
+      const val = g[src];
+      if (!val) return;
+      if (formState[field]) return;          // istifadəçi artıq seçib
+      formState[field] = val;
+      const el = document.getElementById(elId);
+      if (el) el.value = val;
+      filled++;
+    });
+    // Status <select> deyil, chip sırasıdır — öz funksiyası ilə seçilir
+    if (g.tplStatus && !formState.status) {
+      try { selectStatus(g.tplStatus); filled++; } catch (e) {}
+    }
+    if (filled && typeof Toast !== 'undefined') {
+      Toast.info('📋 Qrup şablonundan ' + filled + ' sahə dolduruldu');
+    }
   }
 
   // Qrup dəyişəndə "Kateqoriyaya görə xüsusi sahələr" zonasını canlı
@@ -3122,8 +3384,9 @@ const JollyProducts = (() => {
     commitChainTerm, removeChainTerm, clearChain, filterByBrandChain,
     openSearchHistory, clearSearchHistory, applyDidYouMean,
     saveCurrentFilterSet, openSavedFilters, applySavedFilter, deleteSavedFilter,
-    toggleBulkSelectMode, toggleBulkSelect, shareSelectedViaWhatsApp, bulkDeleteSelected,
+    toggleBulkSelectMode, toggleBulkSelect, shareSelectedViaWhatsApp, bulkDeleteSelected, bulkEdit,
     setHighlightTerms, clearHighlightTerms, hl, renderMatchSuggestChips, showDeviceBridge,
+    onNameTyped, applyGroupGuess, suggestGroupFromName,
     openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,
     openViewer, showBarcode, generateBarcodeImage,

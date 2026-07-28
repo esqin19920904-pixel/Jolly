@@ -297,15 +297,36 @@ const JollyDB = (() => {
   const Drafts = makeStore(KEYS.drafts, 'qaralama');
 
   /* Products: extra convenience methods */
+  /* ── HƏRF BƏRABƏRLƏŞDİRMƏSİ (2026-07-27) ────────────────────
+     "Çorab" yazan da, "corab" yazan da eyni malı tapmalıdır.
+     Azərbaycan hərflərinin latın qarşılığına çevrilir, həm axtarış
+     sözü, həm də məhsulun mətni eyni qaydadan keçir.
+     Diqqət: rəqəmlərə toxunmur, barkodlar olduğu kimi qalır. */
+  const _FOLD = {
+    'ə': 'e', 'ç': 'c', 'ş': 's', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ü': 'u',
+    'Ə': 'e', 'Ç': 'c', 'Ş': 's', 'Ğ': 'g', 'I': 'i', 'İ': 'i', 'Ö': 'o', 'Ü': 'u',
+    'â': 'a', 'î': 'i', 'û': 'u'
+  };
+  function foldText(str) {
+    let out = '';
+    const s2 = String(str == null ? '' : str);
+    for (let i = 0; i < s2.length; i++) {
+      const ch = s2[i];
+      out += (_FOLD[ch] !== undefined) ? _FOLD[ch] : ch.toLowerCase();
+    }
+    return out;
+  }
+
   Products.search = function (query) {
-    const q = (query || '').toLowerCase().trim();
+    const raw = (query || '').trim();
     const list = read(KEYS.products, []);
-    if (!q) return list;
+    if (!raw) return list;
+    const q = foldText(raw);
     return list.filter(p => {
-      const hay = [
+      const hay = foldText([
         p.name, p.mainCode, p.extraCodeType, p.extraCodeValue, p.last4,
         ...(p.barcodes || []), p.brand, p.group, p.location, p.note, p.color, p.status, p.supplier,
-      ].filter(Boolean).join(' ').toLowerCase();
+      ].filter(Boolean).join(' '));
       return hay.includes(q);
     });
   };
@@ -355,24 +376,61 @@ const JollyDB = (() => {
 
   function getBarcodeLog() { return read(BARCODE_LOG_KEY, []) || []; }
 
+  /* ── MƏHSUL DƏYİŞİKLİK TARİXÇƏSİ (2026-07-27) ────────────────
+     Barkod jurnalı yalnız barkodlara baxırdı. İndi eyni sarğı
+     bütün vacib sahələri izləyir: ad, qiymət, qrup, firma, yer,
+     status, tədarükçü, qeyd. Hansı ekrandan dəyişməsindən asılı
+     deyil — hamısı Products.update()-dən keçir.
+     Şəkillər izlənmir (böyükdür və faydası azdır). */
+  const CHANGE_LOG_KEY = 'jolly_change_log';
+  const CHANGE_LOG_MAX = 600;
+
+  const TRACKED = {
+    name: 'Ad', price: 'Qiymət', group: 'Qrup', brand: 'Firma',
+    location: 'Yer', status: 'Status', supplier: 'Tədarükçü',
+    note: 'Qeyd', mainCode: 'Kod'
+  };
+
+  function logChange(entry) {
+    try {
+      const log = read(CHANGE_LOG_KEY, []) || [];
+      log.unshift({ at: Date.now(), by: _actorName(), ...entry });
+      write(CHANGE_LOG_KEY, log.slice(0, CHANGE_LOG_MAX));
+    } catch (e) {}
+  }
+
+  function getChangeLog(productId) {
+    const log = read(CHANGE_LOG_KEY, []) || [];
+    return productId ? log.filter(e => e.productId === productId) : log;
+  }
+
   const _origProductsUpdate = Products.update.bind(Products);
   Products.update = function (id, patch) {
     try {
-      if (patch && Object.prototype.hasOwnProperty.call(patch, 'barcodes')) {
-        const before = Products.get(id);
-        if (before) {
+      const before = Products.get(id);
+      if (before && patch) {
+        // Barkodlar — köhnə jurnal formatında
+        if (Object.prototype.hasOwnProperty.call(patch, 'barcodes')) {
           const oldList = (before.barcodes || []).map(String);
           const newList = (patch.barcodes || []).map(String);
           const added = newList.filter(b => !oldList.includes(b));
           const removed = oldList.filter(b => !newList.includes(b));
           if (added.length || removed.length) {
-            logBarcodeChange({
-              productId: id,
-              name: before.name || 'Adsız',
-              added, removed
-            });
+            logBarcodeChange({ productId: id, name: before.name || 'Adsız', added, removed });
+            logChange({ productId: id, name: before.name || 'Adsız', field: 'barcodes',
+                        label: 'Barkod',
+                        from: oldList.join(', '), to: newList.join(', ') });
           }
         }
+        // Digər sahələr
+        Object.keys(TRACKED).forEach(f => {
+          if (!Object.prototype.hasOwnProperty.call(patch, f)) return;
+          const oldV = before[f] == null ? '' : String(before[f]);
+          const newV = patch[f] == null ? '' : String(patch[f]);
+          if (oldV === newV) return;
+          logChange({ productId: id, name: before.name || 'Adsız',
+                      field: f, label: TRACKED[f], from: oldV, to: newV });
+        });
       }
     } catch (e) {}
     return _origProductsUpdate(id, patch);
@@ -385,6 +443,10 @@ const JollyDB = (() => {
       const codes = ((payload && payload.barcodes) || []).map(String).filter(Boolean);
       if (rec && rec.id && codes.length) {
         logBarcodeChange({ productId: rec.id, name: rec.name || 'Adsız', added: codes, removed: [], created: true });
+      }
+      if (rec && rec.id) {
+        logChange({ productId: rec.id, name: rec.name || 'Adsız', field: '_created',
+                    label: 'Yaradıldı', from: '', to: rec.name || 'Adsız', created: true });
       }
     } catch (e) {}
     return rec;
@@ -581,7 +643,7 @@ const JollyDB = (() => {
     exportAll, importAll,
     addTombstone, isTombstoned, getTombstones, restoreTombstone,
     markForDeletion, unmarkForDeletion, isMarkedForDeletion, getMarkedForDeletion,
-    getBarcodeLog, logBarcodeChange,
+    getBarcodeLog, logBarcodeChange, getChangeLog, logChange, foldText,
     getActivity: () => read(KEYS.activity, []),
     getSettings: () => read(KEYS.settings, {}) || {},
     setSettings: (patch) => write(KEYS.settings, { ...(read(KEYS.settings, {}) || {}), ...patch }),

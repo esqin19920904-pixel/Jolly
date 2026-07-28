@@ -14,6 +14,7 @@ const JollyBarcodeFolder = (() => {
   const GEN_KEY = 'jolly_barcode_folder_generated';
   let _tab = 'catalog';   // 'catalog' | 'new'
   let _query = '';
+  let _sel = new Set();   // "Yaradılanlar"da toplu seçim
 
   /* ---------- İcazələr ---------- */
   function _canView() {
@@ -125,6 +126,7 @@ const JollyBarcodeFolder = (() => {
     return `
       <div class="glass" style="padding:12px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:17px;cursor:pointer;user-select:none;" onclick="JollyBarcodeFolder.toggleSel('${entry.genId}')">${_sel.has(entry.genId) ? '☑️' : '⬜'}</span>
           <div style="width:64px;height:48px;flex-shrink:0;border-radius:8px;overflow:hidden;background:#1a1d2e;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="JollyBarcodeFolder.openScanReady('${_escape(entry.code)}')">${_thumbHtml(entry)}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13.5px;font-weight:600;">${name}</div>
@@ -135,6 +137,7 @@ const JollyBarcodeFolder = (() => {
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" style="flex:1;min-width:150px;" onclick="JollyBarcodeFolder.convertToProduct('${entry.genId}')">➕ Məhsul kartına çevir</button>
           <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.renameGenerated('${entry.genId}')">✏️ Ad</button>
+          <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.lookupName('${entry.genId}')">🌐 Adını tap</button>
           <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.openScanReady('${_escape(entry.code)}')">⛶ Skan</button>
           <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.deleteGenerated('${entry.genId}')">🗑️</button>
         </div>
@@ -208,8 +211,19 @@ const JollyBarcodeFolder = (() => {
     if (_tab === 'new') {
       if (countEl) countEl.textContent = `${created.length} yaradılmış barkod — adını yaz və məhsul kartına çevir`;
       el.className = '';
+      const bulkBar = created.length ? `
+        <div class="glass" style="padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:12.5px;flex:1;">${_sel.size ? `${_sel.size} seçilib` : 'Toplu iş üçün seç'}</span>
+          <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.selectAll()">☑️ Hamısı</button>
+          ${_sel.size ? `
+            <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.clearSel()">Təmizlə</button>
+            <button class="btn btn-ghost btn-sm" onclick="JollyBarcodeFolder.bulkLookup()">🌐 Adları tap</button>
+            <button class="btn btn-primary btn-sm" onclick="JollyBarcodeFolder.bulkConvert()">➕ Məhsula çevir</button>
+          ` : ''}
+          <div id="bcfBulkProgress" style="width:100%;font-size:11.5px;"></div>
+        </div>` : '';
       el.innerHTML = created.length
-        ? created.map(e => _generatedRow(e, q)).join('')
+        ? bulkBar + created.map(e => _generatedRow(e, q)).join('')
         : `<div class="empty-state"><div class="big-icon">🆕</div><h3>Hələ yaradılmış barkod yoxdur</h3><p class="muted" style="font-size:12px;">Yuxarıda sistemdə olmayan bir rəqəm yaz — və ya kassada tanınmayan bir kod skan et — avtomatik bura düşəcək.</p></div>`;
       return;
     }
@@ -370,6 +384,140 @@ const JollyBarcodeFolder = (() => {
     _renderList();
   }
 
+  /* ── TOPLU İŞ (2026-07-27) ───────────────────────────────────
+     Gözləyən barkodlar onlarla yığılanda bir-bir açmaq əziyyətdir.
+     Seçirsən → adları internetdən birdən tapılır → hamısı birdən
+     məhsula çevrilir. */
+  function toggleSel(genId) {
+    _sel.has(genId) ? _sel.delete(genId) : _sel.add(genId);
+    _renderList();
+  }
+  function clearSel() { _sel.clear(); _renderList(); }
+  function selectAll() {
+    const q = String(_query || '').replace(/\D/g, '');
+    _generatedEntries().filter(e => !q || String(e.code).includes(q))
+      .forEach(e => _sel.add(e.genId));
+    _renderList();
+  }
+
+  function _progress(text) {
+    const el = document.getElementById('bcfBulkProgress');
+    if (el) el.innerHTML = text ? `<span class="muted">${text}</span>` : '';
+  }
+
+  /* Seçilənlərin adlarını bir-bir internetdən tapır */
+  async function bulkLookup() {
+    if (!_sel.size) return;
+    if (!navigator.onLine) {
+      if (typeof Toast !== 'undefined') Toast.error('Oflaynsan — internet lazımdır');
+      return;
+    }
+    const ids = [..._sel];
+    let found = 0, done = 0;
+    for (const genId of ids) {
+      done++;
+      _progress(`🌐 ${done}/${ids.length} yoxlanılır — ${found} tapıldı`);
+      const list = _getGenerated();
+      const g = list.find(x => x.id === genId);
+      if (!g || g.label) continue;
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const r = await fetch('/api/barcode-lookup?upc=' + encodeURIComponent(g.code), { signal: ctrl.signal });
+        clearTimeout(t);
+        const data = await r.json();
+        if (data && data.found && data.title) {
+          const cur = _getGenerated();
+          const item = cur.find(x => x.id === genId);
+          if (item) {
+            item.label = data.brand ? (data.title + ' · ' + data.brand) : data.title;
+            _saveGenerated(cur);
+            found++;
+          }
+        }
+      } catch (e) { /* keç */ }
+    }
+    _progress('');
+    if (typeof JollySound !== 'undefined' && found) JollySound.success();
+    if (typeof Toast !== 'undefined') {
+      Toast.success(`${found} ad tapıldı, ${ids.length - found} tapılmadı`);
+    }
+    _renderList();
+  }
+
+  /* Seçilənləri birdən real məhsula çevirir */
+  function bulkConvert() {
+    if (!_sel.size) return;
+    if (!_canCreateProduct()) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Məhsul yaratmaq icazən yoxdur');
+      return;
+    }
+    const list = _getGenerated();
+    const chosen = list.filter(g => _sel.has(g.id));
+    const unnamed = chosen.filter(g => !g.label).length;
+
+    let msg = `${chosen.length} barkod məhsula çevriləcək.`;
+    if (unnamed) msg += `\n\n${unnamed} ədədinin adı yoxdur — onların adı barkod nömrəsi olacaq (sonra dəyişə bilərsən).`;
+    if (!confirm(msg + '\n\nDavam edim?')) return;
+
+    let ok = 0;
+    const keep = [];
+    list.forEach(g => {
+      if (!_sel.has(g.id)) { keep.push(g); return; }
+      try {
+        const rec = JollyDB.Products.add({
+          name: (g.label || '').trim() || g.code,
+          barcodes: [g.code],
+          images: []
+        });
+        if (rec && rec.id) { ok++; return; }
+      } catch (e) { console.error('[BarcodeFolder] bulkConvert:', e); }
+      keep.push(g);   // alınmadı — qovluqda qalsın
+    });
+
+    _saveGenerated(keep);
+    _sel.clear();
+    if (typeof JollySound !== 'undefined') JollySound.success();
+    if (typeof Toast !== 'undefined') Toast.success(`📦 ${ok} məhsul yaradıldı`);
+    _tab = 'new';
+    _renderList();
+  }
+
+  /* Naməlum barkodun adını dünya bazasından tapmağa çalışır */
+  function lookupName(genId) {
+    const list = _getGenerated();
+    const g = list.find(x => x.id === genId);
+    if (!g) return;
+    if (!navigator.onLine) {
+      if (typeof Toast !== 'undefined') Toast.error('Oflaynsan — internet lazımdır');
+      return;
+    }
+    if (typeof Toast !== 'undefined') Toast.info('🌐 Axtarılır...');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    fetch('/api/barcode-lookup?upc=' + encodeURIComponent(g.code), { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(data => {
+        clearTimeout(t);
+        if (data && data.found && data.title) {
+          const cur = _getGenerated();
+          const item = cur.find(x => x.id === genId);
+          if (!item) return;
+          item.label = data.brand ? (data.title + ' · ' + data.brand) : data.title;
+          _saveGenerated(cur);
+          if (typeof JollySound !== 'undefined') JollySound.success();
+          if (typeof Toast !== 'undefined') Toast.success('Tapıldı: ' + data.title);
+          _renderList();
+        } else {
+          if (typeof Toast !== 'undefined') Toast.error('Bu barkod bazada tapılmadı');
+        }
+      })
+      .catch(() => {
+        clearTimeout(t);
+        if (typeof Toast !== 'undefined') Toast.error('Axtarış alınmadı');
+      });
+  }
+
   function deleteGenerated(genId) {
     if (!confirm('Bu yaradılmış barkod silinsin?')) return;
     _saveGenerated(_getGenerated().filter(g => g.id !== genId));
@@ -414,7 +562,8 @@ const JollyBarcodeFolder = (() => {
 
   return {
     render, setTab, liveSearch, searchOrCreate, scanIntoSearch, pickSuggestion,
-    openScanReady, renameGenerated, deleteGenerated, convertToProduct,
+    openScanReady, renameGenerated, deleteGenerated, convertToProduct, lookupName,
+    toggleSel, clearSel, selectAll, bulkLookup, bulkConvert,
     highlightDigits
   };
 })();
