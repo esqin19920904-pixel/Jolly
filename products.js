@@ -1543,11 +1543,54 @@ const JollyProducts = (() => {
     return true;
   }
 
+  /* Skan anında çıxan xəbərdarlıq zolağı — ekranın yuxarısında,
+     özü 6 saniyəyə yox olur, Doktora keçid düyməsi ilə. */
+  function _showScanWarning(w, code, product) {
+    const colors = { danger: '#ff5c6c', warn: '#ff9d5c', info: '#4f9fff' };
+    const col = colors[w.level] || '#ff9d5c';
+    const icons = { danger: '🚨', warn: '⚠️', info: 'ℹ️' };
+    const old = document.getElementById('scanWarnBar');
+    if (old) old.remove();
+
+    const el = document.createElement('div');
+    el.id = 'scanWarnBar';
+    el.style.cssText = `position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 68px);z-index:9998;
+      background:#16192c;border:1px solid ${col};border-left:4px solid ${col};border-radius:12px;
+      padding:11px 13px;box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transition:.25s;`;
+    el.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:9px;">
+        <span style="font-size:17px;">${icons[w.level] || '⚠️'}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:${col};">${escapeHtml(w.title)}</div>
+          <div style="font-size:11.5px;margin-top:3px;line-height:1.45;">${escapeHtml(w.reason)}</div>
+        </div>
+        <span style="cursor:pointer;font-size:16px;opacity:.6;" onclick="this.closest('#scanWarnBar').remove()">×</span>
+      </div>
+      ${w.level !== 'info' ? `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:9px;"
+        onclick="document.getElementById('scanWarnBar').remove();JollyRouter.go('#/data-doctor')">🩺 Doktorda bax</button>` : ''}`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+    if (navigator.vibrate && w.level === 'danger') navigator.vibrate([25, 40, 25]);
+    setTimeout(() => {
+      const cur = document.getElementById('scanWarnBar');
+      if (cur === el) { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }
+    }, w.level === 'info' ? 3500 : 6500);
+  }
+
   function scanSearch() {
     JollyBarcode.open((code) => {
       if (_handleBridgeCode(code)) return;
       const found = JollyDB.Products.findByBarcode(code);
       if (found.length === 1) {
+        // Skanın nəticəsi açılmazdan ƏVVƏL barkodun şübhəli olub-olmadığına bax
+        // (təsdiq damğası vurulmamışdan əvvəl — yoxsa "ilk dəfə" halı itir)
+        let _warn = null;
+        try {
+          if (typeof JollyDataDoctor !== 'undefined' && JollyDataDoctor.inspectBarcode) {
+            _warn = JollyDataDoctor.inspectBarcode(code, found[0]);
+          }
+        } catch (e) {}
+        if (_warn) _showScanWarning(_warn, code, found[0]);
         // Skaner bu kodu oxudu → artıq "təsdiqlənmiş" sayılır
         try { JollyDB.Products.markBarcodeVerified(found[0].id, code, _currentActorName()); } catch (e) {}
         const cfg = (typeof JollyQuickMenu !== 'undefined') ? JollyQuickMenu.getConfig() : null;
