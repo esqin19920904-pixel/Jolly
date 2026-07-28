@@ -165,6 +165,18 @@
 
   function renderGrid(grid) {
     const tools = getTools();
+
+    /* SƏBƏB (2026-07-28): bu alətlərin bir hissəsi artıq açılışda yox,
+       arxa planda yüklənir (jolly-lazy-loader.js). Menyu tez açılanda
+       hələ gəlməmiş modullar siyahıda görünmürdü — ona görə "ya hamısı,
+       ya yarımçıq". İndi menyu açılanda qalanları dərhal yüklədirik və
+       gələn kimi siyahı özü yenilənir. */
+    if (window.JollyLazy && typeof JollyLazy.pending === "function" && JollyLazy.pending() > 0) {
+      try { JollyLazy.flush(); } catch (e) {}
+      grid.insertAdjacentHTML("afterend",
+        '<div class="jtm-empty" id="jtm-loading" style="padding:8px 0;">⏳ Qalan alətlər yüklənir...</div>');
+    }
+
     if (!tools.length) {
       grid.outerHTML = `<div class="jtm-empty">Hələ heç bir əlavə alət qoşulmayıb.</div>`;
       return;
@@ -223,6 +235,13 @@
     injectStyles();
     injectButton();
   }
+
+  /* Arxa plan yükləməsi bitəndə açıq menyunu yenilə */
+  document.addEventListener("jolly:lazy-done", () => {
+    const note = document.getElementById("jtm-loading");
+    if (note) note.remove();
+    refreshGrid();
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

@@ -25,7 +25,6 @@ const JollyStudios = (() => {
     { key: 'workflow', icon: '⚡', title: 'Workflow Studio', sub: 'Avtomatlaşdırma qaydaları', ready: true },
     { key: 'voicevision', icon: '👁️', title: 'Voice & Vision Studio', sub: 'Səs, kamera, OCR', ready: true },
     { key: 'notification', icon: '🔔', title: 'Bildiriş Studio', sub: 'Xəbərdarlıq mərkəzi', ready: true },
-    { key: 'print', icon: '🖨️', title: 'Print / Export Studio', sub: 'Barkod Print Center', ready: true },
     { key: 'integration', icon: '🔗', title: 'İnteqrasiyalar', sub: 'Backup Mərkəzinə keçir', ready: true, route: '#/studios/data' },
     { key: 'updates', icon: '🔄', title: 'Yeniləmələr', sub: 'İçəridən yeni funksiya al', ready: true, route: '#/updates' },
     { key: 'analytics', icon: '🔮', title: 'Analytics Studio', sub: 'Proqnoz və anomaliya', ready: true },
@@ -40,7 +39,7 @@ const JollyStudios = (() => {
     { label: '🧠 AI & Avtomatlaşdırma', keys: ['brain', 'ai', 'workflow'] },
     { label: '📊 Analitika', keys: ['report', 'analytics'] },
     { label: '👁️ Görüntü & Səs', keys: ['voicevision'] },
-    { label: '🖨️ Çap & İnteqrasiya', keys: ['print', 'integration'] },
+    { label: '🔗 İnteqrasiya', keys: ['integration'] },
     { label: '🔔 Digər', keys: ['notification', 'updates', 'changelog'] },
   ];
 
@@ -54,53 +53,140 @@ const JollyStudios = (() => {
     `;
   }
 
-  function renderHome() {
-    const staticSections = STORE_CATEGORIES.map(cat => {
-      const items = cat.keys.map(k => LIST.find(x => x.key === k)).filter(Boolean);
-      if (!items.length) return '';
-      return `
-        <div class="section-title" style="margin-top:16px;">${cat.label}</div>
-        <div class="studio-grid">${items.map(storeCardHtml).join('')}</div>
-      `;
-    }).join('');
-
-    // ── Dinamik modullar (ModuleRegistry) — Qəbul Studio, Skan ilə Qəbul,
-    // Sürətli Menyu Studio və gələcəkdə əlavə olunan HƏR yeni modul burada
-    // avtomatik görünür, aç/bağla düyməsi ilə. ──
-    let dynamicSections = '';
+  /* ── TƏK SİYAHI (2026-07-28) ─────────────────────────────────
+     Əvvəl iki ayrı blok var idi: statik Studio kartları (kateqoriyalara
+     bölünmüş) və ModuleRegistry modulları (öz qruplarında). Esqin
+     qruplaşdırmanı istəmədi — indi hamısı BİR siyahıdadır, iki görünüşü
+     var (siyahı / şəbəkə) və sıra barmaqla dəyişdirilir.
+     Statik Studio-lar söndürülə bilmir (əsas ekranlardır), ona görə
+     onlarda aç/bağla qutusu yoxdur. */
+  function _allItems() {
+    const out = LIST.map(x => ({
+      id: 's:' + x.key,
+      icon: x.icon,
+      title: x.title,
+      sub: x.sub,
+      route: x.route || ('#/studios/' + x.key),
+      fixed: true,
+      enabled: true
+    }));
     if (typeof ModuleRegistry !== 'undefined') {
-      const groups = {};
-      ModuleRegistry.list().forEach(m => { (groups[m.group] = groups[m.group] || []).push(m); });
-      const groupLabel = (g) => {
-        if (g === 'Anbar') return '📦 Anbar Modulları';
-        if (g === 'Studio') return '⚡ Sürətli Alətlər';
-        return '🧩 ' + g;
-      };
-      dynamicSections = Object.keys(groups).map(g => `
-        <div class="section-title" style="margin-top:16px;">${groupLabel(g)}</div>
-        <div class="studio-grid">
-          ${groups[g].map(m => `
-            <div class="glass studio-card" style="position:relative;${m.enabled ? '' : 'opacity:.5;'}">
-              <div onclick="JollyRouter.go('${m.route}')" style="cursor:pointer;">
-                <div class="ic">${m.icon}</div>
-                <div class="title">${escapeAS(m.name)}</div>
-                <div class="sub">${m.enabled ? 'Aktiv' : 'Söndürülüb'}</div>
-              </div>
-              <label style="position:absolute;top:10px;right:10px;display:flex;align-items:center;" onclick="event.stopPropagation();">
-                <input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="JollyStudios.toggleModuleReg('${m.id}', this.checked)">
-              </label>
-            </div>
-          `).join('')}
-        </div>
-      `).join('');
+      ModuleRegistry.list().forEach(m => out.push({
+        id: m.id,
+        icon: m.icon,
+        title: m.name,
+        sub: m.enabled ? 'Aktiv' : 'Söndürülüb',
+        route: m.route,
+        fixed: false,
+        enabled: m.enabled
+      }));
     }
+    // İstifadəçinin qurduğu sıra
+    let order = [];
+    try { order = JSON.parse(localStorage.getItem('jolly_module_order') || '[]'); } catch (e) {}
+    if (order.length) {
+      const map = {};
+      out.forEach(i => { map[i.id] = i; });
+      const sorted = [];
+      order.forEach(id => { if (map[id]) { sorted.push(map[id]); delete map[id]; } });
+      out.forEach(i => { if (map[i.id]) sorted.push(i); });
+      return sorted;
+    }
+    return out;
+  }
+
+  function renderHome() {
+    const items = _allItems();
+    const view = localStorage.getItem('jolly_module_view') || 'grid';
+    const chip = (k, label) => `<span class="chip" style="cursor:pointer;${view === k ? 'border-color:var(--accent-1);color:var(--accent-1);' : ''}" onclick="JollyStudios.setModuleView('${k}')">${label}</span>`;
+
+    const box = (it) => it.fixed ? '' :
+      `<input type="checkbox" ${it.enabled ? 'checked' : ''} onclick="event.stopPropagation();" onchange="JollyStudios.toggleModuleReg('${it.id}', this.checked)">`;
+
+    const rowHtml = (it) => `
+      <div class="jmod-item" data-mid="${it.id}" style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);${it.enabled ? '' : 'opacity:.5;'}">
+        <span class="jmod-handle" style="cursor:grab;touch-action:none;font-size:15px;opacity:.6;">⠿</span>
+        <span style="font-size:18px;">${it.icon}</span>
+        <span style="flex:1;min-width:0;cursor:pointer;" onclick="JollyRouter.go('${it.route}')">
+          <span style="font-size:13.5px;font-weight:600;display:block;">${escapeAS(it.title)}</span>
+          <span class="muted" style="font-size:10.5px;">${escapeAS(it.sub || '')}</span>
+        </span>
+        ${box(it)}
+      </div>`;
+
+    const cardHtml = (it) => `
+      <div class="glass studio-card jmod-item" data-mid="${it.id}" style="position:relative;${it.enabled ? '' : 'opacity:.5;'}">
+        <span class="jmod-handle" style="position:absolute;top:8px;left:9px;cursor:grab;touch-action:none;font-size:13px;opacity:.55;">⠿</span>
+        <div onclick="JollyRouter.go('${it.route}')" style="cursor:pointer;">
+          <div class="ic">${it.icon}</div>
+          <div class="title">${escapeAS(it.title)}</div>
+          <div class="sub">${escapeAS(it.sub || '')}</div>
+        </div>
+        ${it.fixed ? '' : `<label style="position:absolute;top:8px;right:9px;display:flex;align-items:center;">${box(it)}</label>`}
+      </div>`;
 
     return `
       <h2 style="font-family:var(--font-display);margin:0 0 4px;font-size:20px;">🏛️ JOLLY Store</h2>
-      <p class="muted" style="margin:0 0 16px;font-size:13px;">Bütün modulların idarəetmə mərkəzi — kateqoriya üzrə gəz, aç/bağla.</p>
-      ${staticSections}
-      ${dynamicSections}
+      <p class="muted" style="margin:0 0 12px;font-size:13px;">Bütün ekranlar bir siyahıda — sırala, aç/bağla.</p>
+
+      <div class="row" style="gap:8px;margin-bottom:8px;">
+        ${chip('list', '☰ Siyahı')}
+        ${chip('grid', '▦ Şəbəkə')}
+        <span class="muted" style="font-size:11.5px;margin-left:auto;align-self:center;">${items.length} ekran</span>
+      </div>
+      <p class="muted" style="font-size:11px;margin:0 0 10px;">⠿ işarəsindən tutub sürüklə — sıra yadda qalır.</p>
+
+      <div id="jmodWrap" class="${view === 'grid' ? 'studio-grid' : ''}">
+        ${items.map(view === 'grid' ? cardHtml : rowHtml).join('')}
+      </div>
     `;
+  }
+
+  function setModuleView(v) {
+    try { localStorage.setItem('jolly_module_view', v); } catch (e) {}
+    const main = document.getElementById('main');
+    if (main) { main.innerHTML = renderHome(); initModuleDrag(); }
+  }
+
+  /* Barmaqla sıralama — Pointer Events, ayrıca kitabxana yoxdur */
+  let _dragEl = null;
+  function initModuleDrag() {
+    const wrap = document.getElementById('jmodWrap');
+    if (!wrap || wrap.dataset.dragInit) return;
+    wrap.dataset.dragInit = '1';
+
+    wrap.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest('.jmod-handle');
+      if (!handle) return;
+      _dragEl = handle.closest('.jmod-item');
+      if (!_dragEl) return;
+      _dragEl.style.opacity = '.55';
+      e.preventDefault();
+    });
+
+    wrap.addEventListener('pointermove', (e) => {
+      if (!_dragEl) return;
+      const over = document.elementFromPoint(e.clientX, e.clientY);
+      const target = over && over.closest ? over.closest('.jmod-item') : null;
+      if (!target || target === _dragEl || target.parentNode !== wrap) return;
+      const rect = target.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      wrap.insertBefore(_dragEl, after ? target.nextSibling : target);
+      e.preventDefault();
+    });
+
+    const finish = () => {
+      if (!_dragEl) return;
+      _dragEl.style.opacity = '';
+      _dragEl = null;
+      const ids = [...wrap.querySelectorAll('.jmod-item')].map(el => el.dataset.mid);
+      if (typeof ModuleRegistry !== 'undefined' && ModuleRegistry.saveOrder) {
+        ModuleRegistry.saveOrder(ids);
+        if (typeof Toast !== 'undefined') Toast.success('Sıra yadda saxlanıldı');
+      }
+    };
+    wrap.addEventListener('pointerup', finish);
+    wrap.addEventListener('pointercancel', finish);
   }
 
   function toggleModuleReg(id, on) {
@@ -1288,7 +1374,7 @@ const JollyStudios = (() => {
   }
 
   return {
-    renderHome, renderComingSoon, toggleModuleReg,
+    renderHome, renderComingSoon, toggleModuleReg, setModuleView, initModuleDrag,
     renderAI, aiSend, aiQuick, aiVoice,
     renderModuleStudio, toggleNavItem, removeEdgeItem, getNavConfig, NAV_ITEMS_DEFAULT,
     addEdgeItem, getEdgeCatalog, getEdgeCatalogItem,
@@ -1303,4 +1389,9 @@ const JollyStudios = (() => {
     renderIntegration, toggleWaSetting, exportCsv, importCsvFile,
     renderPrintCenter, selectAllPrint, printSelectedBarcodes,
   };
+  /* Studios ekranı hər dəfə çəkiləndən sonra sürükləməni bağla */
+  document.addEventListener('jolly:rendered', () => {
+    try { initModuleDrag(); } catch (e) {}
+  });
+
 })();

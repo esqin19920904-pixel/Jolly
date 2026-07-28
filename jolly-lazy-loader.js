@@ -81,7 +81,17 @@
   window.JollyLazy = {
     flush() {
       started = true;
-      while (i < LAZY.length) inject(LAZY[i++], null);
+      let waiting = 0;
+      const done = () => {
+        waiting--;
+        if (waiting <= 0) {
+          try { document.dispatchEvent(new CustomEvent('jolly:lazy-done')); } catch (e) {}
+        }
+      };
+      while (i < LAZY.length) { waiting++; inject(LAZY[i++], done); }
+      if (!waiting) {
+        try { document.dispatchEvent(new CustomEvent('jolly:lazy-done')); } catch (e) {}
+      }
     },
     pending() { return Math.max(0, LAZY.length - i); }
   };

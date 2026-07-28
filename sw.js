@@ -11,7 +11,7 @@
    İndi BÜTÜN skriptlər `install` zamanı əvvəlcədən yüklənir ki,
    ilk uğurlu quraşdırmadan sonra tətbiq tam offline-safe olsun.
    ============================================================ */
-const CACHE_NAME = 'jolly-v22';
+const CACHE_NAME = 'jolly-v23';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -101,6 +101,7 @@ const STATIC_ASSETS = [
   './jolly-selftest.js',
   './jolly-testdata.js',
   './jolly-guide.js',
+  './jolly-group-health.js',
   './offline-diagnostic.js',
   './dashboard.js',
   './studios.js?v=2',

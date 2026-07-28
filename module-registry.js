@@ -7,12 +7,32 @@ const ModuleRegistry = (() => {
   const _modules = {};          // id → module obyekti
   const _order = [];            // qeydiyyat sırası
   const STATE_KEY = 'jolly_module_state'; // enabled/disabled saxlanılır
+  const ORDER_KEY = 'jolly_module_order'; // istifadəçinin sürükləyib qurduğu sıra
 
   function _loadState() {
     try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch (e) { return {}; }
   }
   function _saveState(s) {
     try { localStorage.setItem(STATE_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  /* İstifadəçi sırası (sürükləyib düzəldilən). Qeydiyyat sırasından
+     üstündür; siyahıda olmayan yeni modullar sona düşür. */
+  function _loadOrder() {
+    try { const v = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function saveOrder(ids) {
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids || [])); } catch (e) {}
+  }
+  function _sortedIds() {
+    const custom = _loadOrder();
+    if (!custom.length) return _order.slice();
+    const seen = new Set();
+    const out = [];
+    custom.forEach(id => { if (_modules[id] && !seen.has(id)) { out.push(id); seen.add(id); } });
+    _order.forEach(id => { if (!seen.has(id)) { out.push(id); seen.add(id); } });
+    return out;
   }
 
   /* ---------- Qeydiyyat ---------- */
@@ -61,7 +81,7 @@ const ModuleRegistry = (() => {
 
   function list(opts) {
     opts = opts || {};
-    let arr = _order.map(id => _modules[id]).filter(Boolean);
+    let arr = _sortedIds().map(id => _modules[id]).filter(Boolean);
     arr = arr.filter(_allowed);
     if (opts.enabledOnly) arr = arr.filter(m => m.enabled);
     if (opts.group) arr = arr.filter(m => m.group === opts.group);
@@ -147,7 +167,7 @@ const ModuleRegistry = (() => {
   }
 
   return {
-    register, unregister, get, list, groups,
+    register, unregister, get, list, groups, saveOrder,
     enable, disable, toggle,
     addToMenu, removeFromMenu, addToEdge, removeFromEdge,
     renderPage, renderModuleManager,

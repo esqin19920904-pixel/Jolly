@@ -252,6 +252,24 @@ const JollyCloud = (() => {
     return { list: out, successCount, attemptCount };
   }
 
+  /* Firebase açarında qadağan olunan simvollar: . $ # [ ] / və boş açar.
+     Belə açarları təhlükəsiz variantla əvəz edir, dəyərlərə toxunmur. */
+  const BAD_KEY = /[.$#\[\]/]/g;
+  function _sanitizeForFirebase(value, depth) {
+    depth = depth || 0;
+    if (depth > 12 || value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(v => _sanitizeForFirebase(v, depth + 1));
+    const out = {};
+    Object.keys(value).forEach(k => {
+      const v = value[k];
+      if (v === undefined) return;                 // Firebase undefined qəbul etmir
+      let key = String(k).replace(BAD_KEY, '_');
+      if (!key) key = '_bos';                      // boş açar qadağandır
+      out[key] = _sanitizeForFirebase(v, depth + 1);
+    });
+    return out;
+  }
+
   /* ---------- REST əsaslı oxu/yaz (SDK-sız, yüngül) ---------- */
   async function push() {
     if (!online()) throw new Error('İnternet yoxdur');
@@ -273,12 +291,29 @@ const JollyCloud = (() => {
       device: navigator.userAgent.slice(0, 60),
       syncedAt: Date.now(),
     };
+
+    /* DÜZƏLİŞ (2026-07-28): Firebase açar adlarında . $ # [ ] / qəbul
+       etmir və boş açara icazə vermir — belə bir açar payload-a
+       düşəndə bütün sinxron 400 ilə dayanırdı və səbəb görünmürdü.
+       İndi göndərməzdən əvvəl təmizlənir. */
+    const cleaned = _sanitizeForFirebase(payload);
+    const body = JSON.stringify(cleaned);
+
     const token = await _getIdToken();
     const res = await fetch(`${BASE}/${NODE}.json?auth=${token}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body,
     });
-    if (!res.ok) throw new Error('Buluda yazıla bilmədi: ' + res.status);
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const txt = await res.text();
+        detail = txt ? (' — ' + txt.slice(0, 160)) : '';
+      } catch (e) {}
+      const sizeKb = Math.round(body.length / 1024);
+      console.error('[Cloud] push xətası', res.status, detail, 'ölçü:', sizeKb + 'KB');
+      throw new Error('Buluda yazıla bilmədi: ' + res.status + detail + ' (' + sizeKb + 'KB)');
+    }
     JollyDB.setSettings({ lastCloudSync: Date.now() });
     registerDevice(); // öz cihazını "aktiv" kimi qeydə al — göndərməyi gözləmə
     return thumbStats;

@@ -186,6 +186,8 @@ const JollySelfTest = (() => {
         <div class="list-row"><span style="font-size:12.5px;">Məhsul sayı</span><span class="mono" style="font-size:12px;">${typeof JollyDB !== 'undefined' ? JollyDB.Products.all().length : '—'}</span></div>
       </div>
 
+      ${_storageHtml()}
+
       ${_errorsHtml()}
 
       <button class="btn btn-primary btn-block" onclick="JollySelfTest.copyReport()">📋 Vəziyyət hesabatını kopyala</button>
@@ -193,6 +195,89 @@ const JollySelfTest = (() => {
       <button class="btn btn-ghost btn-block" style="margin-top:8px;border-color:rgba(255,92,108,.45);color:#ff5c6c;" onclick="JollySelfTest.hardRefresh()">🧹 Tam yenilə (keşi sil)</button>
       <p class="muted" style="font-size:11px;margin-top:10px;">Qırmızı sətir varsa, orada adı çəkilən faylı GitHub-da silib yenidən yüklə, sonra tətbiqi tam bağlayıb aç.</p>
     `;
+  }
+
+  /* ── YADDAŞ ─────────────────────────────────────────────────
+     localStorage ~5 MB-dır. Arxiv snapshot-ları və jurnallar onu
+     doldura bilir — dolanda buluda yazma da, arxiv də dayanır.
+     Burada nəyin nə qədər yer tutduğu görünür və təmizlənir. */
+  function _storageStats() {
+    const rows = [];
+    let total = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k) || '';
+        const bytes = k.length + v.length;
+        total += bytes;
+        rows.push({ key: k, bytes });
+      }
+    } catch (e) {}
+    rows.sort((a, b) => b.bytes - a.bytes);
+    return { rows, total };
+  }
+
+  function _kb(n) { return (n / 1024).toFixed(n > 102400 ? 0 : 1) + ' KB'; }
+
+  function _storageHtml() {
+    const st = _storageStats();
+    const limit = 5 * 1024 * 1024;            // təxmini
+    const pct = Math.min(100, Math.round(st.total / limit * 100));
+    const snaps = st.rows.filter(r => r.key.indexOf('jolly_archive_snap_') === 0);
+    const snapBytes = snaps.reduce((n, r) => n + r.bytes, 0);
+    const col = pct > 85 ? '#ff5c6c' : pct > 60 ? '#ffc86b' : '#4ade80';
+
+    return `
+      <div class="section-title">💾 Yaddaş</div>
+      <div class="glass" style="padding:14px;margin-bottom:12px;">
+        <div style="display:flex;align-items:baseline;gap:10px;">
+          <span style="font-size:24px;font-weight:800;color:${col};">${pct}%</span>
+          <span class="muted" style="font-size:12px;flex:1;">${_kb(st.total)} istifadə olunub (təxmini limit 5 MB)</span>
+        </div>
+        <div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px;margin:10px 0;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${col};"></div>
+        </div>
+        ${pct > 85 ? `<div style="font-size:12px;color:#ff5c6c;margin-bottom:8px;">Yaddaş dolmaq üzrədir — buluda yazma və arxiv dayana bilər.</div>` : ''}
+        <div style="font-size:11.5px;">
+          ${st.rows.slice(0, 6).map(r => `
+            <div style="display:flex;justify-content:space-between;padding:3px 0;">
+              <span class="muted mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:66%;">${esc(r.key)}</span>
+              <span class="mono">${_kb(r.bytes)}</span>
+            </div>`).join('')}
+        </div>
+        ${snaps.length ? `
+          <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px;" onclick="JollySelfTest.clearSnapshots()">
+            🗄️ ${snaps.length} arxiv nüsxəsini sil (${_kb(snapBytes)})
+          </button>` : ''}
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px;" onclick="JollySelfTest.clearLogs()">
+          📜 Jurnalları təmizlə (xəta, barkod, dəyişiklik)
+        </button>
+      </div>`;
+  }
+
+  function clearSnapshots() {
+    if (!confirm('Arxiv nüsxələri silinsin?\n\nƏsl məhsullara TOXUNULMUR — bunlar yalnız gündəlik ehtiyat surətləridir.')) return;
+    let n = 0;
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('jolly_archive_snap_') === 0) keys.push(k);
+      }
+      keys.forEach(k => { localStorage.removeItem(k); n++; });
+      localStorage.removeItem('jolly_archive_index');
+    } catch (e) {}
+    if (typeof Toast !== 'undefined') Toast.success(n + ' arxiv silindi');
+    refresh();
+  }
+
+  function clearLogs() {
+    if (!confirm('Xəta, barkod və dəyişiklik jurnalları silinsin?\n\nMəhsullara TOXUNULMUR.')) return;
+    ['jolly_error_log', 'jolly_barcode_log', 'jolly_change_log'].forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+    if (typeof Toast !== 'undefined') Toast.success('Jurnallar təmizləndi');
+    refresh();
   }
 
   /* ── XƏTALAR ────────────────────────────────────────────────
@@ -255,6 +340,10 @@ const JollySelfTest = (() => {
     try { lines.push('Məhsul sayı: ' + JollyDB.Products.all().length); } catch (e) {}
     try {
       if (typeof JollyLazy !== 'undefined' && JollyLazy.pending) lines.push('Yüklənməmiş arxa plan modulu: ' + JollyLazy.pending());
+    } catch (e) {}
+    try {
+      const st = _storageStats();
+      lines.push('Yaddaş: ' + _kb(st.total) + ' / ~5 MB');
     } catch (e) {}
     lines.push('');
 
@@ -343,5 +432,5 @@ const JollySelfTest = (() => {
     });
   }
 
-  return { render, refresh, buildGroups, copyReport, hardRefresh, clearErrors };
+  return { render, refresh, buildGroups, copyReport, hardRefresh, clearErrors, clearSnapshots, clearLogs };
 })();

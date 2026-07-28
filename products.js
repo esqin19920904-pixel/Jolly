@@ -44,6 +44,21 @@ const JollyProducts = (() => {
   }
   function clearHighlightTerms() { _hlTerms = []; }
 
+  /* DÜZƏLİŞ (2026-07-28): kartda kod iki dəfə görünürdü — "No no-129330".
+     Səbəb: tip ("No") ilə dəyər ("no-129330") ayrıca yazılırdı, dəyərin
+     içində isə tip onsuz da var idi. İndi dəyər tiplə başlayırsa,
+     tip təkrarlanmır. */
+  function extraCodeLabel(p, withType) {
+    const val = String((p && p.extraCodeValue) || '').trim();
+    if (!val) return '';
+    const type = String((p && p.extraCodeType) || '').trim();
+    if (!type) return val;
+    const v = val.toLowerCase();
+    const t = type.toLowerCase();
+    if (v.startsWith(t)) return val;              // "No no-129330" → "no-129330"
+    return withType === false ? val : (type + ' ' + val);
+  }
+
   function hl(text) {
     const safe = escapeHtml(text == null ? '' : text);
     if (!_hlTerms.length || !safe) return safe;
@@ -96,7 +111,7 @@ const JollyProducts = (() => {
         ${p.alertFlag ? `<div style="position:absolute;top:38px;right:6px;z-index:6;background:var(--accent-danger,#ff5c6c);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;display:flex;align-items:center;gap:4px;">🚨 XƏBƏRDARLIQ</div>` : ''}
         <div class="thumb peekable" data-pki='${pki}' data-pkx="0">${thumb}</div>
         <div class="p-name">${hl(p.name || 'Adsız məhsul')}</div>
-        <div class="p-meta">${hl(p.mainCode || '')}${p.extraCodeValue ? ' · ' + escapeHtml(p.extraCodeType || '') + ' ' + escapeHtml(p.extraCodeValue) : ''}</div>
+        <div class="p-meta">${hl(p.mainCode || '')}${extraCodeLabel(p) ? ' · ' + escapeHtml(extraCodeLabel(p)) : ''}</div>
         ${(p.barcodes && p.barcodes.length) ? `<div class="mono" style="font-size:10.5px;color:var(--accent-2);letter-spacing:0.3px;opacity:.85;">🏷️ ${hl(p.barcodes[0])}${p.barcodes.length > 1 ? ` +${p.barcodes.length - 1}` : ''}</div>` : ''}
         <div class="row between">
           <span class="p-price" onclick="event.stopPropagation();JollyProducts.quickEditPrice('${p.id}', this)" title="Tez qiymət dəyiş">${p.price != null && p.price !== '' ? p.price + ' ₼' : '—'} ✎</span>
@@ -1883,7 +1898,7 @@ const JollyProducts = (() => {
 
         <div class="tag-list">
           ${p.mainCode ? chipInfo('Xüsusi kod', p.mainCode) : ''}
-          ${p.extraCodeValue ? chipInfo(p.extraCodeType || 'Model', p.extraCodeValue) : ''}
+          ${p.extraCodeValue ? chipInfo(p.extraCodeType || 'Model', extraCodeLabel(p, false)) : ''}
           ${p.color ? chipInfo('Rəng', p.color) : ''}
         </div>
 
@@ -2160,7 +2175,7 @@ const JollyProducts = (() => {
     const lines = [
       p.name ? `Məhsul: ${p.name}` : null,
       p.mainCode ? `Xüsusi kod: ${p.mainCode}` : null,
-      p.extraCodeValue ? `${p.extraCodeType || 'Model'}: ${p.extraCodeValue}` : null,
+      p.extraCodeValue ? `${p.extraCodeType || 'Model'}: ${extraCodeLabel(p, false)}` : null,
       p.price != null && p.price !== '' ? `Qiymət: ${p.price} ₼` : null,
       p.brand ? `Firma: ${p.brand}` : null,
       (p.barcodes && p.barcodes[0]) ? `Barkod: ${p.barcodes[0]}` : null,
@@ -3259,17 +3274,56 @@ const JollyProducts = (() => {
     return target && target.closest ? target.closest('.product-card') : null;
   }
 
+  /* DÜZƏLİŞ (2026-07-28): basılı saxlayanda kart "əsirdi".
+     İki səbəb: (1) fx-polish-in 3D əyilmə effekti barmaq tərpəndikcə
+     kartı oynadırdı, (2) brauzer mətn seçimi və öz uzun-basma
+     menyusunu açırdı. Basma müddətində hər ikisi söndürülür. */
+  let _lpCard = null;
+
+  function _lpFreeze(card) {
+    _lpCard = card;
+    try {
+      card.style.transform = 'none';
+      card.style.transition = 'none';
+      card.style.userSelect = 'none';
+      card.style.webkitUserSelect = 'none';
+      card.style.webkitTouchCallout = 'none';
+      card.classList.add('no-tilt');
+    } catch (e) {}
+  }
+
+  function _lpUnfreeze() {
+    if (!_lpCard) return;
+    try {
+      _lpCard.style.transform = '';
+      _lpCard.style.transition = '';
+      _lpCard.style.userSelect = '';
+      _lpCard.style.webkitUserSelect = '';
+      _lpCard.style.webkitTouchCallout = '';
+      _lpCard.classList.remove('no-tilt');
+    } catch (e) {}
+    _lpCard = null;
+  }
+
   function _lpStart(e) {
     const card = _lpFindCard(e.target);
     if (!card) return;
     const point = e.touches ? e.touches[0] : e;
     _lpStartX = point.clientX; _lpStartY = point.clientY;
     clearTimeout(_lpTimer);
+    _lpFreeze(card);
     _lpTimer = setTimeout(() => {
       _lpTriggered = true;
       if (navigator.vibrate) navigator.vibrate(15);
+      try { const sel = window.getSelection(); if (sel) sel.removeAllRanges(); } catch (err) {}
+      _lpUnfreeze();
       showQuickPreview(card.dataset.id);
     }, LP_DELAY);
+  }
+
+  // Brauzerin öz uzun-basma menyusu kart üzərində çıxmasın
+  function _lpContextGuard(e) {
+    if (_lpFindCard(e.target)) e.preventDefault();
   }
 
   function _lpMove(e) {
@@ -3277,10 +3331,10 @@ const JollyProducts = (() => {
     const point = e.touches ? e.touches[0] : e;
     const dx = Math.abs(point.clientX - _lpStartX);
     const dy = Math.abs(point.clientY - _lpStartY);
-    if (dx > LP_MOVE_TOLERANCE || dy > LP_MOVE_TOLERANCE) { clearTimeout(_lpTimer); _lpTimer = null; }
+    if (dx > LP_MOVE_TOLERANCE || dy > LP_MOVE_TOLERANCE) { clearTimeout(_lpTimer); _lpTimer = null; _lpUnfreeze(); }
   }
 
-  function _lpEnd() { clearTimeout(_lpTimer); _lpTimer = null; }
+  function _lpEnd() { clearTimeout(_lpTimer); _lpTimer = null; _lpUnfreeze(); }
 
   // Uzun-bas tetiklənəndə, kartın öz onclick-i (kartı açma) işə düşməsin
   // deyə capture mərhələsində click-i tutub dayandırırıq.
@@ -3303,6 +3357,7 @@ const JollyProducts = (() => {
     document.addEventListener('mousemove', _lpMove);
     document.addEventListener('mouseup', _lpEnd);
     document.addEventListener('click', _lpClickGuard, true);
+    document.addEventListener('contextmenu', _lpContextGuard);
   }
 
   function showQuickPreview(id) {
@@ -3315,7 +3370,7 @@ const JollyProducts = (() => {
     overlay.className = 'qa-overlay';
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('on'); });
     const thumb = (p.images && p.images[0])
-      ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0]) : 'src="' + p.images[0] + '"'} style="width:100%;height:180px;object-fit:cover;border-radius:12px;">`
+      ? `<img ${typeof JollyStorage !== 'undefined' ? JollyStorage.imgAttr(p.images[0], true) : 'src="' + p.images[0] + '"'} style="width:100%;height:180px;object-fit:cover;border-radius:12px;">`
       : `<div style="width:100%;height:180px;display:flex;align-items:center;justify-content:center;font-size:44px;background:rgba(255,255,255,0.05);border-radius:12px;">🧴</div>`;
     overlay.innerHTML = `
       <div class="glass qa-sheet" style="max-width:340px;">
@@ -3332,6 +3387,10 @@ const JollyProducts = (() => {
     `;
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('on'));
+    // Şəkil IndexedDB-dədir — hydrate olmadan boz qutu qalırdı
+    if (typeof JollyStorage !== 'undefined' && JollyStorage.hydrate) {
+      setTimeout(() => JollyStorage.hydrate(), 30);
+    }
   }
 
   // ────────────────────────────────────────────────────────────
@@ -3389,7 +3448,7 @@ const JollyProducts = (() => {
     openSearchHistory, clearSearchHistory, applyDidYouMean,
     saveCurrentFilterSet, openSavedFilters, applySavedFilter, deleteSavedFilter,
     toggleBulkSelectMode, toggleBulkSelect, shareSelectedViaWhatsApp, bulkDeleteSelected, bulkEdit,
-    setHighlightTerms, clearHighlightTerms, hl, renderMatchSuggestChips, showDeviceBridge,
+    setHighlightTerms, clearHighlightTerms, hl, extraCodeLabel, renderMatchSuggestChips, showDeviceBridge,
     onNameTyped, applyGroupGuess, suggestGroupFromName,
     openAdvancedSearch, closeAdvancedSearch, clearAdvancedFields, applyAdvancedSearch,
     submitForm, submitAndNew, saveDraft, escapeHtml, renderCard, statusColor,

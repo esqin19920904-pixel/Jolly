@@ -28,7 +28,7 @@
   const ARCHIVE_INDEX_KEY = "jolly_archive_index";
   const SNAP_PREFIX = "jolly_archive_snap_";
   const META_TRASH_KEY = "jolly_meta_trash";
-  const MAX_SNAPSHOTS = 21; // ~3 həftə gündəlik
+  const MAX_SNAPSHOTS = 7;  // ~1 həftə gündəlik (21 idi — localStorage-ı doldururdu)
 
   function todayKey() {
     return new Date().toISOString().slice(0, 10);
@@ -49,16 +49,47 @@
     try { localStorage.setItem(ARCHIVE_INDEX_KEY, JSON.stringify(list)); } catch (e) {}
   }
 
+  /* Ən köhnə avtomatik snapshot-ları silir. Yer açmaq üçün. */
+  function _pruneOldest(count) {
+    let idx = getIndex();
+    const autos = idx.filter(x => !x.manual).sort((a, b) => a.ts - b.ts);
+    let removed = 0;
+    for (const item of autos) {
+      if (removed >= count) break;
+      try { localStorage.removeItem(item.key); } catch (e) {}
+      idx = idx.filter(x => x.key !== item.key);
+      removed++;
+    }
+    if (removed) setIndex(idx);
+    return removed;
+  }
+
   function takeSnapshotNow(manual) {
     if (typeof JollyDB === "undefined") return false;
     const date = todayKey();
     const data = JollyDB.exportAll();
     const key = SNAP_PREFIX + date + (manual ? "_" + Date.now() : "");
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (e) {
-      console.warn("[JollyArchive] snapshot yazıla bilmədi:", e);
-      if (typeof Toast !== "undefined") Toast.error("Arxiv yaddaşı dolu ola bilər");
+    const body = JSON.stringify(data);
+
+    /* DÜZƏLİŞ (2026-07-28): əvvəl yaddaş dolanda sadəcə xəbərdarlıq
+       verib təslim olurdu — və hər gün eyni xəbərdarlıq çıxırdı.
+       İndi ən köhnə arxivləri silib təkrar cəhd edir. Üç dəfə
+       alınmasa, o zaman xəbər verir. */
+    let saved = false;
+    for (let attempt = 0; attempt < 4 && !saved; attempt++) {
+      try {
+        localStorage.setItem(key, body);
+        saved = true;
+      } catch (e) {
+        const freed = _pruneOldest(attempt === 0 ? 2 : 3);
+        if (!freed) break;   // silinəcək arxiv qalmadı
+      }
+    }
+    if (!saved) {
+      console.warn("[JollyArchive] snapshot yazıla bilmədi — yaddaş dolu");
+      if (typeof Toast !== "undefined") {
+        Toast.error("Yaddaş doludur — Yoxlama ekranından təmizlə");
+      }
       return false;
     }
     let idx = getIndex();
