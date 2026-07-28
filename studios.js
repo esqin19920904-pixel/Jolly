@@ -148,18 +148,39 @@ const JollyStudios = (() => {
     if (main) { main.innerHTML = renderHome(); initModuleDrag(); }
   }
 
-  /* Barmaqla sıralama — Pointer Events, ayrıca kitabxana yoxdur */
+  /* Barmaqla sıralama — Pointer Events, ayrıca kitabxana yoxdur.
+     Sürükləmə boyu kartların basma-kiçilmə effekti və keçidləri
+     söndürülür — yoxsa hər yerdəyişmədə kart "atılır" və ekran əsir. */
+  function _dragStyles() {
+    if (document.getElementById('jmod-drag-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'jmod-drag-styles';
+    st.textContent = `
+      body.jmod-dragging .jmod-item,
+      body.jmod-dragging .jmod-item:active {
+        transition: none !important;
+        transform: none !important;
+        animation: none !important;
+      }
+      body.jmod-dragging { user-select: none; -webkit-user-select: none; }
+    `;
+    document.head.appendChild(st);
+  }
+
   let _dragEl = null;
   function initModuleDrag() {
     const wrap = document.getElementById('jmodWrap');
     if (!wrap || wrap.dataset.dragInit) return;
     wrap.dataset.dragInit = '1';
 
+    _dragStyles();
+
     wrap.addEventListener('pointerdown', (e) => {
       const handle = e.target.closest('.jmod-handle');
       if (!handle) return;
       _dragEl = handle.closest('.jmod-item');
       if (!_dragEl) return;
+      document.body.classList.add('jmod-dragging');
       _dragEl.style.opacity = '.55';
       e.preventDefault();
     });
@@ -176,6 +197,7 @@ const JollyStudios = (() => {
     });
 
     const finish = () => {
+      document.body.classList.remove('jmod-dragging');
       if (!_dragEl) return;
       _dragEl.style.opacity = '';
       _dragEl = null;
