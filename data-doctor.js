@@ -253,5 +253,58 @@ const JollyDataDoctor = (() => {
     setTimeout(tryRenderRoute, 0);
   });
 
-  return { render, scan, fixBarcode, mergePair, ignorePair };
+  /* ── SKAN ANINDA XƏBƏRDARLIQ (2026-07-28) ───────────────────
+     Bir kod skan ediləndə həmin barkodun şübhəli olub-olmadığını
+     dərhal deyir. Əvvəl problemi yalnız sonradan, Doktoru açanda
+     tapırdın — indi malı əlində tutduğun anda görürsən.
+     Qaytarır: null (təmiz) və ya {level, title, reason} */
+  function inspectBarcode(code, product) {
+    const c = String(code || '').replace(/\D/g, '');
+    if (!c) return null;
+
+    // 1) Uzunluq standart deyil — skaner çox vaxt belələrini oxumur
+    if (!OK_LENGTHS.includes(c.length)) {
+      return {
+        level: 'warn',
+        title: 'Qeyri-standart barkod',
+        reason: c.length + ' rəqəm — standart 8, 12, 13 və ya 14-dür. Səhv yazılmış ola bilər.'
+      };
+    }
+
+    // 2) Bu koda bir rəqəm fərqi ilə oxşayan başqa barkod varmı?
+    const byBarcode = {};
+    JollyDB.Products.all().forEach(p => {
+      (p.barcodes || []).forEach(b => {
+        const k = String(b);
+        (byBarcode[k] = byBarcode[k] || []).push(p);
+      });
+    });
+    const variants = new Set(_dropVariants(c));
+    let twin = null;
+    Object.keys(byBarcode).forEach(other => {
+      if (twin || other === c) return;
+      if (_dropVariants(other).some(v => variants.has(v))) twin = other;
+    });
+    if (twin) {
+      const owner = (byBarcode[twin] && byBarcode[twin][0]) || null;
+      return {
+        level: 'danger',
+        title: 'Oxşar barkod var',
+        reason: twin + (owner ? ' — "' + (owner.name || 'Adsız') + '"' : '') + '. Bir rəqəm fərqi var, birini səhv salmaq asandır.'
+      };
+    }
+
+    // 3) Heç vaxt skanerdə təsdiqlənməyib
+    if (product && JollyDB.Products.isBarcodeVerified &&
+        !JollyDB.Products.isBarcodeVerified(product, c)) {
+      return {
+        level: 'info',
+        title: 'İlk dəfə skan olunur',
+        reason: 'Bu barkod əldən yazılmışdı — indi skanerlə təsdiqləndi.'
+      };
+    }
+    return null;
+  }
+
+  return { render, scan, fixBarcode, mergePair, ignorePair, inspectBarcode };
 })();

@@ -17,12 +17,17 @@
         background: none !important;
         opacity: 0 !important;
       }
+      /* DÜZƏLİŞ (2026-07-28): əvvəl burada sonsuz "nəfəs alan" parıltı
+         var idi — box-shadow hər kadrda dəyişirdi. Kartlar 7 kiçik qrupa
+         bölünəndə bu görünmürdü, amma hamısı BİR siyahıya yığılandan sonra
+         eyni anda 30 kart pulsasiya edirdi və ekran əsirdi.
+         box-shadow animasiyası CPU-da işləyir, GPU-da yox.
+         İndi kölgə sabitdir — görünüş eynidir, hərəkət yoxdur. */
       .studio-card.jolly-premium-card {
-        animation: jollyGlassPulse 4s ease-in-out infinite;
-      }
-      @keyframes jollyGlassPulse {
-        0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 12px rgba(212,175,55,0.15), inset 0 1px 0 rgba(255,255,255,0.1); }
-        50% { box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 22px rgba(212,175,55,0.35), inset 0 1px 0 rgba(255,255,255,0.15); }
+        box-shadow: 0 8px 28px rgba(0,0,0,0.4),
+                    0 0 16px rgba(212,175,55,0.22),
+                    inset 0 1px 0 rgba(255,255,255,0.12);
+        contain: paint;          /* çəkiliş kartın içində qalsın */
       }
     `;
     document.head.appendChild(style);
