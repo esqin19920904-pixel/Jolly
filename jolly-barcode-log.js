@@ -97,6 +97,7 @@ const JollyBarcodeLog = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'barcode-log',
+      perm: 'barcodelog.view',
       name: 'Barkod Jurnalı',
       icon: '📜',
       route: '#/barcode-log',

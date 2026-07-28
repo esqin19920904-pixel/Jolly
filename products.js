@@ -623,7 +623,7 @@ const JollyProducts = (() => {
         <div id="bulkActionBar" style="position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:99997;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);font-size:13px;">
           <span>${bulkSelectedIds.size} seçildi</span>
           <button style="background:var(--accent-1,#7c8aff);border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkMoveToGroup()">📦 Qrupa köçür</button>
-          <button style="background:#ffc86b;border:none;color:#1a1a1a;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkEdit()">✏️ Toplu dəyiş</button>
+          ${(typeof POS === 'undefined' || POS.can('bulk.edit')) ? `<button style="background:#ffc86b;border:none;color:#1a1a1a;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkEdit()">✏️ Toplu dəyiş</button>` : ''}
           <button style="background:#25D366;border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.shareSelectedViaWhatsApp()">📤 WhatsApp</button>
           ${canDelete ? `<button style="background:var(--accent-danger,#ff5c6c);border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="JollyProducts.bulkDeleteSelected()">🗑️ Sil</button>` : ''}
         </div>`;
@@ -686,6 +686,10 @@ const JollyProducts = (() => {
 
   function bulkEdit() {
     if (!bulkSelectedIds.size) return;
+    if (typeof POS !== 'undefined' && !POS.can('bulk.edit')) {
+      Toast.error('🔒 Toplu dəyişiklik icazən yoxdur — Admin-dən istə');
+      return;
+    }
     if (window.JollyAuth && !JollyAuth.can('products.edit')) {
       Toast.error('🔒 Redaktə icazən yoxdur — Admin-dən istə');
       return;

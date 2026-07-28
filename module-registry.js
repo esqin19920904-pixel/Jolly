@@ -50,9 +50,19 @@ const ModuleRegistry = (() => {
 
   /* ---------- Sorğu ---------- */
   function get(id) { return _modules[id] || null; }
+  /* Modul `perm` açarı ilə qeydiyyatdan keçibsə və istifadəçinin
+     o icazəsi yoxdursa, siyahılarda ümumiyyətlə görünmür.
+     Admin həmişə hamısını görür (POS.can admin üçün true qaytarır). */
+  function _allowed(m) {
+    if (!m || !m.perm) return true;
+    try { return (typeof POS === 'undefined') ? true : POS.can(m.perm); }
+    catch (e) { return true; }
+  }
+
   function list(opts) {
     opts = opts || {};
     let arr = _order.map(id => _modules[id]).filter(Boolean);
+    arr = arr.filter(_allowed);
     if (opts.enabledOnly) arr = arr.filter(m => m.enabled);
     if (opts.group) arr = arr.filter(m => m.group === opts.group);
     if (opts.inMenu) arr = arr.filter(m => m.inMenu);
@@ -104,6 +114,9 @@ const ModuleRegistry = (() => {
       if (hash.startsWith(base + '/')) { found = m; rest = hash.slice(base.length + 1); break; }
     }
     if (!found) return null; // registry bu route-u tanımır (app.js öz köhnə route-larına baxsın)
+    if (!_allowed(found)) {
+      return { html: '<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3><p class="muted" style="font-size:12px;">Bu bölmə üçün Admin-dən icazə istə.</p></div>', module: found, after: null };
+    }
     try {
       const html = found.render(rest);
       // afterRender varsa app.js çağıracaq üçün qaytar

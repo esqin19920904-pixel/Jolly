@@ -174,6 +174,7 @@ const JollyTestData = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'testdata',
+      perm: 'tools.testdata',
       name: 'Sınaq Rejimi',
       icon: '🧪',
       route: '#/testdata',

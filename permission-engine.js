@@ -733,16 +733,55 @@ document.addEventListener('DOMContentLoaded', function() {
     { key:'favorites.use', label:'Sevimlilər', tag:'view', default:true },
   ]});
 
-  POS.register({ id:'print', name:'Çap', icon:'🖨️', permissions:[
-    { key:'print.use', label:'Çap et', tag:'view', default:true },
-  ]});
-
   POS.register({ id:'storemap', name:'Mağaza Xəritəsi', icon:'🗺️', permissions:[
     { key:'storemap.view', label:'Xəritəyə bax', tag:'view', default:true },
   ]});
 
   POS.register({ id:'groups', name:'Qruplar', icon:'📦', permissions:[
     { key:'groups.manage', label:'Qrupları idarə et (yarat/redaktə/ortaq barkod-qiymət)', tag:'edit', default:false },
+  ]});
+
+  /* ── 2026-07-28: son iki gündə əlavə olunan alətlər ──────────
+     Hər birinin öz açarı var ki, işçiyə ayrı-ayrılıqda verilə bilsin.
+     Standart dəyərlər ehtiyatlıdır: gündəlik iş alətləri açıq,
+     məlumatı kütləvi dəyişənlər və texniki alətlər bağlıdır. */
+  POS.register({ id:'fixmode', name:'Bu gün 10 mal', icon:'⚡', permissions:[
+    { key:'fixmode.use', label:'Tamamlanmamış malları düzəlt', tag:'edit', default:true },
+  ]});
+
+  POS.register({ id:'scanmarathon', name:'Skan Maratonu', icon:'🎯', permissions:[
+    { key:'scanmarathon.use', label:'Ardıcıl skan ilə barkod bağla', tag:'edit', default:true },
+  ]});
+
+  POS.register({ id:'doctor', name:'Data Doctor', icon:'🩺', permissions:[
+    { key:'doctor.view', label:'Problemli məhsulları gör', tag:'view', default:true  },
+    { key:'doctor.fix',  label:'Barkodu düzəlt / məhsulları birləşdir', tag:'edit', default:false },
+  ]});
+
+  POS.register({ id:'health', name:'Sağlamlıq Hesabatı', icon:'📈', permissions:[
+    { key:'health.view', label:'Hesabata bax', tag:'view', default:false },
+  ]});
+
+  POS.register({ id:'importer', name:'Barkod İdxalı', icon:'📥', permissions:[
+    { key:'import.use', label:'Fayldan toplu idxal et', tag:'edit', default:false },
+  ]});
+
+  POS.register({ id:'sheet', name:'Cədvəl Körpüsü', icon:'📊', permissions:[
+    { key:'sheet.export', label:'Kataloqu cədvələ çıxar', tag:'view', default:false },
+  ]});
+
+  POS.register({ id:'barcodelog', name:'Barkod Jurnalı', icon:'📜', permissions:[
+    { key:'barcodelog.view', label:'Kim nə dəyişdi — jurnala bax', tag:'view', default:false },
+  ]});
+
+  POS.register({ id:'bulkedit', name:'Toplu Dəyişiklik', icon:'✏️', permissions:[
+    { key:'bulk.edit', label:'Seçilənlərə toplu sahə yaz', tag:'edit', default:false },
+  ]});
+
+  POS.register({ id:'devtools', name:'Texniki Alətlər', icon:'🩻', permissions:[
+    { key:'tools.selftest', label:'JOLLY Yoxlama ekranı', tag:'view', default:false },
+    { key:'tools.testdata', label:'Sınaq məlumatı yarat/sil', tag:'edit', default:false },
+    { key:'tools.guide',    label:'Bələdçi', tag:'view', default:true  },
   ]});
 
   POS.reg.refreshCustomModule();

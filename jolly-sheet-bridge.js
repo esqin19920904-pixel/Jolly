@@ -121,6 +121,7 @@ const JollySheetBridge = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'sheet',
+      perm: 'sheet.export',
       name: 'Cədvəl Körpüsü',
       icon: '📊',
       route: '#/sheet',

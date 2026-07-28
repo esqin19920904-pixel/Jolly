@@ -333,6 +333,7 @@ const JollySelfTest = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'selftest',
+      perm: 'tools.selftest',
       name: 'JOLLY Yoxlama',
       icon: '🩻',
       route: '#/selftest',

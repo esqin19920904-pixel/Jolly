@@ -132,6 +132,7 @@ const JollyGuide = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'guide',
+      perm: 'tools.guide',
       name: 'Bələdçi',
       icon: '🧭',
       route: '#/guide',

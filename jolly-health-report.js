@@ -165,6 +165,7 @@ const JollyHealthReport = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'health-report',
+      perm: 'health.view',
       name: 'Sağlamlıq Hesabatı',
       icon: '📈',
       route: '#/health-report',

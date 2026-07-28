@@ -129,6 +129,7 @@ const JollyFixMode = (() => {
           <div class="muted" style="font-size:11.5px;margin-bottom:12px;">
             ${g.createdAt ? new Date(g.createdAt).toLocaleDateString('az-AZ') : ''} — hələ məhsula bağlanmayıb
           </div>
+          <div id="fixLookupZone" style="margin-bottom:8px;"></div>
           <input id="fixModeInput" placeholder="Bu nə maldır? Adını yaz..."
                  style="width:100%;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border-soft);color:var(--text-hi);font-size:15px;"
                  value="${esc(g.label || '')}"
@@ -141,6 +142,7 @@ const JollyFixMode = (() => {
         </div>`;
       const i0 = document.getElementById('fixModeInput');
       if (i0) setTimeout(() => i0.focus(), 120);
+      if (!g.label) _lookupOnline(g.code);
       return;
     }
 
@@ -294,6 +296,42 @@ const JollyFixMode = (() => {
     _afterFix(p.id);
   }
 
+  /* İnternetdən ad tapma — naməlum barkodun çoxu dünya bazasında var.
+     Tapılsa təklif kimi göstərilir, toxunanda ad qutusuna düşür.
+     Oflayn və ya tapılmayan halda sakitcə heç nə göstərmir. */
+  function _lookupOnline(code) {
+    const zone = document.getElementById('fixLookupZone');
+    if (!zone || !navigator.onLine) return;
+    zone.innerHTML = '<div class="muted" style="font-size:11px;">🌐 İnternetdə axtarılır...</div>';
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    fetch('/api/barcode-lookup?upc=' + encodeURIComponent(code), { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(data => {
+        clearTimeout(t);
+        const z = document.getElementById('fixLookupZone');
+        if (!z) return;
+        if (data && data.found && data.title) {
+          const safe = esc(data.title).replace(/'/g, "\\'");
+          z.innerHTML = `
+            <div style="font-size:11px;color:var(--accent-1);margin-bottom:5px;">🌐 İnternetdə tapıldı — toxun və istifadə et:</div>
+            <span class="chip" style="cursor:pointer;" onclick="JollyFixMode.useLookup('${safe}')">${esc(data.title)}${data.brand ? ' · ' + esc(data.brand) : ''}</span>`;
+        } else {
+          z.innerHTML = '';
+        }
+      })
+      .catch(() => {
+        clearTimeout(t);
+        const z = document.getElementById('fixLookupZone');
+        if (z) z.innerHTML = '';
+      });
+  }
+
+  function useLookup(title) {
+    const el = document.getElementById('fixModeInput');
+    if (el) { el.value = title; el.focus(); }
+  }
+
   let _lastFromScan = false;
 
   function _actorName() {
@@ -365,6 +403,7 @@ const JollyFixMode = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'fixmode',
+      perm: 'fixmode.use',
       name: 'Bu gün 10 mal',
       icon: '⚡',
       route: '#/fixmode',
@@ -375,5 +414,5 @@ const JollyFixMode = (() => {
     });
   }
 
-  return { render, afterRender, save, scan, onPhoto, skip, restart, buildQueue, saveBarcode, dropBarcode };
+  return { render, afterRender, save, scan, onPhoto, skip, restart, buildQueue, saveBarcode, dropBarcode, useLookup };
 })();

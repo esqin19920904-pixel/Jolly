@@ -178,6 +178,7 @@ const JollyScanMarathon = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'scan-marathon',
+      perm: 'scanmarathon.use',
       name: 'Skan Maratonu',
       icon: '🎯',
       route: '#/scan-marathon',

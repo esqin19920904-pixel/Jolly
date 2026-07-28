@@ -124,6 +124,10 @@ const JollyDataDoctor = (() => {
 
   /* Səhv yazılmış barkodu yerindəcə düzəlt — forma açmadan */
   function fixBarcode(productId, oldCode) {
+    if (typeof POS !== 'undefined' && !POS.can('doctor.fix')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Düzəliş icazən yoxdur — Admin-dən istə');
+      return;
+    }
     const p = JollyDB.Products.get(productId);
     if (!p) return;
     const val = prompt(`"${p.name || 'Adsız'}" üçün düzgün barkod:`, oldCode);
@@ -145,6 +149,10 @@ const JollyDataDoctor = (() => {
      birləşdirmə məntiqi işlədilir: barkodlar və şəkillər toplanır,
      ikincisi Səbətə atılır, silinmir). */
   function mergePair(idA, idB) {
+    if (typeof POS !== 'undefined' && !POS.can('doctor.fix')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Düzəliş icazən yoxdur — Admin-dən istə');
+      return;
+    }
     const a = JollyDB.Products.get(idA), b = JollyDB.Products.get(idB);
     if (!a || !b) return;
     const keep = confirm(`Hansı saxlanılsın?\n\nOK = "${a.name || 'Adsız'}"\nLəğv = "${b.name || 'Adsız'}"`);
@@ -167,6 +175,10 @@ const JollyDataDoctor = (() => {
 
   /* "Fərqlidir" — bu cüt bir daha xəbərdarlıqda görünməsin */
   function ignorePair(a, b) {
+    if (typeof POS !== 'undefined' && !POS.can('doctor.fix')) {
+      if (typeof Toast !== 'undefined') Toast.error('🔒 Düzəliş icazən yoxdur — Admin-dən istə');
+      return;
+    }
     const list = _ignored();
     const k = _pairKey(a, b);
     if (!list.includes(k)) list.push(k);

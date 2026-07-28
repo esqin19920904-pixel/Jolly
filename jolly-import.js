@@ -384,6 +384,7 @@ const JollyImport = (() => {
   if (typeof ModuleRegistry !== 'undefined') {
     ModuleRegistry.register({
       id: 'import',
+      perm: 'import.use',
       name: 'Barkod İdxalı',
       icon: '📥',
       route: '#/import',
