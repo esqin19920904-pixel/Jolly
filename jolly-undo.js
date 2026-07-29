@@ -43,6 +43,13 @@
   var MAX_TOTAL     = 24 * 1024 * 1024;     // RAM büdcəsi
   var TOAST_MS      = 10000;
 
+  /* ⚠️ 07-29 Esqin qərarı: üzən zolaq SÖNDÜRÜLDÜ.
+     Səbəb: gündəlik işdə lazım deyil və ekranı örtürdü. Məlumatda HEÇ NƏ
+     dəyişmir — son 30 addım yenə RAM+IndexedDB-də saxlanılır, proqram
+     bağlanıb açılsa da qalır. Sadəcə ekranın altında görünmür.
+     Yenidən açmaq: JollyUndo.setBar(true)  (bu sessiya üçün) */
+  var SHOW_BAR = false;
+
   var IDB_DB = 'jolly_undo', IDB_VER = 1, IDB_STORE = 'steps';
 
   /* Açar → insan dilində ad */
@@ -232,7 +239,7 @@
       if (!step || !step.ops.length) return;
       step.title = titleOf(step);
       persist(step);
-      showBar(step);
+      if (SHOW_BAR) showBar(step);
       try {
         global.dispatchEvent(new CustomEvent('undo.recorded', { detail: { id: step.id, title: step.title } }));
       } catch (e) {}
@@ -464,6 +471,9 @@
       state.ready = true;
       return Promise.resolve({ ready: true, wrapped: state.wrapped });
     },
+
+    setBar: function (v) { SHOW_BAR = !!v; if (!SHOW_BAR) hideBar(); return SHOW_BAR; },
+    barEnabled: function () { return SHOW_BAR; },
 
     undo: undoLatest,
     undoById: undoById,
