@@ -52,6 +52,20 @@
                   'blackbox', 'diag', 'recent', 'cache', 'kes', 'stat',
                   'heartbeat', 'audit'];
 
+  // ⚠️ TƏHLÜKƏSİZLİK İSTİSNASI (07-29, repo kodu oxunandan sonra):
+  // Yuxarıdakı sözlər başqa açarların İÇİNDƏ də tapılır. Sübut edilmiş
+  // təhlükələr:
+  //     'stat'  → jolly_statuses      (Status siyahısı!)
+  //     'audit' → jolly_perm_audit_v2 (icazə auditi)
+  //     'log'   → jolly_catalog / kataloq
+  // İstisna olmasaydı, yaddaş dolanda bunlar "keçici" sayılıb YARIYA
+  // KƏSİLƏRDİ. Bu siyahı ona mane olur.
+  var VOLATILE_EXCEPT = ['status', 'statuses', 'catalog', 'kataloq', 'dialog',
+                         'analog', 'logo', 'login', 'product', 'mehsul',
+                         'məhsul', 'user', 'perm', 'icaze', 'icazə', 'firma',
+                         'group', 'qrup', 'supplier', 'tedaruk', 'brand',
+                         'location', 'tombstone', 'setting', 'marked'];
+
   function isInternal(key) {
     var k = String(key || '');
     for (var i = 0; i < INTERNAL.length; i++) if (k.indexOf(INTERNAL[i]) === 0) return true;
@@ -59,6 +73,7 @@
   }
   function isVolatile(key) {
     var k = String(key || '').toLowerCase();
+    for (var e = 0; e < VOLATILE_EXCEPT.length; e++) if (k.indexOf(VOLATILE_EXCEPT[e]) !== -1) return false;
     for (var i = 0; i < VOLATILE.length; i++) if (k.indexOf(VOLATILE[i]) !== -1) return true;
     return false;
   }
@@ -93,13 +108,30 @@
     try { ls = global.localStorage; } catch (e) { return false; }
     if (!ls) return false;
 
+    /* ⚠️ 07-29 audit: SARĞI PROTOTİP SƏVİYYƏSİNDƏ QOYULUR.
+       permission-engine.js qəsdən belə yazır:
+           Object.getPrototypeOf(localStorage).setItem.call(localStorage, ...)
+       (səbəb: security.js Storage.prototype-ı sarğılayırdı).
+       Əgər biz yalnız `localStorage.setItem`-i (nüsxə səviyyəsi) dəyişsək,
+       icazə yazmaları sarğımızdan YAN KEÇƏR — nə jurnala düşər, nə keş
+       təzələnər, nə hadisə yayımlanar. Prototipi sarğılamaqla hər iki yol
+       tutulur. sessionStorage eyni prototipi paylaşdığı üçün `this`
+       yoxlanışı vacibdir. */
+    var SP = (global.Storage && global.Storage.prototype) ? global.Storage.prototype : null;
+    var host = SP || ls;
+
+    var origSet = host.setItem, origDel = host.removeItem, origClear = host.clear;
+
     state.native = {
-      set: ls.setItem.bind(ls),
-      del: ls.removeItem.bind(ls),
-      clear: ls.clear.bind(ls)
+      set:   function (k, v) { return origSet.call(ls, k, v); },
+      del:   function (k)    { return origDel.call(ls, k); },
+      clear: function ()     { return origClear.call(ls); }
     };
 
-    ls.setItem = function (key, value) {
+    function isLocal(that) { return !SP || that === ls; }
+
+    host.setItem = function (key, value) {
+      if (!isLocal(this)) return origSet.apply(this, arguments);
       // Resursiya, söndürülmüş rejim və nüvə açarları — birbaşa keç
       if (state.depth > 0 || !state.intercept || isInternal(key)) {
         state.stats.passthrough++;
@@ -147,7 +179,8 @@
       }
     };
 
-    ls.removeItem = function (key) {
+    host.removeItem = function (key) {
+      if (!isLocal(this)) return origDel.apply(this, arguments);
       if (state.depth > 0 || !state.intercept || isInternal(key)) {
         state.stats.passthrough++;
         return state.native.del(key);
@@ -173,7 +206,8 @@
     };
 
     // clear() bütün məlumatı silir — buraxırıq, amma qeyd edirik
-    ls.clear = function () {
+    host.clear = function () {
+      if (!isLocal(this)) return origClear.apply(this, arguments);
       console.warn('[DB Bridge] localStorage.clear() çağırıldı — BÜTÜN yerli məlumat silinir!');
       try { if (SA) SA.invalidate(); } catch (e) {}
       return state.native.clear();
@@ -190,17 +224,19 @@
       }
     } catch (e) {}
 
+    state.origHost = host;
+    state.orig = { set: origSet, del: origDel, clear: origClear };
     state.installed = true;
     return true;
   }
 
   function uninstall() {
-    if (!state.installed || !state.native) return false;
+    if (!state.installed || !state.origHost) return false;
     try {
-      var ls = global.localStorage;
-      ls.setItem = state.native.set;
-      ls.removeItem = state.native.del;
-      ls.clear = state.native.clear;
+      var h = state.origHost;
+      h.setItem = state.orig.set;
+      h.removeItem = state.orig.del;
+      h.clear = state.orig.clear;
     } catch (e) { return false; }
     state.installed = false;
     return true;
@@ -255,6 +291,7 @@
      ---------------------------------------------------------------------- */
   function reclaimSync(forKey) {
     var freed = 0;
+    if (!state.native || !state.native.set) return 0;   // sarğı qurulmayıbsa toxunmuruq
     state.depth++;   // təmizlik özü jurnala düşməsin
     try {
       // 1) Layihənin öz təmizləyiciləri varsa — əvvəl onlar

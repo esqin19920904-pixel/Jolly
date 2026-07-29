@@ -34,8 +34,6 @@
   var K_ALIAS = '__jolly_identity_alias__';   // "__jolly_" → körpü tutmur
   var K_KEYS  = '__jolly_extra_perm_keys__';
 
-  var CONTAINERS = ['overrides', 'roles', 'users', 'groups', 'keys', 'modules'];
-
   function rawGet(k) { try { return global.localStorage.getItem(k); } catch (e) { return null; } }
   function rawSet(k, v) { try { global.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 
@@ -97,42 +95,49 @@
       for (var i = 0; i < global.localStorage.length; i++) {
         var k = global.localStorage.key(i);
         if (!k || k.indexOf('__jolly_') === 0) continue;
+        // Əsl anbar: jolly_perm_os_v2 (imza: jolly_perm_os_v2_sig — ona toxunmuruq)
+        if (/_sig$/.test(k)) continue;
         if (/perm|icaze|icazə|rol|role/i.test(k)) out.push(k);
       }
     } catch (e) {}
     return out;
   }
 
+  // ⚠️ 07-29 audit (repo kodu oxunandan sonra tam yenidən yazıldı):
+  //
+  // Əsl anbar forması permission-engine.js-də belədir:
+  //     { v: 2, overrides: {}, userOverrides: {}, ts: ... }
+  // Yəni `roles`/`users` sahələri YOXDUR — mənim əvvəlki yoxlamam onları
+  // axtarırdı və ƏSL POZULMUŞ ANBARI TANIMIRDI.
+  //
+  // Daha vacibi: `jolly-perms-extra.js` bu təmiri ARTIQ DÜZGÜN EDİR
+  // (normalize + load() sarğısı). Ona görə burada anbarı özümüz
+  // düzəltmirik — yalnız vəziyyəti yoxlayır və perms-extra yoxdursa
+  // minimal təmiri edirik. İki fayl eyni obyekti fərqli cür düzəltsə,
+  // bir-birinin işini pozar.
   function repairObject(obj) {
     var added = 0;
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return added;
-    CONTAINERS.forEach(function (c) {
-      if (obj[c] === undefined || obj[c] === null) {
-        // Yalnız bu obyekt "icazə anbarına" oxşayırsa qab əlavə edirik
-        if (c === 'overrides' || obj.roles !== undefined || obj.users !== undefined) {
-          obj[c] = {};
-          added++;
-        }
-      }
-    });
-    // İçəridəki hər istifadəçi qeydində də overrides olsun
-    ['users', 'roles'].forEach(function (c) {
-      var box = obj[c];
-      if (!box || typeof box !== 'object') return;
-      Object.keys(box).forEach(function (id) {
-        var rec = box[id];
-        if (rec && typeof rec === 'object' && !Array.isArray(rec)) {
-          if (rec.overrides === undefined || rec.overrides === null) { rec.overrides = {}; added++; }
-          if (rec.allow === undefined && rec.deny === undefined && rec.perms === undefined) {
-            // qarışmasın deyə toxunmuruq
-          }
-        }
-      });
-    });
+    var looksLikeStore = (obj.overrides !== undefined) || (obj.userOverrides !== undefined) ||
+                         (obj.v === 2) || (obj.perms !== undefined);
+    if (!looksLikeStore) return added;
+    if (!obj.overrides || typeof obj.overrides !== 'object') { obj.overrides = {}; added++; }
+    if (!obj.userOverrides || typeof obj.userOverrides !== 'object') { obj.userOverrides = {}; added++; }
+    if (!obj.v) obj.v = 2;
     return added;
   }
 
+  // perms-extra öz təmirini qurubsa, biz qarışmırıq
+  function extraHandlesIt() {
+    try {
+      var P = global.POS;
+      var store = P && (P.store || (P.engine && P.engine.s));
+      return !!(store && store.load && store.load.__permsExtraWrapped);
+    } catch (e) { return false; }
+  }
+
   function repairStore(silentWrite) {
+    if (extraHandlesIt()) return [];        // jolly-perms-extra öz işini görür
     var keys = permKeys(), fixed = [];
     keys.forEach(function (k) {
       var raw = rawGet(k);
@@ -151,6 +156,12 @@
       state.stats.repairs++;
       state.repairedKeys = fixed;
       console.log('[Perm Bridge] icazə anbarı formaya salındı:', fixed);
+      // mühərrikin daxili keşini boşalt — yoxsa köhnə pozuq obyekt qalır
+      try {
+        var P = global.POS;
+        var st = P && (P.store || (P.engine && P.engine.s));
+        if (st && st._c !== undefined) st._c = null;
+      } catch (e) {}
       // mühərrik yenidən oxusun
       ['load', 'reload', 'refresh', 'init'].forEach(function (m) {
         try { if (state.engine && typeof state.engine[m] === 'function') state.engine[m](); } catch (e) {}
@@ -169,7 +180,9 @@
       for (var i = 0; i < global.localStorage.length; i++) {
         var k = global.localStorage.key(i);
         if (!k || k.indexOf('__jolly_') === 0) continue;
+        // Əsl açar: jolly_users_v1
         if (!/user|isci|işçi|employee/i.test(k)) continue;
+        if (k.indexOf('__jolly_') === 0 || /perm|override/i.test(k)) continue;
         var v = rawGet(k);
         if (!v || v.charAt(0) !== '[') continue;
         var arr = J(v, null);
@@ -319,14 +332,24 @@
                 desc: meta.desc || '', at: Date.now() };
     var E = state.engine || findEngine();
     var done = false;
-    if (E) {
-      ['registerKey', 'register', 'addKey', 'defineKey', 'addPermission'].forEach(function (m) {
-        if (done || typeof E[m] !== 'function') return;
-        try { E[m](key, rec); done = true; } catch (e) {
-          try { E[m](rec); done = true; } catch (e2) {}
-        }
-      });
+
+    // ⚠️ 07-29 audit: əsl API `POS.register(manifest)`-dir, manifest forması:
+    //   { id, name, icon, permissions: [{ key, label, tag, default }] }
+    // jolly-perms-extra.js məhz bunu işlədir. Təxmin etmirik, eynisini edirik.
+    if (E && typeof E.register === 'function') {
+      try {
+        E.register({
+          id: meta.moduleId || 'healthcore',
+          name: meta.name || 'Nüvə Sağlamlığı',
+          icon: meta.icon || '🩺',
+          permissions: [{ key: key, label: meta.desc || meta.name || key,
+                          tag: meta.tag || 'view', default: meta.def !== false }]
+        });
+        try { if (E.reg && E.reg.refreshCustomModule) E.reg.refreshCustomModule(); } catch (e) {}
+        done = true;
+      } catch (e) { console.warn('[Perm Bridge] POS.register alınmadı:', e); }
     }
+
     if (!state.extraKeys.some(function (r) { return r.key === key; })) {
       state.extraKeys.push(rec);
       saveExtraKeys();
@@ -380,8 +403,10 @@
       repairStore(true);
 
       // 5b. bu sessiyanın nüvə modulu açarı
-      registerKey('health.core.view', { name: 'Nüvə Sağlamlığı', group: 'Alətlər',
-                                        desc: 'Yaddaş, jurnal və açılış vəziyyətini görmək' });
+      registerKey('health.core.view', {
+        moduleId: 'healthcore', name: 'Nüvə Sağlamlığı', icon: '🩺', tag: 'view', def: true,
+        desc: 'Yaddaş, jurnal və açılış vəziyyətini görmək'
+      });
 
       // 5c. can() sarğısı
       wrapCan();

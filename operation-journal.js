@@ -360,8 +360,13 @@
       if (!state.enabled) return;
       var tx = state.active;
 
-      // Açıq transaction varsa və bu yazma ona aiddirsə — ona bağla
-      if (tx && !tx._closed) {
+      // Açıq transaction varsa və bu yazma ona aiddirsə — ona bağla.
+      // ⚠️ 07-29 audit: əvvəl HƏR yazma açıq transaction-a yapışırdı.
+      // Yəni bulud bərpası gedərkən başqa modulun etdiyi əlaqəsiz yazma da
+      // eyni əməliyyatın bir hissəsi sayılır və xəta olsa O DA geri
+      // qaytarılırdı. İndi yalnız transaction-un öz yazması (tx.put/remove)
+      // və ya onsuz da izlənən açarlar bağlanır.
+      if (tx && !tx._closed && (tx._claim === op.key || shouldJournal(op.key))) {
         op._journalOp = tx.declare(op.type, op.key, op.type === 'remove' ? null : op.raw);
         op._journalTx = tx;
         return;

@@ -57,10 +57,14 @@
     return false;
   }
 
+  // ⚠️ 07-29 audit: 'log' sözü 'catalog'/'kataloq'/'dialog' içində də tapılır.
+  // İstisna olmasaydı `jolly_catalog` güzgüdən kənarda qalardı.
+  var NOT_NEVER = ['catalog', 'kataloq', 'dialog', 'analog', 'logo', 'login'];
+
   function classify(key) {
     var k = String(key || '');
     if (k.indexOf('__jolly_') === 0 || k.indexOf('jolly_journal') === 0) return 'never';
-    if (has(NEVER, k)) return 'never';
+    if (has(NEVER, k) && !has(NOT_NEVER, k)) return 'never';
     if (has(LAZY, k)) return 'lazy';
     if (has(MIRROR, k)) return 'mirror';
     return 'lazy';   // tanımadığımızı zorla RAM-a yığmırıq
