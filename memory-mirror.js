@@ -48,8 +48,12 @@
                 'module', 'modul', 'theme', 'tema', 'group', 'qrup',
                 'firma', 'company', 'status', 'barcode', 'barkod', 'tombstone'];
 
-  var MAX_ITEM_BYTES  = 600 * 1024;        // bundan böyük açar güzgüyə düşmür
-  var MAX_TOTAL_BYTES = 6 * 1024 * 1024;   // güzgünün ümumi büdcəsi
+  /* ⚠️ 07-29 cihaz testi: hədd 600 KB idi, `jolly_products` isə 946 KB —
+     yəni güzgü ƏN VACİB açarı atırdı və faydası demək olar sıfır idi.
+     RAM-da 5 MB saxlamaq telefon üçün problem deyil (cihaz kvotası 10 GB),
+     localStorage limiti ilə heç bir əlaqəsi yoxdur. */
+  var MAX_ITEM_BYTES  = 5 * 1024 * 1024;    // bundan böyük açar güzgüyə düşmür
+  var MAX_TOTAL_BYTES = 24 * 1024 * 1024;   // güzgünün ümumi büdcəsi
 
   function has(list, k) {
     k = String(k || '').toLowerCase();

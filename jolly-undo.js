@@ -39,7 +39,7 @@
 
   var GROUP_MS      = 900;                  // bu qədər ara ilə gələn yazmalar bir addım sayılır
   var MAX_ENTRIES   = 30;
-  var MAX_PREV      = 2 * 1024 * 1024;      // 2 MB-dan böyük surət saxlanmır
+  var MAX_PREV      = 5 * 1024 * 1024;      // 5 MB-a qədər surət saxlanır (RAM+IDB, localStorage YOX)
   var MAX_TOTAL     = 24 * 1024 * 1024;     // RAM büdcəsi
   var TOAST_MS      = 10000;
 
@@ -111,6 +111,9 @@
     if (k.indexOf('jolly_journal') === 0) return true;
     if (/_sig$/.test(k)) return true;
     if (/log|jurnal|blackbox|diag|heartbeat|session|cache|kes|archive|arxiv|recent|activity|last_change/i.test(k)) return true;
+    // ⚠️ 07-29 cihaz testi: bunlar MƏLUMAT deyil, ekran görünüşüdür — geri
+    // alınacaq bir şey yoxdur, sadəcə zolaq lazımsız yerdə çıxırdı.
+    if (/^jolly_(module_view|module_order|view_mode|edge_config|device_id|device_name|ota_[a-z_]*|announce_[a-z_]*|changelog_reads|snapshot)$/.test(k)) return true;
     return false;
   }
 
@@ -173,9 +176,19 @@
     if (state.busy) return;                       // geri qaytarmanın özünü yazmırıq
     if (skipKey(op.key)) { state.stats.skipped++; return; }
 
+    /* ⚠️ 07-29 cihaz testi — ƏSAS DÜZƏLİŞ:
+       Jurnal köhnə surəti yalnız 128 KB-a qədər saxlayır, çünki o, surətləri
+       localStorage-a yazır və 5 MB limitini qorumalıdır. Amma `jolly_products`
+       946 KB-dır → jurnalda `prev` yoxdur → məhsul dəyişikliyi geri alına
+       bilmirdi. Yəni Geri Al-ın ƏSAS İŞİ işləmirdi.
+       Həll: surəti ÖZÜMÜZ oxuyuruq. declare() yazmadan ƏVVƏL çağırıldığı üçün
+       localStorage-da hələ köhnə dəyər durur. Bizim surətlərimiz RAM və
+       IndexedDB-yə gedir, localStorage-a yox — ona görə həcm problemi yoxdur. */
     var prev = (op.prev && op.prev.rollbackable !== false) ? op.prev.v : null;
+    if (prev === null || prev === undefined) {
+      try { prev = global.localStorage.getItem(op.key); } catch (e) { prev = null; }
+    }
     var bytes = prev ? prev.length * 2 : 0;
-    if (op.prev && op.prev.rollbackable === false) { state.stats.tooBig++; return; }
     if (bytes > MAX_PREV) { state.stats.tooBig++; return; }
 
     var t = now();
