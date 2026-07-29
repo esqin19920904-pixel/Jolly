@@ -119,6 +119,48 @@
   }
   global.addEventListener('load', run, { once: true });
 
+
+  /* ----------------------------------------------------------------------
+     3b. Studio-da "41 ekran / 60 ekran" qarışıqlığı
+     --------------------------------------------------------------------
+     studios.js "N ekran" yazısında HƏMİN AN qeydiyyatdan keçmiş modulları
+     sayır. Modullar isə tənbəl yüklənir (jolly-lazy-loader.js) — Studio-nu
+     birbaşa açanda 41, Alətlər menyusundan sonra 60 görünürdü, çünki menyu
+     açılanda JollyLazy.flush() çağırılır.
+     Həll: Studio-ya girəndə flush ƏVVƏLCƏ çağırılsın. Açılışa toxunmuruq —
+     tənbəl yükləmənin sürət faydası qalır.
+     ---------------------------------------------------------------------- */
+  var flushedFor = null;
+
+  function studioFlush() {
+    var h = String(location.hash || '');
+    if (h.indexOf('#/studios') !== 0) { flushedFor = null; return; }
+    if (flushedFor === h) return;
+    if (!global.JollyLazy || typeof global.JollyLazy.flush !== 'function') return;
+
+    var before = 0;
+    try { before = global.ModuleRegistry ? global.ModuleRegistry.list().length : 0; } catch (e) {}
+
+    flushedFor = h;
+    try { global.JollyLazy.flush(); } catch (e) { return; }
+
+    // Yeni modullar gəldisə ekranı bir dəfə yenidən çək
+    setTimeout(function () {
+      var after = 0;
+      try { after = global.ModuleRegistry ? global.ModuleRegistry.list().length : 0; } catch (e) {}
+      if (after > before && String(location.hash || '').indexOf('#/studios') === 0) {
+        try {
+          if (global.JollyRouter && global.JollyRouter.go) global.JollyRouter.go(location.hash);
+          else global.dispatchEvent(new HashChangeEvent('hashchange'));
+        } catch (e) {}
+        console.log('[Studio] modul sayı ' + before + ' → ' + after + ', ekran yeniləndi');
+      }
+    }, 350);
+  }
+
+  global.addEventListener('hashchange', studioFlush);
+  setTimeout(studioFlush, 1200);
+
   global.JollyGlobalBridge = {
     version: '2.0.0',
     run: run,
