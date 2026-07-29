@@ -29,8 +29,21 @@
   var K_PENDING = '__jolly_pending_keys__';
   var MAX_SNAP_BYTES = 1.5 * 1024 * 1024;      // 1.5 MB-dan böyük surət çıxarılmır
 
-  var RESTORE_RE = /restore|merge|apply|import|pull|download|receive/i;
+  /* ⚠️ 07-29 audit (cloud.js real kodu oxunandan sonra):
+     Əvvəlki variant `pull` adlı hər şeyi "bərpa" sayırdı. Amma cloud.js-də
+     `pull()` sadəcə ŞƏBƏKƏ OXUMASIDIR — heç nə yazmır, üstəlik avtomatik
+     sinxronda təkrar-təkrar çağırılır. Onu bərpa saymaq hər dəfə BÜTÜN
+     localStorage-ın surətini çıxarmaq demək idi → 5 MB limiti dərhal
+     dolardı. Üstəlik `restoreFromCloud()` daxildə `pull()` çağırır, yəni
+     bir bərpada İKİ surət çıxardı.
+     İndi adlar açıq siyahı ilə idarə olunur. */
+  var READONLY = ['pull', 'fetchDevices', 'loadDevicesList', 'enabled',
+                  'getDeviceId', 'getDeviceName', 'isPendingSync',
+                  'getOfflineSince', 'renderStudio', 'initAutoSync', 'scheduleSync'];
+  var RESTORE_RE = /restoreFromCloud|cloudRestore|applyCloudSnapshot|importFromCloud|silentCloudMerge|cloudMerge|^merge|^apply|^import|^restore/i;
   var PUSH_RE    = /push|send|upload|publish|göndər/i;
+
+  var MIN_SNAP_GAP = 5 * 60 * 1000;   // iki surət arasında ən azı 5 dəqiqə
 
   function rawGet(k) { try { return global.localStorage.getItem(k); } catch (e) { return null; } }
   function rawSet(k, v) { try { global.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
@@ -104,7 +117,14 @@
     return { snap: snap, bytes: bytes, skipped: skipped };
   }
 
-  function saveSnapshot(reason) {
+  function saveSnapshot(reason, force) {
+    // Tez-tez surət çıxarmaq yaddaşı doldurur — aralıq qoyuruq
+    var last = snapshotInfo();
+    if (!force && last && (Date.now() - last.at) < MIN_SNAP_GAP) {
+      console.log('[Cloud Bridge] surət atlandı — sonuncusu ' +
+                  Math.round((Date.now() - last.at) / 1000) + ' saniyə əvvəl çıxarılıb');
+      return true;
+    }
     var c = collectSnapshot();
     var payload = { at: Date.now(), reason: reason || null,
                     keys: Object.keys(c.snap).length, bytes: c.bytes,
@@ -205,12 +225,14 @@
         return call();
       }
 
-      // push / göndər
+      // push / göndər — manualPush() daxildə push() çağırır, iki dəfə saymırıq
+      var nested = state._pushing;
+      state._pushing = true;
       var out;
       try { out = orig.apply(self, args); }
-      catch (e) { state.stats.failures++; throw e; }
-      state.stats.pushes++;
-      state.lastPush = { at: Date.now(), fn: name };
+      catch (e) { state.stats.failures++; state._pushing = nested; throw e; }
+      if (!nested) { state.stats.pushes++; state.lastPush = { at: Date.now(), fn: name }; }
+      if (!nested) state._pushing = false;
       if (out && typeof out.then === 'function') {
         return out.then(function (r) { clearPending(); return r; },
                         function (e) { state.stats.failures++; throw e; });
@@ -230,6 +252,7 @@
     if (host) {
       Object.keys(host).forEach(function (n) {
         if (typeof host[n] !== 'function') return;
+        if (READONLY.indexOf(n) !== -1) return;      // yalnız oxuyur — toxunmuruq
         if (RESTORE_RE.test(n)) { if (wrap(host, n, 'restore')) found++; }
         else if (PUSH_RE.test(n)) { if (wrap(host, n, 'push')) found++; }
       });
@@ -237,7 +260,7 @@
 
     // Qlobal funksiyalar — yalnız dəqiq adlar (təsadüfi funksiyaya toxunmamaq üçün)
     ['silentCloudMerge', 'cloudMerge', 'restoreFromCloud', 'cloudRestore', 'applyCloudSnapshot',
-     'importFromCloud', 'pullFromCloud'].forEach(function (n) {
+     'importFromCloud'].forEach(function (n) {
       if (typeof global[n] === 'function' && wrap(global, n, 'restore')) found++;
     });
     ['sendToCloud', 'pushToCloud', 'cloudSend', 'uploadToCloud'].forEach(function (n) {
@@ -309,7 +332,7 @@
     },
     clearPending: clearPending,
 
-    snapshot: function (reason) { return Promise.resolve(saveSnapshot(reason || 'əl ilə')); },
+    snapshot: function (reason) { return Promise.resolve(saveSnapshot(reason || 'əl ilə', true)); },
     snapshotInfo: snapshotInfo,
     undoLastRestore: undoLastRestore,
 
