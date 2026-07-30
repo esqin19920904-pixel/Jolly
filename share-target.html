@@ -38,14 +38,14 @@
 <body>
 <div class="card">
   <div class="logo">👑 JOLLY</div>
-  <div class="sub">Paylaşılan məhsul şəkli</div>
+  <div class="sub">Şəkillə mal axtarışı</div>
   <img class="preview" id="preview" alt="Önbaxış">
   <div class="info" id="info">
     <div class="info-row"><span class="info-label">Başlıq:</span><span id="titleText">—</span></div>
     <div class="info-row"><span class="info-label">Mətn:</span><span id="textText">—</span></div>
     <div class="info-row"><span class="info-label">Şəkil:</span><span id="fileText">—</span></div>
   </div>
-  <button class="btn btn-primary" id="saveBtn" disabled onclick="openInApp()">JOLLY-də aç</button>
+  <button class="btn btn-primary" id="saveBtn" disabled onclick="openInApp()">🔍 Malı tap</button>
   <button class="btn btn-secondary" onclick="goHome()">Ana səhifəyə qayıt</button>
   <div class="status" id="status">Şəkil qəbul edilir…</div>
 </div>
@@ -121,7 +121,9 @@
       el('saveBtn').disabled = false;
 
       var when = new Date(rec.at).toLocaleTimeString('az-AZ');
-      setStatus('Hazırdır (' + when + '). "JOLLY-də aç" ilə məhsula bağla.');
+      setStatus('Hazırdır (' + when + '). "Malı tap" ilə axtarış başlayacaq.');
+      // Avtomatik keç — əlavə toxunuş lazım olmasın
+      setTimeout(openInApp, 700);
     });
   }
 
