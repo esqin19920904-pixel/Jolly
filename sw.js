@@ -11,7 +11,7 @@
    İndi BÜTÜN skriptlər `install` zamanı əvvəlcədən yüklənir ki,
    ilk uğurlu quraşdırmadan sonra tətbiq tam offline-safe olsun.
    ============================================================ */
-const CACHE_NAME = 'jolly-v27';
+const CACHE_NAME = 'jolly-v28';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -173,12 +173,90 @@ async function matchWithFallback(request) {
   return caches.match(request, { ignoreSearch: true });
 }
 
+/* ------------------------------------------------------------
+   Paylaşılan məlumatı IndexedDB-yə yazan köməkçi
+   (localStorage burada işləmir — service worker-in ona girişi yoxdur,
+   üstəlik şəkil base64 kimi 5 MB limitini partladardı)
+   ------------------------------------------------------------ */
+const SHARE_DB = 'jolly_share';
+const SHARE_STORE = 'inbox';
+
+function shareDbOpen() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(SHARE_DB, 1);
+    r.onupgradeneeded = () => {
+      const db = r.result;
+      if (!db.objectStoreNames.contains(SHARE_STORE)) {
+        db.createObjectStore(SHARE_STORE, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+function shareDbPut(record) {
+  return shareDbOpen().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(SHARE_STORE, 'readwrite');
+    const q = tx.objectStore(SHARE_STORE).put(record);
+    q.onsuccess = () => resolve(q.result);
+    q.onerror = () => reject(q.error);
+  }));
+}
+
+async function handleShare(request) {
+  let saved = 0;
+  try {
+    const form = await request.formData();
+    const title = form.get('sharedTitle') || '';
+    const text  = form.get('sharedText')  || '';
+    const link  = form.get('sharedUrl')   || '';
+
+    const files = form.getAll('sharedImages').filter((f) => f && f.size > 0);
+    const images = [];
+    for (const f of files) {
+      const buf = await f.arrayBuffer();
+      images.push({ name: f.name || 'share.jpg', type: f.type || 'image/jpeg', size: f.size, data: buf });
+    }
+
+    await shareDbPut({
+      at: Date.now(),
+      title: String(title),
+      text: String(text),
+      url: String(link),
+      images: images,
+      handled: false
+    });
+    saved = images.length || 1;
+  } catch (e) {
+    // Paylaşma oxunmadı — istifadəçini yenə səhifəyə buraxırıq, orada mesaj görünəcək
+    console.error('[SW] paylaşma oxunmadı:', e);
+  }
+
+  // 303 ilə GET-ə yönləndiririk — POST təkrarlanmasın
+  return Response.redirect('./share-target.html?shared=' + saved + '&t=' + Date.now(), 303);
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  /* ============================================================
+     PAYLAŞMA (share target) — 2026-07-30 düzəlişi
+     ------------------------------------------------------------
+     PROBLEM: manifest.json paylaşmanı POST + multipart ilə göndərir
+     (şəkil başqa yolla göndərilə bilmir). Əvvəl bu POST birbaşa
+     serverə ötürülürdü — Cloudflare Pages statik fayla POST qəbul
+     etmir və HTTP 405 qaytarırdı ("Bu səhifə işləmir").
+     Üstəlik share-target.html məlumatı ünvan sətrindən oxuyurdu,
+     POST-da isə ünvan sətri boş olur.
+
+     HƏLL (PWA-da yeganə düzgün yol): service worker POST-u ÖZÜ oxuyur,
+     şəkli və mətni IndexedDB-yə (`jolly_share`/`inbox`) yazır, sonra
+     brauzeri adi GET ünvanına yönləndirir. Səhifə məlumatı oradan alır.
+     ============================================================ */
   if (request.method === 'POST' && url.pathname.includes('share-target')) {
-    event.respondWith(fetch(request).catch(() => new Response('Share target offline', { status: 503 })));
+    event.respondWith(handleShare(request));
     return;
   }
 

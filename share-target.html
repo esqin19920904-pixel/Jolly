@@ -5,78 +5,138 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Paylaşım — JOLLY</title>
 <meta name="theme-color" content="#06070d">
+<!--
+  2026-07-30 DÜZƏLİŞ — niyə əvvəl işləmirdi:
+  Bu səhifə paylaşılan məlumatı ÜNVAN SƏTRİNDƏN oxuyurdu
+  (`new URLSearchParams(location.search)`), halbuki manifest.json
+  paylaşmanı POST + multipart ilə göndərir — POST-da ünvan sətri boş olur.
+  Üstəlik statik fayla POST getdiyi üçün Cloudflare "HTTP 405" qaytarırdı.
+
+  İndi axın belədir:
+    telefon paylaşır → POST → sw.js onu TUTUR → şəkli IndexedDB-yə yazır
+    → 303 ilə bu səhifəyə GET yönləndirir → səhifə IndexedDB-dən oxuyur
+-->
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#06070d;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
   .card{background:#12131c;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:32px 24px;width:100%;max-width:420px;text-align:center}
   .logo{font-size:1.5rem;font-weight:700;margin-bottom:8px;color:#00d4ff}
   .sub{color:rgba(255,255,255,0.5);font-size:0.875rem;margin-bottom:24px}
-  .preview{width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.1);display:none}
-  .info{background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:12px;padding:16px;margin-bottom:16px;text-align:left}
-  .info-row{display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:6px;color:rgba(255,255,255,0.6)}
+  .preview{width:100%;max-height:300px;object-fit:contain;border-radius:12px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.1);display:none;background:#0a0b12}
+  .info{background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:12px;padding:16px;margin-bottom:16px;text-align:left;display:none}
+  .info-row{display:flex;justify-content:space-between;gap:10px;font-size:0.8rem;margin-bottom:6px;color:rgba(255,255,255,0.6)}
   .info-row:last-child{margin-bottom:0}
-  .info-label{color:rgba(255,255,255,0.35)}
+  .info-label{color:rgba(255,255,255,0.35);flex:none}
+  .info-row span:last-child{text-align:right;word-break:break-word}
   .btn{width:100%;padding:14px;border-radius:12px;border:none;font-size:0.95rem;font-weight:600;cursor:pointer;margin-bottom:10px}
   .btn-primary{background:#00d4ff;color:#06070d}
   .btn-secondary{background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15)}
   .btn:disabled{opacity:0.4;cursor:not-allowed}
-  .status{font-size:0.8rem;color:rgba(255,255,255,0.4);margin-top:8px}
+  .status{font-size:0.8rem;color:rgba(255,255,255,0.4);margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">👑 JOLLY</div>
   <div class="sub">Paylaşılan məhsul şəkli</div>
-  <img class="preview" id="preview" alt="Preview">
-  <div class="info" id="info" style="display:none">
+  <img class="preview" id="preview" alt="Önbaxış">
+  <div class="info" id="info">
     <div class="info-row"><span class="info-label">Başlıq:</span><span id="titleText">—</span></div>
     <div class="info-row"><span class="info-label">Mətn:</span><span id="textText">—</span></div>
-    <div class="info-row"><span class="info-label">Fayl:</span><span id="fileText">—</span></div>
+    <div class="info-row"><span class="info-label">Şəkil:</span><span id="fileText">—</span></div>
   </div>
-  <button class="btn btn-primary" id="saveBtn" disabled onclick="saveProduct()">Məhsul olaraq saxla</button>
+  <button class="btn btn-primary" id="saveBtn" disabled onclick="openInApp()">JOLLY-də aç</button>
   <button class="btn btn-secondary" onclick="goHome()">Ana səhifəyə qayıt</button>
-  <div class="status" id="status">Şəkil qəbul edilir...</div>
+  <div class="status" id="status">Şəkil qəbul edilir…</div>
 </div>
 
 <script>
-  // QEYD: bu səhifə hələ JollyDB-yə birbaşa yazmır — yalnız qəbul edib göstərir.
-  // Real inteqrasiya üçün: window.opener/BroadcastChannel və ya localStorage
-  // vasitəsilə app.js-ə ötürüb JollyDB.addProduct(...) çağırmaq lazımdır.
+  var SHARE_DB = 'jolly_share', SHARE_STORE = 'inbox';
+  var record = null;
 
-  let sharedImage = null;
-  let sharedData = { title: '', text: '' };
+  function el(id) { return document.getElementById(id); }
+  function setStatus(t) { el('status').textContent = t; }
 
-  async function init() {
-    const params = new URLSearchParams(window.location.search);
-    sharedData.title = params.get('title') || '';
-    sharedData.text = params.get('text') || '';
-
-    if (sharedData.title || sharedData.text) {
-      document.getElementById('info').style.display = 'block';
-      document.getElementById('titleText').textContent = sharedData.title || '—';
-      document.getElementById('textText').textContent = sharedData.text || '—';
-      document.getElementById('saveBtn').disabled = false;
-      document.getElementById('status').textContent = 'Məlumat hazırdır';
-    } else {
-      document.getElementById('status').textContent = 'Paylaşılan məlumat tapılmadı';
-    }
+  function dbOpen() {
+    return new Promise(function (res, rej) {
+      var r = indexedDB.open(SHARE_DB, 1);
+      r.onupgradeneeded = function () {
+        var db = r.result;
+        if (!db.objectStoreNames.contains(SHARE_STORE)) {
+          db.createObjectStore(SHARE_STORE, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
   }
+
+  // Ən son paylaşılanı götür
+  function loadLatest() {
+    return dbOpen().then(function (db) {
+      return new Promise(function (res) {
+        var q = db.transaction(SHARE_STORE, 'readonly').objectStore(SHARE_STORE).getAll();
+        q.onsuccess = function () {
+          var all = q.result || [];
+          all.sort(function (a, b) { return b.at - a.at; });
+          res(all[0] || null);
+        };
+        q.onerror = function () { res(null); };
+      });
+    }).catch(function () { return null; });
+  }
+
+  function bytes(n) {
+    if (!n) return '—';
+    return n < 1024 ? n + ' B' : (n / 1024).toFixed(0) + ' KB';
+  }
+
+  function init() {
+    loadLatest().then(function (rec) {
+      if (!rec) {
+        setStatus('Paylaşılan məlumat tapılmadı. Şəkli yenidən paylaşmağa cəhd et — ' +
+                  'ilk dəfə paylaşırsansa, proqramı bir dəfə açıb bağlamaq lazım ola bilər ' +
+                  '(service worker yenilənməlidir).');
+        return;
+      }
+      record = rec;
+
+      var hasInfo = false;
+      if (rec.title) { el('titleText').textContent = rec.title; hasInfo = true; }
+      if (rec.text)  { el('textText').textContent  = rec.text;  hasInfo = true; }
+
+      if (rec.images && rec.images.length) {
+        var img = rec.images[0];
+        el('fileText').textContent = (img.name || 'şəkil') + ' · ' + bytes(img.size);
+        hasInfo = true;
+        try {
+          var blob = new Blob([img.data], { type: img.type || 'image/jpeg' });
+          var url = URL.createObjectURL(blob);
+          el('preview').src = url;
+          el('preview').style.display = 'block';
+        } catch (e) {}
+      }
+
+      if (hasInfo) el('info').style.display = 'block';
+      el('saveBtn').disabled = false;
+
+      var when = new Date(rec.at).toLocaleTimeString('az-AZ');
+      setStatus('Hazırdır (' + when + '). "JOLLY-də aç" ilə məhsula bağla.');
+    });
+  }
+
+  function openInApp() {
+    setStatus('JOLLY açılır…');
+    // Şəkil IndexedDB-dədir — proqram onu #/share-inbox ekranında oradan götürəcək
+    window.location.href = './index.html#/share-inbox';
+  }
+
+  function goHome() { window.location.href = './index.html'; }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
-  }
-
-  function saveProduct() {
-    const status = document.getElementById('status');
-    status.textContent = 'Ana səhifəyə yönləndirilir...';
-    window.location.href = './index.html?action=add-product&shared=1&title=' +
-      encodeURIComponent(sharedData.title) + '&text=' + encodeURIComponent(sharedData.text);
-  }
-
-  function goHome() {
-    window.location.href = './index.html';
   }
 </script>
 </body>
