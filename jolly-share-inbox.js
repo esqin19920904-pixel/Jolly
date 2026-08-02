@@ -4435,7 +4435,12 @@
       'border-bottom:1px solid rgba(255,255,255,.05)}',
       '#jdg .dgl .k b{color:#f7d98a}',
       '#jdg .dgl .k b.warn{color:#ff9d9d}',
-      '#jdg .dgs{margin-top:10px;font-size:11px;opacity:.55;letter-spacing:.5px}'
+      '#jdg .dgs{margin-top:10px;font-size:11px;opacity:.55;letter-spacing:.5px}',
+      '#jdg .sec{font-size:11px;opacity:.55;letter-spacing:.5px;text-transform:uppercase;margin:16px 0 8px}',
+      '#jdg .jgo2{display:flex;justify-content:space-between;align-items:center;padding:12px 13px;',
+      'margin-bottom:8px;border-radius:13px;cursor:pointer;font-size:13px;',
+      'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09)}',
+      '#jdg .jgo2 span:last-child{opacity:.4}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -4479,7 +4484,15 @@
 
   function dgView() {
     var h = ['<div id="jdg">'];
-    h.push('<h2>🩺 JOLLY Yoxlama</h2><div class="sub">Sistem, barkod örtüyü və dəqiqlik ölçüsü</div>');
+    h.push('<h2>🩺 Sistem Yoxlaması</h2>' +
+           '<div class="sub">Bütün yoxlama alətlərinin giriş qapısı. Aşağıda ' +
+           'köhnə alətlərə keçid, sonra Vision AI (şəkillə axtarış) yoxlaması.</div>');
+    h.push('<div class="sec">DİGƏR YOXLAMA ALƏTLƏRİ</div>');
+    h.push('<div class="jgo2" data-lgo="#/selftest"><span>🧪 Modul Testi (ümumi)</span><span>→</span></div>');
+    h.push('<div class="jgo2" data-lgo="#/health-report"><span>📈 Data Hesabatı (7 gün)</span><span>→</span></div>');
+    h.push('<div class="jgo2" data-lgo="#/health-v2"><span>🩺 Nüvə Sağlamlığı (təmir alətləri)</span><span>→</span></div>');
+    h.push('<div class="jgo2" data-diag="1"><span>🔍 Developer Diaqnostika</span><span>→</span></div>');
+    h.push('<div class="sec">VISION AI (ŞƏKİLLƏ AXTARIŞ) YOXLAMASI</div>');
     h.push('<div class="tools"><div class="t" data-dgr="1">🔍 Sistem</div>' +
            '<div class="t" data-dgb="1">⏱ Dəqiqlik</div><div class="t" data-dgc="1">📋 Kopyala</div></div>');
 
@@ -4525,6 +4538,17 @@
     root.__b = true;
     root.addEventListener('click', function (e) {
       var t = e.target;
+      var jgo = t.closest && t.closest('[data-lgo]');
+      if (jgo) { e.stopPropagation(); global.location.hash = jgo.getAttribute('data-lgo'); return; }
+      if (t.closest && t.closest('[data-diag]')) {
+        e.stopPropagation();
+        try {
+          if (global.JollyDiagnostics && typeof global.JollyDiagnostics.show === 'function') {
+            global.JollyDiagnostics.show();
+          } else { toast('Developer Diaqnostika tapılmadı', 'error'); }
+        } catch (e2) { toast('Açılmadı', 'error'); }
+        return;
+      }
       if (t.closest && t.closest('[data-dgr]')) { e.stopPropagation(); return dgRun(); }
       if (t.closest && t.closest('[data-dgb]')) { e.stopPropagation(); return dgBench(); }
       if (t.closest && t.closest('[data-dgc]')) {
@@ -4694,7 +4718,7 @@
           render: Duplicates.render, afterRender: Duplicates.afterRender
         });
         MR.register({
-          id: 'jolly-diag', name: 'JOLLY Yoxlama', icon: '🩺',
+          id: 'jolly-diag', name: '🩺 Sistem Yoxlaması (hər şey)', icon: '🩺',
           route: '#/jolly-diag', group: JG, perm: 'vision.report.view',
           render: Diagnostics.render, afterRender: Diagnostics.afterRender
         });

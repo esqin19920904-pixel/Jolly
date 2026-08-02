@@ -166,7 +166,7 @@ const JollyHealthReport = (() => {
     ModuleRegistry.register({
       id: 'health-report',
       perm: 'health.view',
-      name: 'Sağlamlıq Hesabatı',
+      name: 'Data Hesabatı (7 gün)',
       icon: '📈',
       route: '#/health-report',
       group: 'Alətlər',

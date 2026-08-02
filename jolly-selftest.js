@@ -423,7 +423,7 @@ const JollySelfTest = (() => {
     ModuleRegistry.register({
       id: 'selftest',
       perm: 'tools.selftest',
-      name: 'JOLLY Yoxlama',
+      name: 'Modul Testi (ümumi)',
       icon: '🩻',
       route: '#/selftest',
       group: 'Alətlər',

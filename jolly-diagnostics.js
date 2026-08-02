@@ -378,7 +378,7 @@
 
   window.JollyDiagnostics = {
     id: "diagnostics",
-    name: "Diaqnostika",
+    name: "Developer Diaqnostika",
     version: "1.0.0",
     show,
     openBlackBox,
