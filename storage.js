@@ -150,51 +150,217 @@ const JollyStorage = (() => {
     } catch (e) {} finally { _thumbBuilding.delete(key); }
   }
 
+  /* ── Firebase Storage REST upload ──────────────────────────────────
+     Hər şəkli həm yerli IndexedDB-yə (idb:), həm Firebase Storage-a
+     (fbs:) yazırıq. Belə ki:
+       • brauzer keşi silinəndə → fbs:-dən bərpa olunur
+       • başqa cihaza sinxron edəndə → fbs:-dən yüklənir
+     İstifadə: mövcud cloud.js-dəki eyni apiKey + idToken (anonim auth).
+     Bucket: jolly2026-b3c06.firebasestorage.app
+     REST endpoint: https://firebasestorage.googleapis.com/v0/b/{bucket}/o
+  ─────────────────────────────────────────────────────────────────── */
+  const FBS_BUCKET = 'jolly2026-b3c06.firebasestorage.app';
+  const FBS_BASE   = 'https://firebasestorage.googleapis.com/v0/b/' + FBS_BUCKET + '/o';
+
+  async function _fbsToken() {
+    try {
+      // cloud.js JollyCloud._getIdToken()-i birbaşa çağırmaq olmur (leksik),
+      // amma keşlənmiş tokeni oxuya bilərik
+      const cached = (typeof JollyDB !== 'undefined') ? JollyDB.read('jolly_fb_auth', null) : null;
+      if (cached && cached.idToken && Date.now() < cached.expiry) return cached.idToken;
+      // Token yoxdursa və ya bitibsə — cloud.js-in özünü çağır
+      if (typeof JollyCloud !== 'undefined' && JollyCloud._getIdToken) return await JollyCloud._getIdToken();
+    } catch (e) {}
+    return null;
+  }
+
+  /* Firebase Storage REST API — anonim idToken ilə işləyir.
+     Düzgün format: Authorization: Firebase TOKEN  (Bearer deyil!)
+     Upload: multipart/form-data ilə metadata + blob
+  */
+  async function _fbsUpload(key, dataUrl) {
+    const token = await _fbsToken();
+    if (!token) throw new Error('FBS: token yoxdur');
+
+    // base64 → binary blob
+    const parts = dataUrl.split(',');
+    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+    const binary = atob(parts[1] || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+
+    const path = 'jolly_images%2F' + key;   // URL-encoded '/'
+    const url = FBS_BASE + '?uploadType=multipart&name=' + path;
+
+    // multipart: metadata + blob
+    const boundary = 'jolly_fbs_' + Date.now().toString(36);
+    const meta = JSON.stringify({ name: 'jolly_images/' + key, contentType: mime });
+    var CRLF = '\r\n';
+    var part1 = '--' + boundary + CRLF + 'Content-Type: application/json; charset=UTF-8' + CRLF + CRLF + meta + CRLF;
+    var part2 = '--' + boundary + CRLF + 'Content-Type: ' + mime + CRLF + CRLF;
+    var end   = CRLF + '--' + boundary + '--' + CRLF;
+    const bodyBlob = new Blob([part1, part2, blob, end]);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'multipart/related; boundary=' + boundary,
+        'Authorization': 'Firebase ' + token,
+      },
+      body: bodyBlob,
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error('FBS upload ' + res.status + ': ' + txt.slice(0, 160));
+    }
+    const json = await res.json();
+    console.log('[FBS] upload OK:', json.name);
+    return 'fbs:jolly_images/' + key;
+  }
+
+  async function _fbsDownload(path) {
+    try {
+      const token = await _fbsToken();
+      const encodedPath = encodeURIComponent(path);
+      const url = FBS_BASE + '/' + encodedPath + '?alt=media';
+      const res = await fetch(url, {
+        headers: token ? { 'Authorization': 'Firebase ' + token } : {},
+      });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) { return null; }
+  }
+
+  async function _fbsDelete(path) {
+    try {
+      const token = await _fbsToken();
+      const encodedPath = encodeURIComponent(path);
+      const url = FBS_BASE + '/' + encodedPath;
+      await fetch(url, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': 'Firebase ' + token } : {},
+      });
+    } catch (e) {}
+  }
+
   async function saveImage(dataUrl) {
     // Əvvəl sıx
     dataUrl = await compressImage(dataUrl);
-    if (!isSupported()) return dataUrl; // fallback: olduğu kimi qaytar
-    try {
-      const key = 'img_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-      await _putRaw(key, dataUrl);
-      // Kiçik nüsxə — uğursuz olsa da əsas şəkil saxlanılıb, problem yoxdur
+    const key = 'img_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+
+    // A) Yerli IndexedDB
+    if (isSupported()) {
       try {
-        const thumb = await _makeThumb(dataUrl);
-        if (thumb) await _putRaw(_thumbKey(key), thumb);
-      } catch (e) {}
-      return 'idb:' + key;
-    } catch (e) {
-      console.error('IDB save error', e);
-      return dataUrl; // xəta olsa köhnə üsulla saxla
+        await _putRaw(key, dataUrl);
+        try { const thumb = await _makeThumb(dataUrl); if (thumb) await _putRaw(_thumbKey(key), thumb); } catch (e) {}
+      } catch (e) { console.error('IDB save error', e); }
     }
+
+    // C) Firebase Storage — arxa planda, uğursuz olsa yerli nüsxə hər halda var
+    let fbsRef = null;
+    try {
+      fbsRef = await _fbsUpload(key, dataUrl);
+      console.log('[JollyStorage] FBS upload OK:', fbsRef);
+    } catch (e) {
+      console.warn('[JollyStorage] FBS upload uğursuz (yerli nüsxə var):', e.message);
+    }
+
+    // İki ref saxla: "idb:key|fbs:path" — hydrate hər ikisini anlayır
+    if (fbsRef) return 'idb:' + key + '|' + fbsRef;
+    return 'idb:' + key;
   }
 
-  // Açardan şəkli oxu
+  // Açardan şəkli oxu — idb:key, fbs:path, və ya "idb:key|fbs:path" dual-ref
   async function getImage(ref, preferThumb) {
-    if (!ref || !ref.startsWith('idb:')) return ref; // adi dataURL-dır
-    const key = ref.slice(4);
-    if (preferThumb) {
+    if (!ref) return null;
+
+    // Dual-ref: "idb:key|fbs:path"
+    let idbRef = null, fbsPath = null;
+    if (ref.includes('|')) {
+      const parts = ref.split('|');
+      idbRef = parts.find(p => p.startsWith('idb:')) || null;
+      const fbsPart = parts.find(p => p.startsWith('fbs:'));
+      fbsPath = fbsPart ? fbsPart.slice(4) : null;
+    } else if (ref.startsWith('idb:')) {
+      idbRef = ref;
+    } else if (ref.startsWith('fbs:')) {
+      fbsPath = ref.slice(4);
+    } else {
+      return ref; // adi dataURL
+    }
+
+    // Thumb istənilibsə — IDB-dən cəhd et
+    if (preferThumb && idbRef) {
+      const key = idbRef.slice(4);
       const t = await _getRaw(_thumbKey(key));
       if (t) return t;
-      // Kiçik nüsxə hələ yoxdur — tam şəkli göstər, fonda kiçiyini yarat
-      ensureThumb(ref);
+      ensureThumb(idbRef);
     }
-    return await _getRaw(key);
+
+    // Əvvəl IDB-dən cəhd et (sürətli, yerli)
+    if (idbRef) {
+      const key = idbRef.slice(4);
+      const local = await _getRaw(key);
+      if (local) return local;
+    }
+
+    // IDB-də yoxdursa (silinib/keş təmizlənib) → Firebase Storage-dan yüklə
+    if (fbsPath) {
+      console.log('[JollyStorage] IDB miss — FBS-dən bərpa edilir:', fbsPath);
+      const data = await _fbsDownload(fbsPath);
+      if (data) {
+        // Bərpa olunan şəkli IDB-yə geri yaz (növbəti dəfə sürətli olsun)
+        if (idbRef) {
+          const key = idbRef.slice(4);
+          try {
+            await _putRaw(key, data);
+            try { const thumb = await _makeThumb(data); if (thumb) await _putRaw(_thumbKey(key), thumb); } catch (e) {}
+            console.log('[JollyStorage] FBS → IDB bərpası uğurlu');
+          } catch (e) {}
+        }
+        return data;
+      }
+    }
+
+    return null;
   }
 
-  // Şəkli sil
+  // Şəkli sil — həm IDB, həm FBS
   async function deleteImage(ref) {
-    if (!ref || !ref.startsWith('idb:')) return;
-    try {
-      const db = await openDB();
-      await new Promise((res) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).delete(ref.slice(4));
-        tx.objectStore(STORE).delete(_thumbKey(ref.slice(4)));  // kiçik nüsxə də getsin
-        tx.oncomplete = res;
-        tx.onerror = res;
-      });
-    } catch (e) {}
+    if (!ref) return;
+    let idbKey = null, fbsPath = null;
+    if (ref.includes('|')) {
+      const parts = ref.split('|');
+      const idbPart = parts.find(p => p.startsWith('idb:'));
+      if (idbPart) idbKey = idbPart.slice(4);
+      const fbsPart = parts.find(p => p.startsWith('fbs:'));
+      if (fbsPart) fbsPath = fbsPart.slice(4);
+    } else if (ref.startsWith('idb:')) {
+      idbKey = ref.slice(4);
+    } else if (ref.startsWith('fbs:')) {
+      fbsPath = ref.slice(4);
+    }
+    if (idbKey) {
+      try {
+        const db = await openDB();
+        await new Promise((res) => {
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).delete(idbKey);
+          tx.objectStore(STORE).delete(_thumbKey(idbKey));
+          tx.oncomplete = res; tx.onerror = res;
+        });
+      } catch (e) {}
+    }
+    if (fbsPath) {
+      _fbsDelete(fbsPath); // arxa planda, gözləmirik
+    }
   }
 
   /* DOM-dakı bütün idb: şəkilləri həqiqi şəkillə doldur.
@@ -217,12 +383,10 @@ const JollyStorage = (() => {
     }));
   }
 
-  // img tag-i üçün düzgün atribut qaytarır
+  // img tag-i üçün düzgün atribut qaytarır — idb:, fbs:, dual-ref hamısını anlayır
   function imgAttr(ref, thumb) {
     if (!ref) return '';
-    if (ref.startsWith('idb:')) {
-      // boz placeholder + data-idb (hydrate dolduracaq)
-      // thumb=true → siyahı üçün kiçik nüsxə istənilir
+    if (ref.startsWith('idb:') || ref.startsWith('fbs:') || ref.includes('|')) {
       return `src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect fill='%231b1f36' width='10' height='10'/%3E%3C/svg%3E" data-idb="${ref}"${thumb ? ' data-idb-thumb="1"' : ''}`;
     }
     return `src="${ref}"`;
@@ -340,8 +504,46 @@ const JollyStorage = (() => {
       const already = await navigator.storage.persisted();
       if (already) return { supported: true, granted: true, already: true };
       const granted = await navigator.storage.persist();
+      if (!granted) {
+        // Brauzer icazə vermədi — istifadəçiyə bildiriş göstər
+        try {
+          if (typeof Toast !== 'undefined') {
+            Toast.error('⚠️ Daimi yaddaş aktiv deyil — brauzer şəkilləri siləcək! Studio → Backup → "Daimi Yaddaş İstə" düyməsini sıx.');
+          }
+        } catch (e) {}
+      }
       return { supported: true, granted, already: false };
     } catch (e) { return { supported: false }; }
+  }
+
+  // B — Açılışda persist yoxlaması (app.js-dən çağırılır)
+  async function checkPersistOnBoot() {
+    try {
+      if (!(navigator.storage && navigator.storage.persisted)) return;
+      const persisted = await navigator.storage.persisted();
+      if (persisted) return; // OK
+      // İlk dəfəsə sükutla cəhd et
+      const KEY = 'jolly_persist_asked';
+      const asked = localStorage.getItem(KEY);
+      const granted = await navigator.storage.persist();
+      if (granted) {
+        if (!asked) console.log('[JollyStorage] Daimi yaddaş avtomatik verildi');
+        localStorage.setItem(KEY, '1');
+        return;
+      }
+      // Hər 7 gündən bir istifadəçiyə xəbər ver
+      const lastWarn = parseInt(localStorage.getItem('jolly_persist_warn') || '0', 10);
+      if (Date.now() - lastWarn > 7 * 86400 * 1000) {
+        localStorage.setItem('jolly_persist_warn', String(Date.now()));
+        setTimeout(() => {
+          try {
+            if (typeof Toast !== 'undefined') {
+              Toast.error('⚠️ Şəkillər korunmur! Studio → Backup → "Daimi Yaddaş İstə" düyməsini sıx — brauzer yaddaşı silinəndə şəkillər itir.');
+            }
+          } catch (e) {}
+        }, 4000);
+      }
+    } catch (e) {}
   }
   async function isPersisted() {
     if (!(navigator.storage && navigator.storage.persisted)) return null;
@@ -392,5 +594,7 @@ const JollyStorage = (() => {
     isSupported, saveImage, getImage, deleteImage, hydrate, imgAttr, migrateOldImages, ensureThumb,
     resolveAll, initAutoHydrate, compressImage,
     requestPersistence, isPersisted, exportAllImagesToDevice,
+    checkPersistOnBoot,
+    _fbsUpload, _fbsDownload, _fbsDelete, _fbsToken,
   };
 })();
