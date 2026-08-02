@@ -271,7 +271,16 @@ const JollyDashboard = (() => {
     if (cfg.items) cfg.items = cfg.items.filter(id => id !== 'quickPhoto');
     /* v5.8: "DAHA ÇOX" bölməsi artıq konfiqurasiyadan gəlir.
        İlk dəfə mövcud görünüş olduğu kimi saxlanılır. */
-    if (!Array.isArray(cfg.more)) cfg.more = MORE.map(c => c.id);
+    if (!Array.isArray(cfg.more)) {
+      /* v6.1: Kassa Barkodu (yazdıqca tapan axtarış + ekranda barkod)
+         iş masasında ƏN BAŞDA görünsün — Esqin onu ən çox işlədir. */
+      cfg.more = ['t_kassa'].concat(MORE.map(c => c.id));
+    }
+    if (cfg.more.indexOf('t_kassa') < 0 && !cfg.kassaOnce) {
+      cfg.more.unshift('t_kassa');
+      cfg.kassaOnce = 1;          // yalnız bir dəfə; sonra gizlətsə qayıtmır
+      setConfig(cfg);
+    }
     return cfg;
   }
   function setConfig(cfg) { JollyDB.write(CFG_KEY, cfg); }
@@ -1167,16 +1176,9 @@ const JollyDashboard = (() => {
     const groups = {};
     available.forEach(c => { (groups[group(c)] = groups[group(c)] || []).push(c); });
 
-    const sw = (key, label, hint, onByDefault) => {
-      const raw = localStorage.getItem(key);
-      const on = raw === null ? !!onByDefault : raw === '1';
-      return `
-        <div class="list-row">
-          <span style="flex:1;">${label}<br><span class="muted" style="font-size:11px;">${hint}</span></span>
-          <span class="actions"><span onclick="JollyDashboard.toggleTool('${key}', ${onByDefault ? 'true' : 'false'})"
-            style="color:${on ? 'var(--accent-2)' : 'var(--accent-warn)'};">${on ? '✅ açıq' : '🚫 sönülü'}</span></span>
-        </div>`;
-    };
+    /* v6.3: JOLLY funksiya açarları buradan #/jolly-settings-ə köçürüldü —
+       Dashboard Studio yalnız KARTLARIN yerini idarə edir, funksiyaları yox.
+       (köhnə `sw()` açar-düyməsi funksiyası bu səbəbdən silindi) */
 
     setTimeout(() => attachDrag(), 0);
     return `
@@ -1192,13 +1194,12 @@ const JollyDashboard = (() => {
         </div>
       </div>
 
-      <div class="section-title">JOLLY funksiyaları — aç / söndür</div>
+      <div class="section-title">JOLLY funksiyaları</div>
       <div class="glass" style="padding:4px 14px;">
-        ${sw('jolly_addon_live', '⚡ Canlı axtarış', 'Hər ekranda yazdıqca mal tapır', true)}
-        ${sw('jolly_addon_studio', '🔎 Studio ekran axtarışı', 'Studio-da bütün ekranları süzür', true)}
-        ${sw('jolly_addon_dash', '🧩 Əlavə iş masası blokları', 'Kənar köməkçi bloklar', false)}
-        ${sw('jolly_bc_auto', '🎯 Barkod avtomatik açılsın', 'Mal dəqiq tapılanda barkod özü açılır', true)}
-        ${sw('jolly_fab_off', '🔍 Üzən axtarış düyməsi', 'Ekranın küncündə həmişə görünən dairə', false)}
+        <div class="list-row" style="cursor:pointer;" onclick="location.hash='#/jolly-settings'">
+          <span>⚙️ Bütün JOLLY açarları — canlı axtarış, barkod, üzən düymə və s.</span>
+          <span class="actions">→</span>
+        </div>
       </div>
 
       <div class="section-title">İş masasında olanlar — sürüşdür, sırala</div>

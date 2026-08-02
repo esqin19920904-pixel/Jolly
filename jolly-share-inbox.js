@@ -1544,8 +1544,8 @@
                ' · yeni: ' + state.warm.made + ' · xəta: ' + state.warm.errors +
                (state.warm.running ? '' : ' · bitdi') + '</div>');
       }
-      h.push(trioBlock());
-      h.push(panelBlock());
+      /* v6.3: Analitika/Dublikat/Performans buradan çıxarıldı —
+         indi Studio-da müstəqil ekranlardır (JOLLY qovluğu). */
       h.push(historyBlock());
       h.push('</div>');
       return h.join('');
@@ -1609,8 +1609,6 @@
     }
     h.push('<div class="btn" data-clear="1">🗑 Şəkli sil</div>');
     h.push(statsBlock());
-    h.push(trioBlock());
-    h.push(panelBlock());
     h.push(historyBlock());
     h.push('</div>');
     return h.join('');
@@ -2152,6 +2150,8 @@
     '#jlk .recent .rc{padding:8px 12px;border-radius:999px;font-size:12.5px;cursor:pointer;',
     'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}',
     '#jlk .recent .rc.x{opacity:.6}',
+    '#jlk .jgo{margin-top:14px;padding:12px;border-radius:13px;text-align:center;font-size:12.5px;',
+    'cursor:pointer;opacity:.7;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03)}',
     '#jlk .tools{display:flex;gap:8px;margin-top:11px}',
     '#jlk .tools .t{flex:1;padding:14px 8px;border-radius:13px;text-align:center;font-size:13.5px;',
     'font-weight:700;cursor:pointer;border:1px solid rgba(120,180,255,.35);',
@@ -2243,7 +2243,8 @@
   function lpaint() {
     var host = document.getElementById('jlk-list');
     if (!host) return;
-    host.innerHTML = lvsHTML() + lrowsHTML() + diagHTML();
+    host.innerHTML = lvsHTML() + lrowsHTML() +
+      '<div class="jgo" data-lgodiag="1">🩺 Yoxlama və hesabat →</div>';
     var a = document.getElementById('jlk-auto');
     if (a) a.textContent = autoOpenPref() ? '🎯' : '🚫';
     lhydrate();
@@ -2352,6 +2353,7 @@
         toast(off ? 'İş masası blokları açıldı' : 'İş masası blokları gizləndi', 'ok');
         lpaint(); return;
       }
+      if (t.closest && t.closest('[data-lgodiag]')) { e.stopPropagation(); global.location.hash = '#/jolly-diag'; return; }
       if (t.closest && t.closest('[data-dgrun]')) { e.stopPropagation(); return runDiag(); }
       if (t.closest && t.closest('[data-dgbench]')) { e.stopPropagation(); return runBench(); }
       if (t.closest && t.closest('[data-dgcopy]')) {
@@ -3750,70 +3752,98 @@
     if (SE.idx && SE.sig === sig && (Date.now() - SE.at) < 4000) return SE.idx;
 
     var lists = seLists();
+    /* v6.2 (Esqinin qaydası) — sahələr AYRI-AYRI saxlanılır ki, sorğunun
+       uzunluğuna görə hansı sahələrdə axtarılacağı dəqiq idarə olunsun:
+         2 hərf → yalnız ad + kod
+         3 hərf → + marka, model
+         4+     → + qeyd, təsvir və qalan sahələr                     */
     SE.idx = list.map(function (p) {
       var codes = allCodes(p).map(function (c) { return String(c).replace(/\s+/g, ''); });
-      var fields = [
-        p.name, p.brand, p.firma, p.company, p.model, p.modelNo, p.note, p.notes, p.qeyd,
-        p.color, p.reng, p.tags,
+      var brand = [p.brand, p.firma, p.company, seName(lists, 'jolly_brands', p.brandId)]
+                    .filter(Boolean).join(' ');
+      var model = [p.model, p.modelNo].filter(Boolean).join(' ');
+      var extra = [
+        p.note, p.notes, p.qeyd, p.description, p.color, p.reng, p.tags,
         seName(lists, 'jolly_groups', p.group || p.groupId || p.category),
-        seName(lists, 'jolly_brands', p.brandId),
         seName(lists, 'jolly_locations', p.location || p.locationId || p.yer),
         seName(lists, 'jolly_statuses', p.status || p.statusId),
         seName(lists, 'jolly_suppliers', p.supplier || p.supplierId)
       ].filter(function (v) { return v !== null && v !== undefined && v !== ''; })
-       .map(function (v) { return Array.isArray(v) ? v.join(' ') : String(v); });
+       .map(function (v) { return Array.isArray(v) ? v.join(' ') : String(v); }).join(' ');
 
       return {
         p: p,
         name: foldTxt(p.name || ''),
-        hay: foldTxt(fields.join(' ')),
+        brand: foldTxt(brand),
+        model: foldTxt(model),
+        extra: foldTxt(extra),
         codes: codes,
-        digits: codes.join(' '),
-        price: String(p.price || '')
+        digits: codes.join(' ')
       };
     });
     SE.sig = sig; SE.at = Date.now();
     return SE.idx;
   }
 
-  function seScoreOne(rec, q, qd, words) {
+  /* BAL CƏDVƏLİ (Esqinin təyin etdiyi):
+       ad tam uyğun        100
+       kod tam uyğun        95
+       ad başlanğıcı        90
+       kodun içində         85
+       adın içində          75
+       marka / model        60   (3 hərfdən sonra)
+       digər sahələr    max 40   (4 hərfdən sonra)
+       səhv yazı        max 35
+     Beləliklə qeydində "siqaret" olan Corab heç vaxt adı "Siqaret..."
+     olan malı keçə bilmir. */
+  function seScoreOne(rec, q, qd, words, tier) {
     var best = 0, why = '';
 
-    // 1) kodlar
+    // 1) KOD — bütün mərhələlərdə
     if (qd.length >= 2) {
       for (var i = 0; i < rec.codes.length; i++) {
         var c = rec.codes[i];
-        if (c === qd) { return { s: 100, why: 'kod tam uyğun' }; }
+        if (c === qd) return { s: 95, why: 'kod tam uyğun' };
         if (c.indexOf(qd) === 0 && best < 92) { best = 92; why = 'kod başlanğıcı'; }
-        else if (c.indexOf(qd) > 0 && best < 84) { best = 84; why = 'kodun içində'; }
+        else if (c.indexOf(qd) > 0 && best < 85) { best = 85; why = 'kodun içində'; }
       }
     }
 
-    // 2) ad
+    // 2) AD — bütün mərhələlərdə
     if (q) {
-      if (rec.name === q && best < 96) { best = 96; why = 'ad tam uyğun'; }
-      else if (rec.name.indexOf(q) === 0 && best < 88) { best = 88; why = 'ad başlanğıcı'; }
-      else if (rec.name.indexOf(q) > 0 && best < 78) { best = 78; why = 'adın içində'; }
-      else if (rec.hay.indexOf(q) >= 0 && best < 66) { best = 66; why = 'digər sahədə'; }
+      if (rec.name === q) return { s: 100, why: 'ad tam uyğun' };
+      if (rec.name.indexOf(q) === 0 && best < 90) { best = 90; why = 'ad başlanğıcı'; }
+      else if (rec.name.indexOf(q) > 0 && best < 75) { best = 75; why = 'adın içində'; }
+      else if (words.length > 1 && best < 70 &&
+               words.every(function (w) { return rec.name.indexOf(w) >= 0; })) {
+        best = 70; why = words.length + ' söz adda';
+      }
     }
 
-    // 3) çoxsözlü — hamısı varsa
-    if (words.length > 1 && best < 74) {
-      var all = words.every(function (w) { return rec.hay.indexOf(w) >= 0 || rec.digits.indexOf(w) >= 0; });
-      if (all) { best = 74; why = words.length + ' söz uyğun'; }
+    // 3) MARKA / MODEL — 3 hərfdən sonra
+    if (tier >= 3 && q && best < 60) {
+      if (rec.brand.indexOf(q) >= 0) { best = 60; why = 'marka'; }
+      else if (rec.model.indexOf(q) >= 0) { best = 58; why = 'model'; }
     }
 
-    // 4) səhv yazı
-    if (best < 58 && q && q.length >= 3) {
+    // 4) QEYD və digər mətn sahələri — yalnız 4 hərfdən sonra, maksimum 40
+    if (tier >= 4 && q && best < 40) {
+      if (rec.extra.indexOf(q) >= 0) { best = 40; why = 'qeyd / digər sahə'; }
+      else if (words.length > 1 &&
+               words.every(function (w) { return (rec.extra + ' ' + rec.name).indexOf(w) >= 0; })) {
+        best = 36; why = 'sözlər müxtəlif sahələrdə';
+      }
+    }
+
+    // 5) SƏHV YAZI — yalnız 4 hərfdən sonra, ən aşağı çəki
+    if (tier >= 4 && best < 35 && q.length >= 4) {
       var parts = rec.name.split(/\s+/).slice(0, 4);
       for (var k = 0; k < parts.length; k++) {
         var sim = seLev(q, parts[k]);
-        if (sim >= 0.7) {
-          var v = Math.round(40 + sim * 18);
+        if (sim >= 0.72) {
+          var v = Math.round(20 + sim * 15);
           if (v > best) { best = v; why = 'səhv yazı (' + Math.round(sim * 100) + '%)'; }
-        } else if (seSubseq(q, parts[k])) {
-          if (best < 46) { best = 46; why = 'qısaldılmış yazı'; }
-        }
+        } else if (seSubseq(q, parts[k]) && best < 28) { best = 28; why = 'qısaldılmış yazı'; }
       }
     }
 
@@ -3827,19 +3857,23 @@
       opts = opts || {};
       var limit = opts.limit || 30;
       var q = foldTxt(String(text || '')).trim();
-      if (q.length < (opts.min || 2)) return [];
+      if (q.length < (opts.min || 2)) return [];      // 0-1 hərf → heç nə
       var qd = q.replace(/\D/g, '');
       var words = q.split(/\s+/).filter(function (w) { return w.length > 1; });
 
+      /* MƏRHƏLƏ: 2 → ad+kod · 3 → +marka/model · 4+ → +qeyd və digərləri */
+      var tier = q.length >= 4 ? 4 : (q.length === 3 ? 3 : 2);
+
       var out = [];
       seBuild().forEach(function (rec) {
-        var r = seScoreOne(rec, q, qd, words);
+        var r = seScoreOne(rec, q, qd, words, tier);
         if (r) out.push({ product: rec.p, score: r.s, why: r.why });
       });
       out.sort(function (a, b) {
         if (b.score !== a.score) return b.score - a.score;
         return String(a.product.name || '').localeCompare(String(b.product.name || ''));
       });
+
       return out.slice(0, limit);
     },
 
@@ -4118,6 +4152,398 @@
     hide: function () { dsWrite('jolly_fab_off', 1); var n = document.getElementById('qs-fab'); if (n) n.remove(); }
   };
 
+
+  /* ======================================================================
+     ⚙️ JOLLY AYARLARI — #/jolly-settings   (v6.3)
+     Bütün JOLLY aç/söndür açarları BİR ekranda. Əvvəl bunlar Dashboard
+     Studio-da, 🩺 paneldə və bir neçə yerdə səpələnmişdi — Esqin
+     "qatmısan, çox qarışıq" dedi, haqlı idi. İndi tək ünvan buradır.
+     ====================================================================== */
+
+  var SCSS = [
+    '#jja{padding:14px 12px 90px;max-width:640px;margin:0 auto;color:#e8e8f0}',
+    '#jja h2{font-size:19px;margin:0 0 4px;font-weight:700}',
+    '#jja .sub{font-size:12px;opacity:.6;margin-bottom:16px;line-height:1.55}',
+    '#jja .sec{font-size:11px;letter-spacing:.7px;opacity:.5;text-transform:uppercase;margin:18px 0 8px}',
+    '#jja .row{display:flex;align-items:center;gap:11px;padding:13px;margin-bottom:8px;border-radius:14px;',
+    'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);cursor:pointer}',
+    '#jja .row .t{flex:1;min-width:0}',
+    '#jja .row .l{font-size:14px;font-weight:600}',
+    '#jja .row .h{font-size:11.5px;opacity:.55;margin-top:2px;line-height:1.4}',
+    '#jja .sw{flex:none;width:46px;height:27px;border-radius:999px;position:relative;',
+    'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);transition:background .15s}',
+    '#jja .sw i{position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;',
+    'background:#8a8f9c;transition:transform .15s}',
+    '#jja .sw.on{background:rgba(55,214,122,.35);border-color:rgba(55,214,122,.55)}',
+    '#jja .sw.on i{transform:translateX(19px);background:#37d67a}',
+    '#jja .seg{display:flex;gap:7px;margin-top:9px}',
+    '#jja .seg span{flex:1;padding:10px;border-radius:11px;text-align:center;font-size:12.5px;font-weight:700;',
+    'cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04)}',
+    '#jja .seg span.on{border-color:rgba(245,196,81,.5);background:rgba(245,196,81,.14);color:#f7d98a}',
+    '#jja .link{display:flex;align-items:center;gap:10px;padding:13px;margin-bottom:8px;border-radius:14px;',
+    'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);cursor:pointer;font-size:13.5px}',
+    '#jja .link .a{margin-left:auto;opacity:.5}',
+    '#jja .note{margin-top:18px;padding:12px;border-radius:13px;font-size:11.5px;opacity:.6;line-height:1.6;',
+    'background:rgba(120,180,255,.07);border:1px solid rgba(120,180,255,.2)}'
+  ].join('');
+
+  function jjaCSS() {
+    if (document.getElementById('jja-css')) return;
+    var st = document.createElement('style');
+    st.id = 'jja-css'; st.textContent = SCSS;
+    document.head.appendChild(st);
+  }
+
+  function jjaSwitch(key, on, label, hint) {
+    return '<div class="row" data-jja="' + esc(key) + '">' +
+           '<div class="t"><div class="l">' + label + '</div><div class="h">' + hint + '</div></div>' +
+           '<div class="sw' + (on ? ' on' : '') + '"><i></i></div></div>';
+  }
+
+  function jjaView() {
+    var h = ['<div id="jja">'];
+    h.push('<h2>⚙️ JOLLY Ayarları</h2>');
+    h.push('<div class="sub">Bütün JOLLY funksiyaları bir yerdə. Kartların iş masasında yeri üçün ' +
+           'Dashboard Studio-ya bax — bura yalnız aç/söndürdür.</div>');
+
+    h.push('<div class="sec">Axtarış</div>');
+    h.push(jjaSwitch('live', addonOn('live'), '⚡ Canlı axtarış',
+      'Hər ekranda 2 hərfdən sonra yazdıqca mal tapır'));
+    h.push(jjaSwitch('studio', addonOn('studio'), '🔎 Studio ekran axtarışı',
+      'Studio-da bütün ekranları (61+) süzür'));
+    h.push(jjaSwitch('voice', perm('search.voice.use'), '🎤 Səslə axtarış',
+      '(İcazə Mərkəzindən idarə olunur)'));
+
+    h.push('<div class="sec">Barkod</div>');
+    h.push(jjaSwitch('auto', autoOpenPref(), '🎯 Barkod avtomatik açılsın',
+      'Mal dəqiq tapılanda (🟢) barkod özü ekrana çıxır'));
+    h.push(jjaSwitch('fab', qsFabOn(), '🔍 Üzən axtarış düyməsi',
+      'Ekranın küncündə həmişə görünən dairə'));
+    h.push('<div class="row" style="cursor:default"><div class="t"><div class="l">🔁 12 rəqəmli kodun forması</div>' +
+           '<div class="h">Skanerin hansı rəqəmi göndərəcəyini seçir</div>' +
+           '<div class="seg">' +
+           '<span class="' + (mode12() === 'ean' ? 'on' : '') + '" data-jjamode="ean">EAN-13 (kart kimi)</span>' +
+           '<span class="' + (mode12() === 'upc' ? 'on' : '') + '" data-jjamode="upc">UPC-A</span>' +
+           '</div></div></div>');
+
+    h.push('<div class="sec">Digər JOLLY ekranları</div>');
+    h.push('<div class="link" data-jjago="#/jolly-analytics"><span>📈 Analitika — son 30 gün</span><span class="a">→</span></div>');
+    h.push('<div class="link" data-jjago="#/jolly-duplicates"><span>📦 Dublikatlar</span><span class="a">→</span></div>');
+    h.push('<div class="link" data-jjago="#/jolly-diag"><span>🩺 Sistem yoxlaması</span><span class="a">→</span></div>');
+    h.push('<div class="link" data-jjago="#/barcode-fix"><span>🔧 Barkod Düzəldici</span><span class="a">→</span></div>');
+
+    h.push('<div class="note">ℹ️ Kartların iş masasında görünüb-görünməməsi burada deyil, ' +
+           '<b>Dashboard Studio</b>-dadır (Studio → Dashboard Studio).</div>');
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function jjaPaint() {
+    var host = document.getElementById('jja-host');
+    if (host) host.innerHTML = jjaView();
+  }
+
+  function jjaBind() {
+    var root = document.getElementById('jja-host');
+    if (!root || root.__b) return;
+    root.__b = true;
+    root.addEventListener('click', function (e) {
+      var t = e.target;
+      var sw = t.closest && t.closest('[data-jja]');
+      if (sw) {
+        var key = sw.getAttribute('data-jja');
+        if (key === 'live' || key === 'studio') { addonSet(key, !addonOn(key)); jjaPaint(); return; }
+        if (key === 'auto') { autoOpenPref(!autoOpenPref()); jjaPaint(); return; }
+        if (key === 'fab') {
+          var on = !qsFabOn();
+          try { localStorage.setItem('jolly_fab_off', on ? '0' : '1'); } catch (e2) {}
+          if (on) qsFab(); else { var n = document.getElementById('qs-fab'); if (n) n.remove(); }
+          jjaPaint(); return;
+        }
+      }
+      var md = t.closest && t.closest('[data-jjamode]');
+      if (md) { mode12(md.getAttribute('data-jjamode')); jjaPaint(); toast('Yadda saxlanıldı', 'ok'); return; }
+      var go = t.closest && t.closest('[data-jjago]');
+      if (go) { global.location.hash = go.getAttribute('data-jjago'); return; }
+    });
+  }
+
+  var Settings = {
+    version: '6.3.0',
+    render: function () { jjaCSS(); setTimeout(function () { jjaBind(); jjaPaint(); }, 0); return '<div id="jja-host">' + jjaView() + '</div>'; },
+    afterRender: function () { jjaCSS(); jjaBind(); jjaPaint(); }
+  };
+
+
+  /* ======================================================================
+     📈 JOLLY ANALİTİKA — #/jolly-analytics   (v6.3, əvvəl Şəkillə axtarış
+     ekranının altında basdırılmışdı, indi müstəqil ekran)
+     ====================================================================== */
+  var AN = { data: null };
+
+  function anCSS() {
+    if (document.getElementById('jan-css')) return;
+    var st = document.createElement('style');
+    st.id = 'jan-css';
+    st.textContent = [
+      '#jan{padding:14px 12px 90px;max-width:640px;margin:0 auto;color:#e8e8f0}',
+      '#jan h2{font-size:19px;margin:0 0 4px;font-weight:700}',
+      '#jan .sub{font-size:12px;opacity:.6;margin-bottom:16px}',
+      '#jan .k{display:flex;justify-content:space-between;gap:10px;padding:12px 13px;margin-bottom:8px;',
+      'border-radius:13px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:13px}',
+      '#jan .k b{font-family:ui-monospace,monospace;color:#f7d98a;font-size:15px}',
+      '#jan .grp{margin-top:14px;padding:12px 13px;border-radius:13px;background:rgba(255,255,255,.03);',
+      'border:1px solid rgba(255,255,255,.08);font-size:12.5px;line-height:1.9}',
+      '#jan .grp b{opacity:.7;display:block;margin-bottom:6px;font-size:11px;letter-spacing:.5px;text-transform:uppercase}',
+      '#jan .empty{text-align:center;opacity:.55;padding:30px 10px;font-size:13.5px}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  function anLoad() {
+    AN.data = 'loading'; anPaint();
+    ensureVisual().then(function (vs) {
+      if (typeof vs.analytics !== 'function') { AN.data = { error: 'Motor dəstəkləmir' }; anPaint(); return; }
+      return vs.analytics(30).then(function (a) { AN.data = a; anPaint(); });
+    }).catch(function (e) { AN.data = { error: String(e && e.message || e) }; anPaint(); });
+  }
+
+  function anView() {
+    var h = ['<div id="jan">'];
+    h.push('<h2>📈 JOLLY Analitika</h2><div class="sub">Şəkillə axtarışın son 30 günü</div>');
+    var a = AN.data;
+    if (a === 'loading') h.push('<div class="empty">Hesablanır…</div>');
+    else if (!a || a.error) h.push('<div class="empty">' + esc((a && a.error) || 'Məlumat yoxdur') + '</div>');
+    else if (!a.searches) h.push('<div class="empty">Hələ heç bir şəkillə axtarış edilməyib.</div>');
+    else {
+      h.push('<div class="k"><span>Axtarış sayı</span><b>' + a.searches + '</b></div>');
+      h.push('<div class="k"><span>Tapıldı</span><b>' + a.found + ' · ' + a.foundRate + '%</b></div>');
+      h.push('<div class="k"><span>Tapılmadı</span><b>' + a.notFound + '</b></div>');
+      h.push('<div class="k"><span>Barkodla bitən</span><b>' + a.barcodeRate + '%</b></div>');
+      h.push('<div class="k"><span>OCR qısa yolu</span><b>' + a.ocrRate + '%</b></div>');
+      h.push('<div class="k"><span>Orta vaxt</span><b>' + (a.avgMs / 1000).toFixed(2) + ' s</b></div>');
+      if (a.top && a.top.length) {
+        h.push('<div class="grp"><b>Ən çox axtarılan</b>' +
+               a.top.map(function (t) { return esc(t.name) + ' ×' + t.count; }).join('<br>') + '</div>');
+      }
+      if (a.stages && a.stages.length) {
+        h.push('<div class="grp"><b>Necə tapıldı</b>' +
+               a.stages.map(function (t) { return esc(t.stage) + ' ×' + t.count; }).join('<br>') + '</div>');
+      }
+    }
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function anPaint() { var host = document.getElementById('jan-host'); if (host) host.innerHTML = anView(); }
+
+  var Analytics = {
+    version: '6.3.0',
+    render: function () { anCSS(); setTimeout(anLoad, 0); return '<div id="jan-host">' + anView() + '</div>'; },
+    afterRender: function () { anCSS(); anLoad(); }
+  };
+
+  /* ======================================================================
+     📦 JOLLY DUBLİKATLAR — #/jolly-duplicates   (v6.3)
+     ====================================================================== */
+  var DU = { data: null };
+
+  function duCSS() {
+    if (document.getElementById('jdp-css')) return;
+    var st = document.createElement('style');
+    st.id = 'jdp-css';
+    st.textContent = [
+      '#jdp{padding:14px 12px 90px;max-width:640px;margin:0 auto;color:#e8e8f0}',
+      '#jdp h2{font-size:19px;margin:0 0 4px;font-weight:700}',
+      '#jdp .sub{font-size:12px;opacity:.6;margin-bottom:16px}',
+      '#jdp .sec{font-size:11.5px;opacity:.55;letter-spacing:.5px;text-transform:uppercase;margin:16px 0 8px}',
+      '#jdp .grp{padding:12px 13px;margin-bottom:8px;border-radius:13px;font-size:12.5px;line-height:1.6;',
+      'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}',
+      '#jdp .grp b{color:#f7d98a;display:block;margin-bottom:3px}',
+      '#jdp .empty{text-align:center;opacity:.55;padding:30px 10px;font-size:13.5px}',
+      '#jdp .note{margin-top:10px;font-size:11.5px;opacity:.55}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  function duLoad() {
+    DU.data = 'loading'; duPaint();
+    ensureVisual().then(function (vs) {
+      if (typeof vs.duplicates !== 'function') { DU.data = { error: 'Motor dəstəkləmir' }; duPaint(); return; }
+      return vs.duplicates().then(function (d) { DU.data = d; duPaint(); });
+    }).catch(function (e) { DU.data = { error: String(e && e.message || e) }; duPaint(); });
+  }
+
+  function duSection(title, arr) {
+    if (!arr || !arr.length) return '';
+    var h = ['<div class="sec">' + title + ' (' + arr.length + ' qrup)</div>'];
+    arr.slice(0, 12).forEach(function (g) {
+      h.push('<div class="grp"><b>' + esc(g.key).slice(0, 30) + '</b>' +
+             g.items.map(function (i) { return esc(i.name || i.id); }).join(' · ') + '</div>');
+    });
+    return h.join('');
+  }
+
+  function duView() {
+    var h = ['<div id="jdp">'];
+    h.push('<h2>📦 JOLLY Dublikatlar</h2><div class="sub">Eyni barkod / kod / şəkil / görünüş</div>');
+    var d = DU.data;
+    if (d === 'loading') h.push('<div class="empty">Yoxlanılır…</div>');
+    else if (!d || d.error) h.push('<div class="empty">' + esc((d && d.error) || 'Məlumat yoxdur') + '</div>');
+    else {
+      var any = (d.barcode||[]).length || (d.code||[]).length || (d.image||[]).length || (d.visual||[]).length;
+      if (!any) h.push('<div class="empty">✅ Dublikat tapılmadı.</div>');
+      else {
+        h.push(duSection('Eyni barkod', d.barcode));
+        h.push(duSection('Eyni xüsusi kod', d.code));
+        h.push(duSection('Eyni şəkil', d.image));
+        h.push(duSection('Eyni görünüş (barmaq izi)', d.visual));
+      }
+      if (d.note) h.push('<div class="note">ℹ️ ' + esc(d.note) + '</div>');
+    }
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function duPaint() { var host = document.getElementById('jdp-host'); if (host) host.innerHTML = duView(); }
+
+  var Duplicates = {
+    version: '6.3.0',
+    render: function () { duCSS(); setTimeout(duLoad, 0); return '<div id="jdp-host">' + duView() + '</div>'; },
+    afterRender: function () { duCSS(); duLoad(); }
+  };
+
+  /* ======================================================================
+     🩺 JOLLY YOXLAMA — #/jolly-diag   (v6.3, əvvəl Kassa Barkodu ekranının
+     altında basdırılmışdı, indi müstəqil ekran)
+     ====================================================================== */
+  var DG = { diag: null, bench: null };
+
+  function dgCSS() {
+    if (document.getElementById('jdg-css')) return;
+    var st = document.createElement('style');
+    st.id = 'jdg-css';
+    st.textContent = [
+      '#jdg{padding:14px 12px 90px;max-width:640px;margin:0 auto;color:#e8e8f0}',
+      '#jdg h2{font-size:19px;margin:0 0 4px;font-weight:700}',
+      '#jdg .sub{font-size:12px;opacity:.6;margin-bottom:14px}',
+      '#jdg .tools{display:flex;gap:8px;margin-bottom:14px}',
+      '#jdg .t{flex:1;padding:13px 6px;border-radius:13px;text-align:center;font-size:12.5px;font-weight:700;',
+      'cursor:pointer;border:1px solid rgba(120,180,255,.35);background:rgba(120,180,255,.12);color:#bcd8ff}',
+      '#jdg .dgl{font-size:12.5px;line-height:1.8;font-family:ui-monospace,monospace;opacity:.85;margin-bottom:8px}',
+      '#jdg .dgl .k{display:flex;justify-content:space-between;gap:10px;padding:4px 0;',
+      'border-bottom:1px solid rgba(255,255,255,.05)}',
+      '#jdg .dgl .k b{color:#f7d98a}',
+      '#jdg .dgl .k b.warn{color:#ff9d9d}',
+      '#jdg .dgs{margin-top:10px;font-size:11px;opacity:.55;letter-spacing:.5px}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  function dgRun() {
+    DG.diag = 'loading'; dgPaint();
+    ensureVisual().then(function (vs) {
+      var d = { cov: codeCoverage(), engine: vs.version || '?' };
+      d.barcodeApi = (typeof BarcodeDetector !== 'undefined');
+      d.mode12 = mode12();
+      var jobs = [];
+      if (typeof vs.selfTest === 'function') jobs.push(vs.selfTest().then(function (r) { d.vs = r; }));
+      if (typeof vs.perf === 'function') jobs.push(vs.perf().then(function (r) { d.perf = r; }));
+      return Promise.all(jobs).then(function () { DG.diag = d; dgPaint(); });
+    }).catch(function (e) { DG.diag = { error: String(e && e.message || e) }; dgPaint(); });
+  }
+
+  function dgBench() {
+    DG.bench = 'loading'; dgPaint();
+    ensureVisual().then(function (vs) {
+      if (typeof vs.benchmark !== 'function') { DG.bench = { error: 'Motor dəstəkləmir' }; dgPaint(); return; }
+      return vs.benchmark({ n: 8 }).then(function (r) { DG.bench = r; dgPaint(); });
+    }).catch(function (e) { DG.bench = { error: String(e && e.message || e) }; dgPaint(); });
+  }
+
+  function dgReport() {
+    var d = (DG.diag && DG.diag !== 'loading') ? DG.diag : null;
+    var b = (DG.bench && DG.bench !== 'loading') ? DG.bench : null;
+    var t = ['JOLLY — sistem hesabatı', new Date().toLocaleString(), ''];
+    if (d && !d.error) {
+      t.push('motor: v' + d.engine + ' · barkod oxuyucu: ' + (d.barcodeApi ? 'var' : 'yox') + ' · 12-rəqəm: ' + d.mode12);
+      if (d.vs) t.push('mal: ' + d.vs.products + ' · şəkli olan: ' + d.vs.withImages + ' · barmaq izi: ' + (d.vs.fingerprints || 0));
+      var c = d.cov, scan = c.ean13 + c.twelve + c.ean8;
+      t.push('barkod örtüyü: ' + scan + '/' + c.total + ' (' + Math.round(scan/(c.total||1)*100) + '%) · kodsuz: ' + c.noCode);
+    }
+    if (b && !b.error) {
+      t.push('dəqiqlik testi: ' + b.first + '/' + b.tested + ' birinci yerdə (' + b.firstRate + '%) · orta ' + b.avgMs + ' ms');
+    }
+    return t.join('\n');
+  }
+
+  function dgView() {
+    var h = ['<div id="jdg">'];
+    h.push('<h2>🩺 JOLLY Yoxlama</h2><div class="sub">Sistem, barkod örtüyü və dəqiqlik ölçüsü</div>');
+    h.push('<div class="tools"><div class="t" data-dgr="1">🔍 Sistem</div>' +
+           '<div class="t" data-dgb="1">⏱ Dəqiqlik</div><div class="t" data-dgc="1">📋 Kopyala</div></div>');
+
+    var d = DG.diag;
+    if (d === 'loading') h.push('<div class="dgl">Yoxlanılır…</div>');
+    else if (d && d.error) h.push('<div class="dgl warn">' + esc(d.error) + '</div>');
+    else if (d) {
+      var c = d.cov, scan = c.ean13 + c.twelve + c.ean8;
+      h.push('<div class="dgl">');
+      h.push('<div class="k"><span>Motor</span><b>v' + esc(d.engine) + '</b></div>');
+      if (d.vs) {
+        h.push('<div class="k"><span>Mal / şəkli olan</span><b>' + d.vs.products + ' / ' + d.vs.withImages + '</b></div>');
+        h.push('<div class="k"><span>Barmaq izi</span><b>' + (d.vs.fingerprints || 0) + '</b></div>');
+        h.push('<div class="k"><span>Öz-özünə test</span><b class="' + (d.vs.sample === 100 ? '' : 'warn') + '">' +
+               (d.vs.sample === 100 ? '✅ 100' : '⚠️ ' + d.vs.sample) + '</b></div>');
+      }
+      h.push('<div class="k"><span>Barkod oxuyucusu</span><b>' + (d.barcodeApi ? '✅ var' : '⚠️ yox') + '</b></div>');
+      h.push('<div class="dgs">BARKOD ÖRTÜYÜ · ' + c.total + ' mal</div>');
+      h.push('<div class="k"><span>Skanerlə vurula bilər</span><b>' + scan + ' · ' + Math.round(scan/(c.total||1)*100) + '%</b></div>');
+      h.push('<div class="k"><span>Kodsuz</span><b>' + c.noCode + '</b></div>');
+      if (c.badCheck) h.push('<div class="k"><span>Çek rəqəmi səhv</span><b class="warn">' + c.badCheck + '</b></div>');
+      h.push('</div>');
+    }
+
+    var b = DG.bench;
+    if (b === 'loading') h.push('<div class="dgl">⏱ Test aparılır…</div>');
+    else if (b && b.error) h.push('<div class="dgl warn">' + esc(b.error) + '</div>');
+    else if (b) {
+      h.push('<div class="dgl"><div class="dgs">DƏQİQLİK · ' + b.tested + ' mal (optimist ölçü)</div>');
+      h.push('<div class="k"><span>Birinci yerdə</span><b>' + b.first + ' / ' + b.tested + ' · ' + b.firstRate + '%</b></div>');
+      h.push('<div class="k"><span>Orta vaxt</span><b>' + (b.avgMs/1000).toFixed(2) + ' s</b></div>');
+      h.push('</div>');
+    }
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function dgPaint() { var host = document.getElementById('jdg-host'); if (host) host.innerHTML = dgView(); }
+
+  function dgBind() {
+    var root = document.getElementById('jdg-host');
+    if (!root || root.__b) return;
+    root.__b = true;
+    root.addEventListener('click', function (e) {
+      var t = e.target;
+      if (t.closest && t.closest('[data-dgr]')) { e.stopPropagation(); return dgRun(); }
+      if (t.closest && t.closest('[data-dgb]')) { e.stopPropagation(); return dgBench(); }
+      if (t.closest && t.closest('[data-dgc]')) {
+        e.stopPropagation();
+        var rep = dgReport();
+        if (global.navigator && global.navigator.clipboard) {
+          global.navigator.clipboard.writeText(rep).then(function () { toast('Hesabat kopyalandı', 'ok'); });
+        }
+        return;
+      }
+    });
+  }
+
+  var Diagnostics = {
+    version: '6.3.0',
+    render: function () { dgCSS(); setTimeout(function () { dgBind(); dgRun(); }, 0); return '<div id="jdg-host">' + dgView() + '</div>'; },
+    afterRender: function () { dgCSS(); dgBind(); dgRun(); }
+  };
+
   /* ---------- API ---------- */
 
   var Inbox = {
@@ -4227,7 +4653,8 @@
             { key: 'vision.learn.use',   label: 'Şəkil axtarışını öyrətmək (✅/❌)', tag: 'edit', default: true },
             { key: 'vision.warmup.run',  label: 'Barmaq izlərini hazırlamaq (⚡)',  tag: 'edit', default: true },
             { key: 'vision.report.view', label: 'Yoxlama və hesabat paneli',       tag: 'view', default: true },
-            { key: 'vision.duplicates.view', label: 'Dublikat siyahısı',           tag: 'view', default: true }
+            { key: 'vision.duplicates.view', label: 'Dublikat siyahısı',           tag: 'view', default: true },
+            { key: 'jolly.settings.view', label: 'JOLLY Ayarları ekranı',           tag: 'view', default: true }
           ]
         });
       }
@@ -4235,20 +4662,41 @@
     try {
       var MR = lex('ModuleRegistry');
       if (MR && typeof MR.register === 'function') {
+        var JG = 'JOLLY';   // v6.3: hamısı bir qovluqda (Studio axtarışında "jolly" yazsan hamısı çıxır)
         MR.register({
           id: 'share-inbox', name: 'Şəkillə axtarış', icon: '📥',
-          route: ROUTE, group: 'Alətlər', perm: PERM,
+          route: ROUTE, group: JG, perm: PERM,
           render: Inbox.render, afterRender: Inbox.afterRender
         });
         MR.register({
           id: 'barcode-view', name: 'Kassa Barkodu', icon: '🧾',
-          route: LROUTE, group: 'Alətlər', perm: LPERM,
+          route: LROUTE, group: JG, perm: LPERM,
           render: Lookup.render, afterRender: Lookup.afterRender
         });
         MR.register({
           id: 'barcode-fix', name: 'Barkod Düzəldici', icon: '🔧',
-          route: FROUTE, group: 'Alətlər', perm: FPERM,
+          route: FROUTE, group: JG, perm: FPERM,
           render: Fixer.render, afterRender: Fixer.afterRender
+        });
+        MR.register({
+          id: 'jolly-settings', name: 'JOLLY Ayarları', icon: '⚙️',
+          route: '#/jolly-settings', group: JG, perm: 'jolly.settings.view',
+          render: Settings.render, afterRender: Settings.afterRender
+        });
+        MR.register({
+          id: 'jolly-analytics', name: 'JOLLY Analitika', icon: '📈',
+          route: '#/jolly-analytics', group: JG, perm: 'vision.report.view',
+          render: Analytics.render, afterRender: Analytics.afterRender
+        });
+        MR.register({
+          id: 'jolly-duplicates', name: 'JOLLY Dublikatlar', icon: '📦',
+          route: '#/jolly-duplicates', group: JG, perm: 'vision.duplicates.view',
+          render: Duplicates.render, afterRender: Duplicates.afterRender
+        });
+        MR.register({
+          id: 'jolly-diag', name: 'JOLLY Yoxlama', icon: '🩺',
+          route: '#/jolly-diag', group: JG, perm: 'vision.report.view',
+          render: Diagnostics.render, afterRender: Diagnostics.afterRender
         });
         return true;
       }
