@@ -1230,26 +1230,53 @@ const JollyStudios = (() => {
     return Math.floor(diff / 86400) + ' gün';
   }
 
-  function exportBackup() {
+  async function exportBackup() {
     if (window.JollyAuth && !JollyAuth.can('backup.export')) {
       if (typeof Toast !== 'undefined') Toast.error('🔒 Export icazən yoxdur');
       return;
     }
+    Toast.info('⏳ Backup hazırlanır — şəkillər daxil edilir...');
     const data = JollyDB.exportAll();
+
+    // A) Şəkilləri backup-a daxil et — idb: ref-lərini həqiqi base64-ə çevir
+    let imgCount = 0;
+    const _embedImages = async (list) => {
+      if (!Array.isArray(list)) return list;
+      return Promise.all(list.map(async (item) => {
+        if (!item || !Array.isArray(item.images) || !item.images.length) return item;
+        const resolved = await Promise.all(item.images.map(async (ref) => {
+          if (!ref) return ref;
+          try {
+            let dataUrl = null;
+            if (typeof JollyStorage !== 'undefined') dataUrl = await JollyStorage.getImage(ref);
+            if (!dataUrl) return ref; // referansı saxla, şəkil tapılmadı
+            imgCount++;
+            return { ref, data: dataUrl }; // ref + həqiqi data birlikdə
+          } catch (e) { return ref; }
+        }));
+        return { ...item, images: resolved };
+      }));
+    };
+    try {
+      if (Array.isArray(data.products)) data.products = await _embedImages(data.products);
+      if (Array.isArray(data.drafts))   data.drafts   = await _embedImages(data.drafts);
+    } catch (e) { console.warn('Şəkil daxil etmə xətası:', e); }
+
     const checksum = computeChecksum(data);
-    const payload = { ...data, __checksum: checksum };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const payload = { ...data, __checksum: checksum, __hasImages: true };
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `jolly-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.href = url;
+    a.download = `jolly-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     JollyDB.setSettings({ lastBackup: Date.now() });
-    Toast.success(`Backup yükləndi ✓ (yoxlama kodu: ${checksum})`);
+    Toast.success(`Backup hazırdır ✓ — ${imgCount} şəkil daxil edildi (yoxlama: ${checksum})`);
     JollyRouter.go('#/studios/data');
   }
 
-  function importBackup(e) {
+  async function importBackup(e) {
     if (window.JollyAuth && !JollyAuth.can('backup.import')) {
       if (typeof Toast !== 'undefined') Toast.error('🔒 Bərpa/Import icazən yoxdur — Admin-dən istə');
       return;
@@ -1257,7 +1284,7 @@ const JollyStudios = (() => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const raw = JSON.parse(ev.target.result);
         const { __checksum, ...data } = raw;
@@ -1273,10 +1300,37 @@ const JollyStudios = (() => {
           }
         }
         const count = (data.jolly_products || []).length;
-        if (confirm(`Bu backup-da ${count} məhsul var. Mövcud məlumatlar bununla əvəz olunacaq. Davam edilsin?`)) {
+        const hasImgs = data.__hasImages;
+        if (confirm(`Bu backup-da ${count} məhsul var${hasImgs ? ' (şəkillər daxil)' : ''}. Mövcud məlumatlar bununla əvəz olunacaq. Davam edilsin?`)) {
           saveSnapshot();
+          // Şəkilləri IDB-yə geri yaz, məhsullarda sadə ref saxla
+          const _restoreImages = async (list) => {
+            if (!Array.isArray(list)) return list;
+            return Promise.all(list.map(async (item) => {
+              if (!item || !Array.isArray(item.images) || !item.images.length) return item;
+              const refs = await Promise.all(item.images.map(async (entry) => {
+                if (!entry) return entry;
+                if (typeof entry === 'string') return entry; // köhnə format
+                if (entry.data && typeof JollyStorage !== 'undefined') {
+                  try {
+                    const newRef = await JollyStorage.saveImage(entry.data);
+                    return newRef;
+                  } catch (e) { return entry.ref || null; }
+                }
+                return entry.ref || null;
+              }));
+              return { ...item, images: refs.filter(Boolean) };
+            }));
+          };
+          if (hasImgs) {
+            Toast.info('⏳ Şəkillər bərpa olunur...');
+            try {
+              if (Array.isArray(data.jolly_products)) data.jolly_products = await _restoreImages(data.jolly_products);
+              if (Array.isArray(data.jolly_drafts))   data.jolly_drafts   = await _restoreImages(data.jolly_drafts);
+            } catch (e) { console.warn('Şəkil bərpası xətası:', e); }
+          }
           JollyDB.importAll(data);
-          Toast.success('Bərpa tamamlandı');
+          Toast.success('Bərpa tamamlandı' + (hasImgs ? ' — şəkillər də qayıtdı ✓' : ''));
           JollyRouter.go('#/home');
         }
       } catch (err) {

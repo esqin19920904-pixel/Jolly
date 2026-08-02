@@ -1214,15 +1214,25 @@ const JollyDashboard = (() => {
         }).join('') || '<div class="muted" style="padding:14px;">İş masası boşdur — aşağıdan əlavə et.</div>'}
       </div>
 
-      ${Object.keys(groups).map(g => `
-        <div class="section-title">Əlavə et — ${g} (${groups[g].length})</div>
-        <div class="glass" style="padding:4px 14px;">
-          ${groups[g].map(c => `
-            <div class="list-row">
-              <span>${c.emoji || ''} ${c.label}</span>
-              <span class="actions"><span onclick="JollyDashboard.addItem('${c.id}')" style="color:var(--accent-2);">+ əlavə</span></span>
-            </div>`).join('')}
-        </div>`).join('')}
+      ${(() => {
+        const FMETA = {'JOLLY alətləri':'🧩','Klassik kartlar':'🃏','Modullar':'📦'};
+        function dfOpen(fid) { try { var s=JSON.parse(localStorage.getItem('jolly_ds_fold')||'{}'); return fid==='Modullar_' ? s[fid]===true : s[fid]!==false; } catch(e){ return fid!=='Modullar_'; } }
+        return Object.keys(groups).map(g => {
+          const fid = g.replace(/[^a-z0-9]/gi,'_') + '_';
+          const open = dfOpen(fid);
+          const icon = FMETA[g] || '📋';
+          const rows = groups[g].map(c => '<div class="list-row"><span>' + (c.emoji||'') + ' ' + c.label + '</span><span class="actions"><span onclick="JollyDashboard.addItem(\'' + c.id + '\')" style="color:var(--accent-2);">+ əlavə</span></span></div>').join('');
+          return '<div style="margin-bottom:8px;">'
+            + '<div onclick="JollyDashboard._dFold(\'' + fid + '\')" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.04);cursor:pointer;border:1px solid rgba(255,255,255,.07);">'
+            + '<span id="dfarr_' + fid + '" style="font-size:12px;opacity:.6;">' + (open?'▾':'▸') + '</span>'
+            + '<span style="font-size:15px;">' + icon + '</span>'
+            + '<span style="font-weight:600;font-size:13px;">' + g + '</span>'
+            + '<span class="muted" style="font-size:11px;margin-left:auto;">' + groups[g].length + '</span>'
+            + '</div>'
+            + '<div id="jdfold_' + fid + '" class="glass" style="padding:4px 14px;' + (open?'':'display:none;') + '">' + rows + '</div>'
+            + '</div>';
+        }).join('');
+      })()}
 
       <div class="glass" style="padding:12px 14px;margin-top:14px;">
         <div class="row between">
@@ -1254,6 +1264,19 @@ const JollyDashboard = (() => {
         const cfg = getConfig(); cfg.items = ids; setConfig(cfg);
       });
     });
+  }
+
+  function _dFold(fid) {
+    try {
+      var s = JSON.parse(localStorage.getItem('jolly_ds_fold') || '{}');
+      var wasOpen = fid === 'Modullar_' ? s[fid] === true : s[fid] !== false;
+      s[fid] = !wasOpen;
+      localStorage.setItem('jolly_ds_fold', JSON.stringify(s));
+      var w = document.getElementById('jdfold_' + fid);
+      var a = document.getElementById('dfarr_' + fid);
+      if (w) w.style.display = wasOpen ? 'none' : '';
+      if (a) a.textContent = wasOpen ? '▸' : '▾';
+    } catch(e) {}
   }
 
   function addItem(id) {
@@ -1303,7 +1326,7 @@ const JollyDashboard = (() => {
   return {
     render, renderIncomplete, renderGallery, filterGalleryByGroup, searchGallery, toggleGallerySelectMode, toggleGallerySelect, bulkDeleteGallerySelection, bulkMoveGallerySelection, renderRecent, renderRecentlyEdited, renderStudio, openGalleryImage,
     renderTrash, renderFavorites, restoreTrash, purgeTrash, emptyTrash,
-    quickPhoto, toggleFab, fabAction, addItem, removeItem, toggleAttention, getConfig, CATALOG,
+    quickPhoto, toggleFab, fabAction, addItem, removeItem, toggleAttention, getConfig, CATALOG, _dFold,
     toggleTool, resetLayout, allCards,
     openSmartSearch, closeSmartSearch, smartSearch,
     dismissChangelog, openChangelogHistory,
