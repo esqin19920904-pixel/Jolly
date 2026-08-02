@@ -2410,7 +2410,7 @@
   }
 
   var Lookup = {
-    version: '6.0.0',
+    version: '6.3.0',
     render: function () {
       linjectCSS();
       setTimeout(function () {
@@ -2725,7 +2725,7 @@
   }
 
   var Fixer = {
-    version: '6.0.0',
+    version: '6.3.0',
     render: function () {
       finject();
       setTimeout(function () { fbind(); fpaint(); }, 0);
@@ -3851,7 +3851,7 @@
   }
 
   var Search = {
-    version: '6.0.0',
+    version: '6.3.0',
 
     query: function (text, opts) {
       opts = opts || {};
@@ -4547,7 +4547,7 @@
   /* ---------- API ---------- */
 
   var Inbox = {
-    version: '6.0.0',
+    version: '6.3.0',
 
     render: function () {
       injectCSS();
