@@ -502,10 +502,27 @@
     var ok3 = registerPerm();
     var ok4 = registerModule();
 
-    if ((ok1 && ok2 && ok3 && ok4) || ++tries > 40) {
-      if (tries > 40) console.warn('[UserMode] tam qoşula bilmədi:',
-        { add: ok1, dashboard: ok2, perm: ok3, module: ok4 });
-      else console.log('[UserMode] hazırdır');
+    var coreOk = ok1 && ok3 && ok4; // add guard + perm + module
+    ++tries;
+    if (coreOk && ok2) {
+      console.log('[UserMode] hazırdır');
+      guardRoute();
+      return;
+    }
+    if (tries > 40) {
+      // Dashboard sarğısı olmasa da digərləri işləyir — bunu sonra yenidən cəhd edirik
+      if (!ok2) {
+        console.warn('[UserMode] dashboard sarğısı uğursuz — hər render-də cəhd ediləcək');
+        // hashchange-də yenidən cəhd
+        global.addEventListener('jolly:rendered', function tryDash() {
+          if (installDashboardWrap()) {
+            console.log('[UserMode] dashboard sarğısı qoşuldu');
+            global.removeEventListener('jolly:rendered', tryDash);
+          }
+        });
+      }
+      if (coreOk) { guardRoute(); return; }
+      console.warn('[UserMode] tam qoşula bilmədi:', { add: ok1, dashboard: ok2, perm: ok3, module: ok4 });
       guardRoute();
       return;
     }
