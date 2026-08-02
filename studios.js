@@ -567,25 +567,91 @@ const JollyStudios = (() => {
 
   const aiHistory = [];
 
+  /* ── Məhsul Axtarışı — AI paneli içində, canlı, sürətli ─────────── */
+  let _aisRows = [], _aisTimer = null;
+  function _aisQuery(q) {
+    q = (q || '').trim();
+    if (q.length < 2) { _aisRows = []; _aisPaint(q); return; }
+    try {
+      const S = window.JollySearch || (typeof JollySearch !== 'undefined' ? JollySearch : null);
+      if (S) _aisRows = S.products(q, { limit: 10 });
+      else {
+        const DB = window.JollyDB || (typeof JollyDB !== 'undefined' ? JollyDB : null);
+        if (DB) _aisRows = DB.Products.search(q).slice(0, 10);
+        else _aisRows = [];
+      }
+    } catch (e) { _aisRows = []; }
+    _aisPaint(q);
+  }
+  function _aisPaint(q) {
+    const el = document.getElementById('ais-results');
+    if (!el) return;
+    if (!q || q.length < 2) { el.innerHTML = ''; return; }
+    if (!_aisRows.length) {
+      el.innerHTML = '<div style="padding:10px 12px;font-size:12.5px;opacity:.5;text-align:center;">Nəticə yoxdur</div>';
+      return;
+    }
+    el.innerHTML = _aisRows.map(p => {
+      const code = (p.barcodes && p.barcodes[0]) || p.code || '';
+      const price = p.price ? ` · ${p.price} ₼` : '';
+      return `<div onclick="JollyRouter.go('#/product/${p.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(p.name||'(adsız)').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))}</div>
+          <div style="font-size:12px;opacity:.55;font-family:ui-monospace,monospace;margin-top:2px;">${code||'kod yoxdur'}${price}</div>
+        </div>
+        ${code ? `<div onclick="event.stopPropagation();JollyProducts&&JollyProducts.showBarcode('${code}','${(p.name||'').replace(/'/g,"\\'")}');" style="padding:7px 10px;border-radius:8px;border:1px solid rgba(245,196,81,.4);background:rgba(245,196,81,.12);color:#f7d98a;font-size:13px;cursor:pointer;">📊</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  function aisInput() {
+    const el = document.getElementById('ais-input');
+    if (!el) return;
+    const q = el.value;
+    if (_aisTimer) clearTimeout(_aisTimer);
+    _aisTimer = setTimeout(() => _aisQuery(q), 160);
+  }
+  function aisClear() {
+    const el = document.getElementById('ais-input');
+    if (el) { el.value = ''; el.focus(); }
+    _aisRows = []; _aisPaint('');
+  }
+
   function renderAI() {
     setTimeout(() => scrollAiBottom(), 0);
     return `
-      <div class="row between" style="margin-bottom:12px;">
+      <div class="row between" style="margin-bottom:14px;">
         <h2 style="font-family:var(--font-display);margin:0;font-size:19px;">🤖 JOLLY AI</h2>
-        <span class="chip" onclick="JollyRouter.go('#/chat')">💬 Tam Chat aç</span>
+        <span class="chip" onclick="JollyRouter.go('#/chat')">💬 Tam Chat</span>
       </div>
-      <button class="btn btn-primary btn-block" style="margin-bottom:12px;" onclick="JollyRouter.go('#/studios/ai-brain')">🧠 AI Brain Studio Pro aç</button>
-      <div class="ai-panel glass" style="padding:14px;">
-        <div class="ai-messages" id="aiMessages">
-          ${aiHistory.length === 0 ? `<div class="ai-msg bot">Salam! Mən JOLLY AI-yam. Yalnız bu proqramın daxilindəki məlumatlarla — məhsullar, firmalar, qruplar, statuslar — kömək edə bilərəm. Nə soruşmaq istəyirsən?</div>` : aiHistory.map(m => `<div class="ai-msg ${m.role}">${m.text.replace(/\n/g, '<br>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</div>`).join('')}
+
+      <!-- ── MƏHSUL AXTARIŞI ── -->
+      <div class="glass" style="border-radius:16px;overflow:hidden;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;">
+          <span style="font-size:18px;line-height:1;">🔍</span>
+          <input id="ais-input" type="text" autocomplete="off" placeholder="Mal adı, barkod, firma..."
+            style="flex:1;background:transparent;border:none;outline:none;font-size:14px;color:var(--text-hi);"
+            oninput="JollyStudios.aisInput()"
+            onkeydown="if(event.key==='Escape')JollyStudios.aisClear()">
+          <span onclick="JollyStudios.aisClear()" style="font-size:18px;opacity:.5;cursor:pointer;line-height:1;">✕</span>
         </div>
-        <div class="ai-suggestions">
-          <span class="chip" onclick="JollyStudios.aiQuick('Neçə məhsul var?')">Neçə məhsul var?</span>
-          <span class="chip" onclick="JollyStudios.aiQuick('Problemli məhsullar')">Problemli</span>
+        <div id="ais-results" style="max-height:260px;overflow-y:auto;"></div>
+      </div>
+
+      <!-- ── JOLLY AI CHAT (yığcam) ── -->
+      <div class="glass" style="padding:12px;border-radius:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:600;opacity:.7;">JOLLY AI — sual ver</span>
+          <span class="chip" style="font-size:11px;" onclick="JollyRouter.go('#/studios/ai-brain')">🧠 Brain Pro</span>
+        </div>
+        <div class="ai-messages" id="aiMessages" style="max-height:180px;overflow-y:auto;">
+          ${aiHistory.length === 0 ? `<div class="ai-msg bot" style="font-size:12.5px;">Salam! Mağaza haqqında soruş — neçə mal var, problemlilər, barkodsuzlar...</div>` : aiHistory.map(m => `<div class="ai-msg ${m.role}" style="font-size:12.5px;">${m.text.replace(/\n/g, '<br>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</div>`).join('')}
+        </div>
+        <div class="ai-suggestions" style="margin:8px 0 6px;">
+          <span class="chip" onclick="JollyStudios.aiQuick('Neçə məhsul var?')">Neçə mal?</span>
           <span class="chip" onclick="JollyStudios.aiQuick('Barkodsuz məhsullar')">Barkodsuz</span>
+          <span class="chip" onclick="JollyStudios.aiQuick('Problemli məhsullar')">Problemli</span>
           <span class="chip" onclick="JollyStudios.aiQuick('Ən bahalı')">Ən bahalı</span>
           <span class="chip" onclick="JollyStudios.aiQuick('Hesabat')">Hesabat</span>
-          <span class="chip" onclick="JollyStudios.aiQuick('Yeni məhsul')">Yeni məhsul</span>
         </div>
         <div class="ai-input-row">
           <input id="aiInput" placeholder="Sual yaz..." onkeydown="if(event.key==='Enter')JollyStudios.aiSend()">
@@ -1397,7 +1463,7 @@ const JollyStudios = (() => {
 
   return {
     renderHome, renderComingSoon, toggleModuleReg, setModuleView, initModuleDrag,
-    renderAI, aiSend, aiQuick, aiVoice,
+    renderAI, aiSend, aiQuick, aiVoice, aisInput, aisClear,
     renderModuleStudio, toggleNavItem, removeEdgeItem, getNavConfig, NAV_ITEMS_DEFAULT,
     addEdgeItem, getEdgeCatalog, getEdgeCatalogItem,
     renderTheme, applyTheme, applySavedTheme, THEMES, toggleAnim, toggleSound, toggleVibrate, toggleFx,

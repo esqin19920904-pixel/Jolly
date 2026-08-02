@@ -880,7 +880,7 @@
      (Esqin onları bəyəndi), iş masası blokları isə SÖNÜLÜ, çünki
      dashboard.js-in öz Dashboard Studio-su var və o, əsasdır.
      Açarlar Dashboard Studio-dan da idarə olunur. */
-  var ADDON_DEFAULT = { live: true, studio: true, dash: false };
+  var ADDON_DEFAULT = { live: false, studio: true, dash: false }; // canlı axtarış standart SÖNÜLÜ — yalnız #/home, #/products-da mənalıdır
 
   function addonOn(which) {
     try {
@@ -2939,7 +2939,10 @@
     } catch (e) {}
   }
   function lsMine(hash) {
-    return /^#\/(share-inbox|barcode-view|barcode-fix)/.test(String(hash || ''));
+    var h = String(hash || '');
+    // Öz ekranları + canlı axtarışın mənasız olduğu ekranlar
+    return /^#\/(share-inbox|barcode-view|barcode-fix)/.test(h) ||
+           /^#\/(studios|product\/|product$|dashboard\/studio|chat|brain|guide|selftest|testdata|perm|user-mode|module-cleanup|jolly-settings|jolly-diag|health|import|sheet|tasks|scan-marathon|photo-session|store-map|receiving|supplier-order|barcode-folder|fixmode|data-doctor|group-health|cloud-doctor|updates|undo)/.test(h);
   }
 
   function lsOwn(el) {
