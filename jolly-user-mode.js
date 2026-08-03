@@ -632,7 +632,10 @@
   }
 
   function renderAdmin() {
-    if (!isAdmin() && !can(PERM_KEY)) {
+    /* Sessiya ümumiyyətlə yoxdursa (PIN qurulmayıb / giriş edilməyib)
+       proqram kilidsizdir — ekranı bağlamağın mənası yoxdur.
+       Yalnız GİRİŞ EDİLMİŞ və admin OLMAYAN halda bağlanır. */
+    if (session() && !isAdmin() && !can(PERM_KEY)) {
       return '<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>';
     }
     syncModulePerms();
@@ -643,7 +646,7 @@
     h.push('<div class="storeos">');
     h.push('<div class="dash-head"><div>' +
              '<h2 style="font-family:var(--font-display);margin:0;font-size:22px;">👥 İşçi Rejimi</h2>' +
-             '<div class="muted" style="font-size:12.5px;">Karta basıb saxla — sil, gizlət, icazə ver</div>' +
+             '<div class="muted" style="font-size:12.5px;">v2.1 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
            '</div></div>');
 
     h.push('<div class="glass" style="padding:11px 13px;margin:10px 0 4px;font-size:12.5px;line-height:1.5;">' +
@@ -831,9 +834,14 @@
     var MR = global.ModuleRegistry || peek('ModuleRegistry');
     if (!MR || typeof MR.register !== 'function') return false;
     try {
+      /* ⚠️ perm: QƏSDƏN VERİLMİR.
+         module-registry.js `_allowed()` = POS.can(m.perm); açarın
+         standartı false olduğu üçün sessiya yoxdursa modul siyahıdan
+         TAMAMİLƏ düşürdü — ekran var idi, amma heç yerdə görünmürdü.
+         İcazə yoxlaması indi renderAdmin() içindədir. */
       MR.register({
         id: 'user-mode', name: 'İşçi Rejimi', icon: '👥',
-        route: ROUTE, group: 'JOLLY', perm: PERM_KEY,
+        route: ROUTE, group: 'JOLLY',
         render: renderAdmin
       });
       return true;

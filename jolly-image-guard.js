@@ -182,6 +182,94 @@
     return Promise.all(jobs).then(function () { return res; });
   }
 
+  /* ══════════════════════════════════════════════════════════
+     YOXLAMA — qeyddəki ref-ləri IndexedDB-nin ƏSL məzmunu ilə
+     tutuşdurur. Cavab verir: şəkillər tək-tək itir, yoxsa hamısı
+     birdən gedib (yəni IndexedDB-nin özü boşalıb)?
+     ══════════════════════════════════════════════════════════ */
+  var AUDIT = null;   // son nəticə
+
+  function openImagesDB() {
+    return new Promise(function (res, rej) {
+      try {
+        var req = indexedDB.open('jolly_images_db', 1);
+        req.onsuccess = function () { res(req.result); };
+        req.onerror = function () { rej(req.error); };
+        req.onupgradeneeded = function () { /* anbar yoxdursa boş qalır */ };
+      } catch (e) { rej(e); }
+    });
+  }
+
+  function idbAllKeys() {
+    return openImagesDB().then(function (db) {
+      return new Promise(function (res) {
+        try {
+          if (!db.objectStoreNames.contains('images')) { res([]); return; }
+          var tx = db.transaction('images', 'readonly');
+          var rq = tx.objectStore('images').getAllKeys();
+          rq.onsuccess = function () { res(rq.result || []); };
+          rq.onerror = function () { res([]); };
+        } catch (e) { res([]); }
+      });
+    }).catch(function () { return []; });
+  }
+
+  function audit() {
+    var DB = global.JollyDB || peek('JollyDB');
+    var rows = [];
+    function eat(list, kind) {
+      if (!list || !list.length) return;
+      for (var i = 0; i < list.length; i++) {
+        var it = list[i];
+        if (!it || !it.images || !it.images.length) continue;
+        for (var j = 0; j < it.images.length; j++) {
+          var r = it.images[j];
+          if (typeof r === 'string' && r) {
+            rows.push({ ref: r, name: it.name || it.id || '?', kind: kind, key: idbKeyOf(r), fbs: r.indexOf('fbs:') !== -1 });
+          }
+        }
+      }
+    }
+    try { if (DB && DB.Products && DB.Products.all) eat(DB.Products.all(), 'məhsul'); } catch (e) {}
+    try { if (DB && DB.Drafts   && DB.Drafts.all)   eat(DB.Drafts.all(),   'qaralama'); } catch (e) {}
+    try { if (DB && DB.Trash    && DB.Trash.all)    eat(DB.Trash.all(),    'səbət'); } catch (e) {}
+
+    return idbAllKeys().then(function (keys) {
+      var have = {}, i;
+      for (i = 0; i < keys.length; i++) have[String(keys[i])] = 1;
+
+      var okCount = 0, missing = [], cloudOnly = [], plain = 0;
+      for (i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (!r.key) {                       // data: və ya yalnız fbs:
+          if (r.fbs) cloudOnly.push(r); else plain++;
+          continue;
+        }
+        if (have[r.key]) okCount++;
+        else if (r.fbs) cloudOnly.push(r);  // yerli yoxdur, buludda var
+        else missing.push(r);               // ƏSL İTKİ
+      }
+
+      /* IDB-də olan, amma heç bir qeyddə istifadə olunmayan açarlar */
+      var used = {};
+      for (i = 0; i < rows.length; i++) if (rows[i].key) used[rows[i].key] = 1;
+      var orphan = 0;
+      for (i = 0; i < keys.length; i++) {
+        var k = String(keys[i]);
+        if (k.indexOf('_thumb') !== -1) continue;   // kiçik nüsxələr
+        if (!used[k]) orphan++;
+      }
+
+      AUDIT = {
+        at: Date.now(),
+        refs: rows.length, ok: okCount, plain: plain,
+        missing: missing, cloudOnly: cloudOnly,
+        idbKeys: keys.length, orphan: orphan
+      };
+      return AUDIT;
+    });
+  }
+
   /* ── ekran ──────────────────────────────────────────────── */
   function can(perm) {
     var UM = global.JollyUserMode;
@@ -192,7 +280,9 @@
   }
 
   function render() {
-    if (!can(PERM_KEY)) {
+    var sess = null;
+    try { sess = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null'); } catch (e) {}
+    if (sess && sess.role !== 'admin' && !can(PERM_KEY)) {
       return '<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>';
     }
     var t = trash();
@@ -224,6 +314,44 @@
              '<div style="display:flex;justify-content:space-between;padding:6px 0;"><span>🗑 Silinməyə hazır (sahibsiz)</span><b>' + ready + '</b></div>' +
              '<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid rgba(255,255,255,.08);margin-top:4px;"><span>Cəmi</span><b>' + refs.length + '</b></div>' +
            '</div>');
+
+    /* ── yoxlama nəticəsi ── */
+    h.push('<div class="section-title" style="margin-top:6px;">Şəkil yoxlaması</div>');
+    if (!AUDIT) {
+      h.push('<div class="glass" style="padding:14px;margin-bottom:10px;font-size:12.5px;line-height:1.6;">' +
+               'Qeyddəki şəkil ünvanlarını IndexedDB-nin əsl məzmunu ilə tutuşdurur — ' +
+               'şəkillərin tək-tək itdiyini, yoxsa anbarın bütöv boşaldığını göstərir.' +
+               '<div style="margin-top:10px;"><button class="btn btn-primary" onclick="JollyImageGuard.auditNow()">🔍 İndi yoxla</button></div>' +
+             '</div>');
+    } else {
+      var verdict, vcolor;
+      if (AUDIT.refs === 0) { verdict = 'Heç bir şəkil qeydi yoxdur'; vcolor = '#9ca3af'; }
+      else if (AUDIT.missing.length === 0) { verdict = '✅ Bütün şəkillər yerindədir'; vcolor = '#4ade80'; }
+      else if (AUDIT.ok === 0 && AUDIT.idbKeys === 0) { verdict = '⚠️ ANBAR TAM BOŞDUR — hamısı birdən gedib'; vcolor = '#fca5a5'; }
+      else { verdict = '⚠️ ' + AUDIT.missing.length + ' şəkil itib (tək-tək)'; vcolor = '#fbbf24'; }
+
+      h.push('<div class="glass" style="padding:14px;margin-bottom:10px;">' +
+               '<div style="font-size:14px;font-weight:600;color:' + vcolor + ';margin-bottom:10px;">' + verdict + '</div>' +
+               '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;"><span>Qeyddəki şəkil ünvanı</span><b>' + AUDIT.refs + '</b></div>' +
+               '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;"><span>Yerli anbarda tapıldı</span><b>' + AUDIT.ok + '</b></div>' +
+               '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;"><span>☁️ Yalnız buludda (bərpa oluna bilər)</span><b>' + AUDIT.cloudOnly.length + '</b></div>' +
+               '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;"><span>❌ Tapılmadı</span><b style="color:#fca5a5;">' + AUDIT.missing.length + '</b></div>' +
+               '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;border-top:1px solid rgba(255,255,255,.08);margin-top:4px;"><span>IndexedDB-dəki fayl sayı</span><b>' + AUDIT.idbKeys + '</b></div>' +
+               '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;"><span>Sahibsiz fayl (yer yeyir)</span><b>' + AUDIT.orphan + '</b></div>' +
+               '<div style="margin-top:10px;"><button class="btn" onclick="JollyImageGuard.auditNow()">🔄 Yenidən yoxla</button></div>' +
+             '</div>');
+
+      if (AUDIT.missing.length) {
+        h.push('<div class="glass" style="padding:10px 14px;margin-bottom:10px;">' +
+               '<div class="muted" style="font-size:11.5px;margin-bottom:6px;">İtən şəkillərin sahibləri:</div>');
+        for (i = 0; i < Math.min(AUDIT.missing.length, 25); i++) {
+          h.push('<div style="font-size:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);">' +
+                 '❌ ' + esc(AUDIT.missing[i].name) + ' <span style="opacity:.45;">(' + AUDIT.missing[i].kind + ')</span></div>');
+        }
+        if (AUDIT.missing.length > 25) h.push('<div style="font-size:11.5px;opacity:.5;padding-top:6px;">… və daha ' + (AUDIT.missing.length - 25) + '</div>');
+        h.push('</div>');
+      }
+    }
 
     h.push('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
              '<button class="btn btn-primary" onclick="JollyImageGuard.rescueNow()">🛟 İstifadədə olanları xilas et</button>' +
@@ -270,6 +398,16 @@
   global.JollyImageGuard = {
     render: render,
     sweep: sweep,
+    audit: audit,
+    auditNow: function () {
+      toast('Yoxlanılır…');
+      audit().then(function (a) {
+        console.log('[ImageGuard] yoxlama:', a);
+        refresh();
+      }).catch(function (e) {
+        toast('Yoxlama alınmadı: ' + (e && e.message), 'error');
+      });
+    },
     status: function () {
       var t = trash();
       return { on: on(), pending: Object.keys(t).length };
@@ -317,9 +455,12 @@
     var MR = global.ModuleRegistry || peek('ModuleRegistry');
     if (!MR || typeof MR.register !== 'function') return false;
     try {
+      /* ⚠️ perm: QƏSDƏN VERİLMİR — bax jolly-user-mode.js-dəki izah.
+         Registry perm-i olan modulu POS.can() false qaytaranda tam
+         gizlədir; icazə yoxlaması render() içindədir. */
       MR.register({
         id: 'image-guard', name: 'Şəkil Qoruyucusu', icon: '🖼',
-        route: ROUTE, group: 'JOLLY', perm: PERM_KEY, render: render
+        route: ROUTE, group: 'JOLLY', render: render
       });
       return true;
     } catch (e) { return false; }
