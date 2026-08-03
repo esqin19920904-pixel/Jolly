@@ -292,6 +292,55 @@
     return null;
   }
 
+  /* Marşruta görə kart tap — əsl iş masasında uzun basmaq üçün.
+     dashboard.js kartları belədir: onclick="JollyRouter.go('#/xxx')" */
+  function cardByRoute(route) {
+    if (!route) return null;
+    route = String(route).split('?')[0];
+    var list = catalog();
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].route).split('?')[0] === route) return list[i];
+    }
+    return null;
+  }
+
+  var GO_RE = /JollyRouter\.go\(\s*['"](#\/[^'"]+)['"]/;
+
+  function routeOfEl(el) {
+    try {
+      if (el.getAttribute) {
+        var dr = el.getAttribute('data-route');
+        if (dr && dr.charAt(0) === '#') return dr;
+        var oc = el.getAttribute('onclick');
+        if (oc) { var m = oc.match(GO_RE); if (m) return m[1]; }
+        var hf = el.getAttribute('href');
+        if (hf && hf.charAt(0) === '#') return hf;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  /* Basılan yerdən yuxarı qalxıb ya .jum-card, ya da marşrutu olan
+     hər hansı kartı tapır. Qaytarır: {el, id} və ya null */
+  function findPressTarget(target) {
+    var el = target, depth = 0;
+    while (el && el !== document.body && depth < 8) {
+      if (el.classList && el.classList.contains('jum-card')) {
+        var jid = el.getAttribute('data-jum-id');
+        if (jid) return { el: el, id: jid, edit: el.getAttribute('data-jum-edit') === '1' };
+        return null;
+      }
+      var r = routeOfEl(el);
+      if (r) {
+        var cd = cardByRoute(r);
+        if (cd) return { el: el, id: cd.id, edit: false };
+        return null;          // marşrut var, amma kataloqda deyil — toxunma
+      }
+      el = el.parentNode; depth++;
+    }
+    return null;
+  }
+
   /* ══════════════════════════════════════════════════════════
      4) CSS
      ══════════════════════════════════════════════════════════ */
@@ -455,7 +504,7 @@
   /* ══════════════════════════════════════════════════════════
      6) UZUN BASMA — telefon ana ekranı məntiqi
      ══════════════════════════════════════════════════════════ */
-  var pressTimer = null, pressEl = null, pressStart = null;
+  var pressTimer = null, pressEl = null, pressStart = null, suppressClick = false;
 
   function clearPress() {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
@@ -475,20 +524,23 @@
   function onPressStart(e) {
     var t = (e.touches && e.touches[0]) || e;
     var card = findCard(e.target);
-    if (!card) return;
+    if (card && card.getAttribute('data-jum-add') === '1') return;   // ＋ xanası
 
-    if (card.getAttribute('data-jum-add') === '1') return;      // ＋ xanası — adi klik
-    if (card.getAttribute('data-jum-edit') !== '1') return;     // yalnız redaktə rejimində
-    if (!isAdmin() && !can(PERM_KEY)) return;
+    /* Yalnız admin (və ya sessiyasız hal) idarə edə bilər */
+    if (session() && !isAdmin() && !can(PERM_KEY)) return;
 
-    pressEl = card;
+    var hit = findPressTarget(e.target);
+    if (!hit) return;
+
+    pressEl = hit.el;
     pressStart = { x: t.clientX, y: t.clientY };
-    card.classList.add('jum-press');
+    try { hit.el.classList.add('jum-press'); } catch (er) {}
     pressTimer = setTimeout(function () {
-      var id = card.getAttribute('data-jum-id');
       try { if (navigator.vibrate) navigator.vibrate(18); } catch (er) {}
       clearPress();
-      openCardMenu(id);
+      suppressClick = true;            // ardınca gələn kliki udur
+      setTimeout(function () { suppressClick = false; }, 700);
+      openCardMenu(hit.id);
     }, 480);
   }
 
@@ -501,6 +553,11 @@
   /* Klik: redaktə rejimində menyu açır (naviqasiya mənasızdır),
      işçidə isə adi keçid edir */
   function onClick(e) {
+    if (suppressClick) {               // uzun basma menyunu açdı — keçidi ləğv et
+      suppressClick = false;
+      e.preventDefault(); e.stopPropagation();
+      return;
+    }
     var card = findCard(e.target);
     if (!card) return;
 
@@ -580,8 +637,13 @@
              '<span class="mi-ic">➡</span><span>Sona çək</span></div>');
     }
 
-    h.push('<div class="jum-mi danger" onclick="JollyUserMode.hideCard(\'' + esc(id) + '\')">' +
-           '<span class="mi-ic">👁</span><span>İşçidən gizlət (kartı sil)</span></div>');
+    if (pos === -1) {
+      h.push('<div class="jum-mi" onclick="JollyUserMode.addCard(\'' + esc(id) + '\')">' +
+             '<span class="mi-ic">➕</span><span>İşçinin ekranına əlavə et</span></div>');
+    } else {
+      h.push('<div class="jum-mi danger" onclick="JollyUserMode.hideCard(\'' + esc(id) + '\')">' +
+             '<span class="mi-ic">👁</span><span>İşçidən gizlət (kartı sil)</span></div>');
+    }
     h.push('<div class="jum-mi" onclick="JollyUserMode.closeSheet()" style="opacity:.6;">' +
            '<span class="mi-ic">✕</span><span>Bağla</span></div>');
 
@@ -646,11 +708,11 @@
     h.push('<div class="storeos">');
     h.push('<div class="dash-head"><div>' +
              '<h2 style="font-family:var(--font-display);margin:0;font-size:22px;">👥 İşçi Rejimi</h2>' +
-             '<div class="muted" style="font-size:12.5px;">v2.1 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
+             '<div class="muted" style="font-size:12.5px;">v2.2 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
            '</div></div>');
 
     h.push('<div class="glass" style="padding:11px 13px;margin:10px 0 4px;font-size:12.5px;line-height:1.5;">' +
-             'Aşağıdakı ekran işçinin gördüyünün eynisidir. ' +
+             'Aşağıdakı ekran işçinin gördüyünün eynisidir. Uzun basma <b>əsl iş masasında da</b> işləyir. ' +
              '<b>Basıb saxla</b> → menyu. <b>＋</b> → yeni kart. ' +
              '<span style="opacity:.6;">' + c.cards.length + ' / ' + total + ' kart seçilib</span>' +
            '</div>');
@@ -810,6 +872,7 @@
     catalog: catalog,
     syncPerms: syncModulePerms,
     permState: permState,
+    _findPressTarget: findPressTarget,
     _renderUserDash: renderUserDash,
     _applyGreeting: applyGreeting
   };
