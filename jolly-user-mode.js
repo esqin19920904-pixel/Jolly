@@ -1,48 +1,48 @@
 /* ============================================================
    JOLLY İşçi Rejimi — jolly-user-mode.js
-   (2026-08-02)
+   v2.0  (2026-08-03)
 
-   DÖRD İŞ GÖRÜR:
+   ────────────────────────────────────────────────────────────
+   v1.0-DAN FƏRQİ (Esqinin 08-03 istəkləri):
 
-   1) QADAĞALARI İŞLƏK EDİR (ən vacibi)
-      Repoda 22 yerdə belə yoxlama var:
-          if (window.JollyAuth && !JollyAuth.can('products.create')) ...
-      Amma `window.JollyAuth` YALNIZ security.js-də təyin olunur və
-      security.js index.html-də ÜMUMİYYƏTLƏ YOXDUR. Ona görə şərtin
-      birinci hissəsi həmişə false olurdu → bütün qadağalar səssizcə
-      keçirdi. Bu fayl JollyAuth-u POS (permission-engine) üzərində
-      qurur. security.js yüklənmir — o, Storage.prototype-ı sarğılayır
-      və nüvə qatı ilə toqquşur.
-      Əlavə olaraq JollyDB.Products.add() birbaşa bağlanır ki, arxa
-      qapılar (sürətli əlavə, skan, qovluq) da qadağaya tabe olsun.
+   A) SABİT 14 KART SİLİNDİ.
+      Seçim siyahısı artıq ModuleRegistry-dən CANLI gəlir —
+      repodakı bütün qeydiyyatlı modullar + app.js-in öz əsas
+      marşrutları. İşçi səhifəsində 0 kart da ola bilər, hamısı da.
 
-   2) LUPA ↔ EDGE PANEL
-      #qs-fab z-index:9990 daşıyırdı, .edge-panel isə 60 → lupa
-      panelin üstündə qalırdı. İndi 52-yə salınır və panel açılanda
-      bütün üzən düymələr gizlədilir.
+   B) UZUN BASMA (telefon ana ekranı kimi).
+      #/user-mode ekranı artıq işçinin iş masasının CANLI surətidir.
+      Karta basıb saxlayanda (≈500 ms) menyu çıxır:
+          🔓/🔒 İcazə   ⬅ ➡ yerini dəyiş   👁 Gizlət
+      Boş "＋" xanası bütün modul siyahısını açır (axtarışlı).
 
-   3) SALAMLAMA BAŞLIĞI
-      dashboard.js:471-dəki sabit "İş masası" mətni işçinin adı ilə
-      əvəzlənir: "Zülfüqar İsmayılov, xoş gəlmisən 👋".
-      Mətn şablonunu YALNIZ admin dəyişir.
+   C) İCAZƏ PROBLEMİNİN KÖK SƏBƏBİ DÜZƏLDİ.
+      permission-engine.js-də resolveFor() belədir:
+          userOverride → globalOverride → perm.default → false
+      Modul ModuleRegistry-yə perm:'xxx' ilə qeyd olunsa da, həmin
+      açar POS.register() ilə qeydiyyatdan keçməyibsə allPerms()
+      onu tapmır → HƏMİŞƏ false → işçidə bağlı qalır VƏ İcazə
+      Mərkəzində siyahıda olmadığı üçün admin onu AÇA DA BİLMİR.
+      İndi syncModulePerms() bütün modul açarlarını avtomatik
+      'Modul girişləri' adı altında POS-a yazır — hamısı İcazə
+      Mərkəzində görünür və uzun basma menyusundan da açılır.
 
-   4) İŞÇİ ÜÇÜN AYRI İŞ MASASI
-      Rolu 'user' olan kəs tamam başqa, sadə ekran görür — Studio,
-      AI, backup, modul siyahısı yoxdur. Admin #/user-mode ekranından
-      seçir ki, işçidə hansı kartlar olsun.
+   D) EDGE PANEL kodu bu fayldan çıxarıldı — onu artıq
+      jolly-edge-off.js söndürür. Lupanın z-index-i azaldılmır.
 
-   GERİ QAYTARMA (hər şey əvvəlki halına qayıdır):
+   GERİ QAYTARMA:
       localStorage.removeItem('jolly_user_mode')
    ============================================================ */
 (function (global) {
   'use strict';
 
-  var CFG_KEY = 'jolly_user_mode';
+  var CFG_KEY  = 'jolly_user_mode';
   var PERM_KEY = 'usermode.manage';
-  var ROUTE = '#/user-mode';
+  var ROUTE    = '#/user-mode';
+  var PERM_MOD = 'jum-modperms';   // avtomatik yaradılan icazə qrupu
 
-  /* ── Leksik const-ları oxumaq üçün (JollyDB, JollyDashboard və s.
-        `const`-dur, window-a yapışmır) ─────────────────────────── */
+  /* ── Leksik const-ları oxumaq (JollyDB, ModuleRegistry və s.
+        `const`-dur, window-a yapışmır) ─────────────────────── */
   function peek(name) {
     try {
       return new Function('try { return typeof ' + name + ' !== "undefined" ? ' + name + ' : null; } catch (e) { return null; }')();
@@ -52,11 +52,17 @@
   function toast(msg, kind) {
     var T = global.Toast || peek('Toast');
     try {
-      if (T && kind === 'error' && T.error) return T.error(msg);
-      if (T && kind === 'ok' && T.success) return T.success(msg);
+      if (T && kind === 'error' && T.error)   return T.error(msg);
+      if (T && kind === 'ok'    && T.success) return T.success(msg);
       if (T && T.info) return T.info(msg);
     } catch (e) {}
     console.log('[UserMode]', msg);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -76,15 +82,15 @@
   }
 
   var DEFAULTS = {
-    on: true,                                    // işçi rejimi ümumiyyətlə işləsin?
-    greeting: '{ad}, xoş gəlmisən 👋',           // {ad} = işçinin adı
+    on: true,                                  // işçi rejimi ümumiyyətlə işləsin?
+    greeting: '{ad}, xoş gəlmisən 👋',         // {ad} = işçinin adı
     sub: 'Bu gün nə edirik?',
-    greetAdminToo: true,                         // admin də adı ilə salamlansın
-    simpleDash: true,                            // işçiyə ayrı sadə iş masası
-    hideTop: true,                               // işçidə yuxarı düymələri gizlət
-    hideFabs: true,                              // işçidə üzən dairəvi menyuları gizlət
-    lockAdminRoutes: true,                       // işçi admin ekranlarına girə bilməsin
-    cards: ['home', 'scan', 'share-inbox', 'barcode-view', 'fixmode', 'tasks']
+    greetAdminToo: true,
+    simpleDash: true,                          // işçiyə ayrı sadə iş masası
+    hideTop: true,
+    hideFabs: true,
+    lockAdminRoutes: true,
+    cards: ['home', 'scan', 'share-inbox', 'fixmode', 'tasks']
   };
 
   function cfg() {
@@ -104,9 +110,12 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     1) JollyAuth — 22 mövcud yoxlamanı canlandırır
+     1) JollyAuth — repodakı 22 mövcud yoxlamanı canlandırır
+        (window.JollyAuth yalnız security.js-də var, o isə
+         index.html-ə qoşulmayıb → bütün qadağalar keçirdi)
      ══════════════════════════════════════════════════════════ */
   function can(perm) {
+    if (!perm) return true;
     if (isAdmin()) return true;
     var POS = global.POS || peek('POS');
     if (!POS || typeof POS.can !== 'function') return true;   // mühərrik yoxdursa kilidləmirik
@@ -118,10 +127,8 @@
         var s = session();
         try {
           JE.emit('permission.denied', {
-            key: perm,
-            userId: s ? s.userId : null,
-            userName: s ? s.userName : null,
-            at: Date.now()
+            key: perm, userId: s ? s.userId : null,
+            userName: s ? s.userName : null, at: Date.now()
           });
         } catch (e) {}
       }
@@ -155,21 +162,144 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     2) Lupa ↔ edge panel + işçi görünüşü üçün CSS
+     2) İcazə körpüsü — açarları oxumaq / yazmaq / qeyd etmək
+     ══════════════════════════════════════════════════════════ */
+  function permState(key) {
+    if (!key) return null;                       // açarsız kart — həmişə açıq
+    var POS = global.POS || peek('POS');
+    if (!POS) return null;
+    try {
+      if (POS.store && typeof POS.store.getOverride === 'function') {
+        var ov = POS.store.getOverride(key);
+        if (typeof ov === 'boolean') return ov;
+      }
+      if (POS.reg && typeof POS.reg.allPerms === 'function') {
+        var all = POS.reg.allPerms();
+        for (var i = 0; i < all.length; i++) if (all[i].key === key) return !!all[i]['default'];
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function setPerm(key, val) {
+    if (!key) return false;
+    var POS = global.POS || peek('POS');
+    if (!POS || !POS.store || typeof POS.store.setOverride !== 'function') return false;
+    try {
+      POS.store.setOverride(key, !!val);
+      try { if (typeof POS.syncUI === 'function') POS.syncUI(); } catch (e) {}
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ★ KÖK SƏBƏBİN HƏLLİ ★
+     Modulun perm açarı POS-da qeydiyyatdan keçməyibsə,
+     resolveFor() onu tapmır və HƏMİŞƏ false qaytarır — üstəlik
+     İcazə Mərkəzində də görünmür. Hamısını avtomatik qeyd edirik. */
+  function syncModulePerms() {
+    var POS = global.POS || peek('POS');
+    if (!POS || typeof POS.register !== 'function' || !POS.reg) return false;
+
+    var known = {};
+    try {
+      POS.reg.allPerms().forEach(function (p) {
+        if (p.moduleId !== PERM_MOD) known[p.key] = 1;   // öz qrupumuzu saymırıq
+      });
+    } catch (e) { return false; }
+
+    var perms = [], seen = {};
+    function add(key, label) {
+      if (!key || known[key] || seen[key]) return;
+      seen[key] = 1;
+      perms.push({ key: key, label: label || key, tag: 'view', 'default': false });
+    }
+
+    CORE.forEach(function (c) { add(c.perm, (c.icon || '') + ' ' + c.label); });
+
+    var MR = global.ModuleRegistry || peek('ModuleRegistry');
+    if (MR && typeof MR._all === 'function') {
+      var mods = MR._all();
+      for (var id in mods) {
+        var m = mods[id];
+        if (m && m.perm) add(m.perm, (m.icon || '📦') + ' ' + (m.name || id));
+      }
+    }
+
+    if (!perms.length) return true;
+    try {
+      POS.register({ id: PERM_MOD, name: 'Modul girişləri', icon: '🧩', permissions: perms });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     3) KART KATALOQU — sabit siyahı YOX, canlı siyahı
+     ══════════════════════════════════════════════════════════ */
+  /* app.js-in öz marşrutları (ModuleRegistry-də deyillər) */
+  var CORE = [
+    { id: 'home',      route: '#/home',                icon: '🔍', label: 'Axtarış',      perm: 'products.view' },
+    { id: 'scan',      route: '#/scan',                icon: '📡', label: 'Barkod skan',  perm: 'barcode.scan' },
+    { id: 'new',       route: '#/product/new',         icon: '➕', label: 'Yeni məhsul',  perm: 'products.create' },
+    { id: 'favorites', route: '#/dashboard/favorites', icon: '⭐', label: 'Sevimlilər',   perm: 'favorites.use' },
+    { id: 'drafts',    route: '#/drafts',              icon: '📝', label: 'Qaralamalar',  perm: null },
+    { id: 'dashboard', route: '#/dashboard',           icon: '🏠', label: 'İş masası',    perm: null }
+  ];
+
+  /* İşçiyə verilməyəcək ekranlar — admin alətləridir */
+  var NEVER = {
+    'user-mode': 1, 'module-cleanup': 1, 'testdata': 1, 'selftest': 1,
+    'perm-preview': 1, 'health-v2': 1, 'cloud-doctor': 1, 'diag-report': 1,
+    'jolly-diag': 1, 'code-studio': 1, 'jolly-settings': 1, 'updates': 1
+  };
+
+  /* Bütün mümkün kartlar: CORE + qeydiyyatdan keçmiş modullar */
+  function catalog() {
+    var out = [], byRoute = {}, byId = {}, i;
+
+    for (i = 0; i < CORE.length; i++) {
+      var c = CORE[i];
+      out.push({ id: c.id, route: c.route, icon: c.icon, label: c.label, perm: c.perm, group: 'Əsas' });
+      byRoute[c.route] = 1; byId[c.id] = 1;
+    }
+
+    var MR = global.ModuleRegistry || peek('ModuleRegistry');
+    var mods = [];
+    try {
+      if (MR && typeof MR.list === 'function') mods = MR.list() || [];
+      else if (MR && typeof MR._all === 'function') {
+        var all = MR._all();
+        for (var k in all) mods.push(all[k]);
+      }
+    } catch (e) { mods = []; }
+
+    for (i = 0; i < mods.length; i++) {
+      var m = mods[i];
+      if (!m || !m.id || NEVER[m.id]) continue;
+      if (byId[m.id] || byRoute[m.route]) continue;
+      byId[m.id] = 1; byRoute[m.route] = 1;
+      out.push({
+        id: m.id, route: m.route || ('#/' + m.id),
+        icon: m.icon || '📦', label: m.name || m.id,
+        perm: m.perm || null, group: m.group || 'Digər'
+      });
+    }
+    return out;
+  }
+
+  function cardById(id) {
+    var list = catalog();
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     4) CSS
      ══════════════════════════════════════════════════════════ */
   function installCss() {
     if (document.getElementById('jum-css')) return;
     var st = document.createElement('style');
     st.id = 'jum-css';
     st.textContent = [
-      /* lupa artıq panelin üstündə deyil (.edge-panel 60, .edge-scrim 55) */
-      '#qs-fab{z-index:52!important;}',
-      /* edge panel açılanda bütün üzən düymələr yox olur */
-      'body.jum-edge-open #qs-fab,',
-      'body.jum-edge-open .jfab-wrap,',
-      'body.jum-edge-open .quick-fab,',
-      'body.jum-edge-open #radialFabRoot,',
-      'body.jum-edge-open .fab-scrim2{display:none!important;}',
       /* işçi rejimi — sadə görünüş */
       'body.jum-user #cmdBtn,',
       'body.jum-user #backupPill,',
@@ -178,98 +308,93 @@
       'body.jum-user-nofab #radialFabRoot,',
       'body.jum-user-nofab .jfab-wrap,',
       'body.jum-user-nofab .quick-fab{display:none!important;}',
-      /* işçi iş masası */
+      /* iş masası */
       '.jum-hi{padding:18px 0 6px;}',
       '.jum-hi h2{font-family:var(--font-display);margin:0;font-size:23px;line-height:1.25;}',
       '.jum-hi .jum-sub{font-size:12.5px;opacity:.6;margin-top:4px;}',
       '.jum-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px;}',
-      '.jum-card{border-radius:18px;padding:18px 14px;text-align:center;cursor:pointer;',
+      '.jum-card{position:relative;border-radius:18px;padding:18px 14px;text-align:center;cursor:pointer;',
       'background:rgba(255,255,255,0.045);border:1px solid rgba(255,255,255,0.09);',
+      '-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;',
       'transition:transform .12s ease,background .2s ease;}',
       '.jum-card:active{transform:scale(.96);background:rgba(255,255,255,0.09);}',
       '.jum-card .jum-ic{font-size:30px;line-height:1;}',
       '.jum-card .jum-lb{margin-top:9px;font-size:13.5px;font-weight:600;}',
-      '.jum-empty{padding:26px 16px;text-align:center;opacity:.6;font-size:13px;}'
+      '.jum-empty{padding:26px 16px;text-align:center;opacity:.6;font-size:13px;}',
+      /* redaktə rejimi */
+      '.jum-card.jum-edit{border-style:dashed;border-color:rgba(255,255,255,0.22);}',
+      '.jum-card.jum-press{transform:scale(.93);background:rgba(245,196,81,.14);}',
+      '.jum-lock{position:absolute;top:7px;right:9px;font-size:12px;opacity:.85;}',
+      '.jum-add{display:flex;align-items:center;justify-content:center;font-size:32px;',
+      'opacity:.55;border-style:dashed!important;min-height:96px;}',
+      /* uzun basma menyusu */
+      '.jum-sheet{position:fixed;inset:0;z-index:10050;background:rgba(6,7,13,.72);',
+      'display:flex;align-items:flex-end;}',
+      '.jum-sheet-in{width:100%;background:#12141c;border-radius:20px 20px 0 0;',
+      'padding:14px 14px calc(18px + env(safe-area-inset-bottom));',
+      'border-top:1px solid rgba(255,255,255,.12);max-height:82vh;overflow:auto;}',
+      '.jum-sh-h{display:flex;align-items:center;gap:11px;padding:4px 4px 12px;',
+      'border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:8px;}',
+      '.jum-sh-h .i{font-size:26px;}',
+      '.jum-sh-h .t{flex:1;min-width:0;}',
+      '.jum-sh-h .t b{font-size:15px;display:block;}',
+      '.jum-sh-h .t span{font-size:11px;opacity:.5;font-family:ui-monospace,monospace;}',
+      '.jum-mi{display:flex;align-items:center;gap:12px;padding:13px 10px;border-radius:13px;',
+      'cursor:pointer;font-size:14px;}',
+      '.jum-mi:active{background:rgba(255,255,255,.07);}',
+      '.jum-mi .mi-ic{font-size:18px;width:24px;text-align:center;flex:none;}',
+      '.jum-mi.danger{color:#fca5a5;}',
+      '.jum-pick-s{width:100%;padding:12px 14px;border-radius:13px;font-size:16px;color:#e8e8f0;',
+      'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);outline:none;margin-bottom:10px;}',
+      '.jum-pi{display:flex;align-items:center;gap:11px;padding:11px 10px;border-radius:12px;',
+      'cursor:pointer;font-size:13.5px;border:1px solid rgba(255,255,255,.07);margin-bottom:6px;}',
+      '.jum-pi:active{background:rgba(255,255,255,.07);}',
+      '.jum-pi .pi-g{font-size:10.5px;opacity:.42;}'
     ].join('');
     (document.head || document.documentElement).appendChild(st);
   }
 
-  function watchEdgePanel() {
-    var panel = document.getElementById('edgePanel');
-    if (!panel || panel.__jum) return;
-    panel.__jum = true;
-    var sync = function () {
-      try {
-        document.body.classList.toggle('jum-edge-open', panel.classList.contains('open'));
-      } catch (e) {}
-    };
-    try {
-      new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
-    } catch (e) {}
-    sync();
-  }
-
   /* ══════════════════════════════════════════════════════════
-     3+4) İş masası — salamlama və işçi ekranı
+     5) İş masası — salamlama və işçi ekranı
      ══════════════════════════════════════════════════════════ */
-  var CARDS = [
-    { id: 'home',           route: '#/home',                icon: '🔍', label: 'Axtarış',         perm: 'products.view' },
-    { id: 'scan',           route: '#/scan',                icon: '📡', label: 'Barkod skan',     perm: 'barcode.scan' },
-    { id: 'share-inbox',    route: '#/share-inbox',         icon: '📥', label: 'Şəkillə axtar',   perm: 'share.inbox.view' },
-    { id: 'barcode-view',   route: '#/barcode-view',        icon: '🧾', label: 'Kassa Barkodu',   perm: 'barcode.screen.view' },
-    { id: 'fixmode',        route: '#/fixmode',             icon: '⚡', label: 'Bu gün 10 mal',   perm: 'fixmode.use' },
-    { id: 'tasks',          route: '#/tasks',               icon: '✅', label: 'Tapşırıqlarım',   perm: 'tasks.view' },
-    { id: 'new',            route: '#/product/new',         icon: '➕', label: 'Yeni məhsul',     perm: 'products.create' },
-    { id: 'photo-session',  route: '#/photo-session',       icon: '📸', label: 'Foto seansı',     perm: 'photo.session' },
-    { id: 'barcode-folder', route: '#/barcode-folder',      icon: '📁', label: 'Barkod Qovluğu',  perm: 'barcode.folder.view' },
-    { id: 'store-map',      route: '#/store-map',           icon: '🗺️', label: 'Mağaza xəritəsi', perm: 'storemap.view' },
-    { id: 'receiving',      route: '#/receiving',           icon: '📦', label: 'Mal qəbulu',      perm: 'receiving.view' },
-    { id: 'scan-marathon',  route: '#/scan-marathon',       icon: '🎯', label: 'Skan maratonu',   perm: 'scanmarathon.use' },
-    { id: 'favorites',      route: '#/dashboard/favorites', icon: '⭐', label: 'Sevimlilər',      perm: 'favorites.use' },
-    { id: 'drafts',         route: '#/drafts',              icon: '📝', label: 'Qaralamalar',     perm: null }
-  ];
-  function cardById(id) {
-    for (var i = 0; i < CARDS.length; i++) if (CARDS[i].id === id) return CARDS[i];
-    return null;
-  }
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
-
   function greetingText() {
     var c = cfg();
     return String(c.greeting || DEFAULTS.greeting).split('{ad}').join(userName());
   }
 
-  /* İşçinin öz iş masası — orijinal dashboard heç çağırılmır */
-  function renderUserDash(preview) {
+  /* edit=true → admin redaktə edir (uzun basma açıqdır, icazə süzgəci yoxdur) */
+  function renderUserDash(edit) {
     var c = cfg();
     var ids = c.cards || [];
-    var body = '';
-    var shown = 0;
+    var body = '', shown = 0;
+
     for (var i = 0; i < ids.length; i++) {
       var cd = cardById(ids[i]);
       if (!cd) continue;
-      if (!preview && cd.perm && !can(cd.perm)) continue;   // icazəsi yoxdursa kart da yoxdur
+      if (!edit && cd.perm && !can(cd.perm)) continue;   // icazəsi yoxdursa kart da yoxdur
       shown++;
-      body += '<div class="jum-card" onclick="JollyUserMode.go(\'' + cd.route + '\')">' +
+      var st = edit && cd.perm ? permState(cd.perm) : null;
+      var badge = (edit && cd.perm) ? '<div class="jum-lock">' + (st ? '🔓' : '🔒') + '</div>' : '';
+      body += '<div class="jum-card' + (edit ? ' jum-edit' : '') + '" data-jum-id="' + esc(cd.id) + '"' +
+                (edit ? ' data-jum-edit="1"' : '') + '>' +
+                badge +
                 '<div class="jum-ic">' + cd.icon + '</div>' +
                 '<div class="jum-lb">' + esc(cd.label) + '</div>' +
               '</div>';
     }
-    if (!shown) {
-      body = '<div class="jum-empty">Hələ heç nə açılmayıb.<br>Admin-dən icazə istə.</div>';
-      return '<div class="storeos"><div class="jum-hi"><h2>' + esc(greetingText()) + '</h2>' +
-             '<div class="jum-sub">' + esc(c.sub || '') + '</div></div>' + body + '</div>';
+
+    if (edit) {
+      body += '<div class="jum-card jum-edit jum-add" data-jum-add="1">＋</div>';
     }
-    return '<div class="storeos">' +
-             '<div class="jum-hi"><h2>' + esc(greetingText()) + '</h2>' +
-             '<div class="jum-sub">' + esc(c.sub || '') + '</div></div>' +
-             '<div class="jum-grid">' + body + '</div>' +
-           '</div>';
+
+    var head = '<div class="jum-hi"><h2>' + esc(greetingText()) + '</h2>' +
+               '<div class="jum-sub">' + esc(c.sub || '') + '</div></div>';
+
+    if (!shown && !edit) {
+      return '<div class="storeos">' + head +
+             '<div class="jum-empty">Hələ heç nə açılmayıb.<br>Admin-dən icazə istə.</div></div>';
+    }
+    return '<div class="storeos">' + head + '<div class="jum-grid">' + body + '</div></div>';
   }
 
   /* Admin-in öz iş masası dəyişmir — yalnız başlıq mətni əvəzlənir */
@@ -328,7 +453,170 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     Admin ekranı — #/user-mode
+     6) UZUN BASMA — telefon ana ekranı məntiqi
+     ══════════════════════════════════════════════════════════ */
+  var pressTimer = null, pressEl = null, pressStart = null;
+
+  function clearPress() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    if (pressEl) { try { pressEl.classList.remove('jum-press'); } catch (e) {} pressEl = null; }
+    pressStart = null;
+  }
+
+  function findCard(target) {
+    var el = target;
+    while (el && el !== document.body) {
+      if (el.classList && el.classList.contains('jum-card')) return el;
+      el = el.parentNode;
+    }
+    return null;
+  }
+
+  function onPressStart(e) {
+    var t = (e.touches && e.touches[0]) || e;
+    var card = findCard(e.target);
+    if (!card) return;
+
+    if (card.getAttribute('data-jum-add') === '1') return;      // ＋ xanası — adi klik
+    if (card.getAttribute('data-jum-edit') !== '1') return;     // yalnız redaktə rejimində
+    if (!isAdmin() && !can(PERM_KEY)) return;
+
+    pressEl = card;
+    pressStart = { x: t.clientX, y: t.clientY };
+    card.classList.add('jum-press');
+    pressTimer = setTimeout(function () {
+      var id = card.getAttribute('data-jum-id');
+      try { if (navigator.vibrate) navigator.vibrate(18); } catch (er) {}
+      clearPress();
+      openCardMenu(id);
+    }, 480);
+  }
+
+  function onPressMove(e) {
+    if (!pressStart) return;
+    var t = (e.touches && e.touches[0]) || e;
+    if (Math.abs(t.clientX - pressStart.x) > 10 || Math.abs(t.clientY - pressStart.y) > 10) clearPress();
+  }
+
+  /* Klik: redaktə rejimində menyu açır (naviqasiya mənasızdır),
+     işçidə isə adi keçid edir */
+  function onClick(e) {
+    var card = findCard(e.target);
+    if (!card) return;
+
+    if (card.getAttribute('data-jum-add') === '1') {
+      e.preventDefault(); e.stopPropagation();
+      openPicker();
+      return;
+    }
+    var id = card.getAttribute('data-jum-id');
+    if (!id) return;
+
+    if (card.getAttribute('data-jum-edit') === '1') {
+      e.preventDefault(); e.stopPropagation();
+      openCardMenu(id);
+      return;
+    }
+    var cd = cardById(id);
+    if (cd) API.go(cd.route);
+  }
+
+  function installGestures() {
+    if (document.__jumGest) return;
+    document.__jumGest = true;
+    document.addEventListener('touchstart', onPressStart, { passive: true });
+    document.addEventListener('touchmove',  onPressMove,  { passive: true });
+    document.addEventListener('touchend',   clearPress,   { passive: true });
+    document.addEventListener('touchcancel',clearPress,   { passive: true });
+    document.addEventListener('mousedown',  onPressStart);
+    document.addEventListener('mousemove',  onPressMove);
+    document.addEventListener('mouseup',    clearPress);
+    document.addEventListener('click',      onClick, true);
+  }
+
+  /* ── alt vərəq (sheet) ─────────────────────────────────── */
+  function closeSheet() {
+    var s = document.getElementById('jumSheet');
+    if (s) s.parentNode.removeChild(s);
+  }
+
+  function sheet(innerHtml) {
+    closeSheet();
+    var d = document.createElement('div');
+    d.id = 'jumSheet';
+    d.className = 'jum-sheet';
+    d.innerHTML = '<div class="jum-sheet-in">' + innerHtml + '</div>';
+    d.addEventListener('click', function (ev) { if (ev.target === d) closeSheet(); });
+    document.body.appendChild(d);
+    return d;
+  }
+
+  function openCardMenu(id) {
+    var cd = cardById(id);
+    if (!cd) { toast('Bu kart artıq mövcud deyil', 'error'); return; }
+    var c = cfg();
+    var pos = c.cards.indexOf(id);
+    var st = cd.perm ? permState(cd.perm) : null;
+
+    var h = [];
+    h.push('<div class="jum-sh-h"><span class="i">' + cd.icon + '</span>' +
+           '<span class="t"><b>' + esc(cd.label) + '</b><span>' + esc(cd.route) + '</span></span></div>');
+
+    if (cd.perm) {
+      h.push('<div class="jum-mi" onclick="JollyUserMode.flipPerm(\'' + esc(id) + '\')">' +
+               '<span class="mi-ic">' + (st ? '🔓' : '🔒') + '</span>' +
+               '<span>' + (st ? 'İcazə AÇIQDIR — bağla' : 'İcazə BAĞLIDIR — aç') + '</span></div>');
+    } else {
+      h.push('<div class="jum-mi" style="opacity:.45;"><span class="mi-ic">🔓</span>' +
+             '<span>İcazə açarı yoxdur — həmişə açıq</span></div>');
+    }
+
+    if (pos > 0) {
+      h.push('<div class="jum-mi" onclick="JollyUserMode.move(\'' + esc(id) + '\',-1)">' +
+             '<span class="mi-ic">⬅</span><span>Əvvələ çək</span></div>');
+    }
+    if (pos !== -1 && pos < c.cards.length - 1) {
+      h.push('<div class="jum-mi" onclick="JollyUserMode.move(\'' + esc(id) + '\',1)">' +
+             '<span class="mi-ic">➡</span><span>Sona çək</span></div>');
+    }
+
+    h.push('<div class="jum-mi danger" onclick="JollyUserMode.hideCard(\'' + esc(id) + '\')">' +
+           '<span class="mi-ic">👁</span><span>İşçidən gizlət (kartı sil)</span></div>');
+    h.push('<div class="jum-mi" onclick="JollyUserMode.closeSheet()" style="opacity:.6;">' +
+           '<span class="mi-ic">✕</span><span>Bağla</span></div>');
+
+    sheet(h.join(''));
+  }
+
+  function openPicker() {
+    var c = cfg();
+    var list = catalog().filter(function (x) { return c.cards.indexOf(x.id) === -1; });
+    var h = [];
+    h.push('<div class="jum-sh-h"><span class="i">＋</span>' +
+           '<span class="t"><b>Kart əlavə et</b><span>' + list.length + ' modul mövcuddur</span></span></div>');
+    h.push('<input class="jum-pick-s" id="jumPickS" placeholder="Axtar…" oninput="JollyUserMode.filterPick(this.value)">');
+    h.push('<div id="jumPickL">');
+    if (!list.length) {
+      h.push('<div class="jum-empty">Hamısı artıq əlavə olunub 👍</div>');
+    } else {
+      for (var i = 0; i < list.length; i++) {
+        var x = list[i];
+        h.push('<div class="jum-pi" data-nm="' + esc((x.label + ' ' + x.group).toLowerCase()) + '" ' +
+                 'onclick="JollyUserMode.addCard(\'' + esc(x.id) + '\')">' +
+                 '<span style="font-size:20px;">' + x.icon + '</span>' +
+                 '<span style="flex:1;">' + esc(x.label) +
+                   '<div class="pi-g">' + esc(x.group) + (x.perm ? ' · ' + esc(x.perm) : '') + '</div>' +
+                 '</span>' +
+                 '<span style="font-size:15px;opacity:.6;">＋</span>' +
+               '</div>');
+      }
+    }
+    h.push('</div>');
+    sheet(h.join(''));
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     7) Admin ekranı — #/user-mode
      ══════════════════════════════════════════════════════════ */
   function sw(key, on, label, hint) {
     return '<div class="glass" style="padding:12px 14px;margin-bottom:9px;display:flex;align-items:center;gap:12px;">' +
@@ -347,16 +635,34 @@
     if (!isAdmin() && !can(PERM_KEY)) {
       return '<div class="empty-state"><div class="big-icon">🔒</div><h3>İcazə yoxdur</h3></div>';
     }
+    syncModulePerms();
+
     var c = cfg();
+    var total = catalog().length;
     var h = [];
     h.push('<div class="storeos">');
     h.push('<div class="dash-head"><div>' +
              '<h2 style="font-family:var(--font-display);margin:0;font-size:22px;">👥 İşçi Rejimi</h2>' +
-             '<div class="muted" style="font-size:12.5px;">İşçi nə görsün — sən seçirsən</div>' +
+             '<div class="muted" style="font-size:12.5px;">Karta basıb saxla — sil, gizlət, icazə ver</div>' +
            '</div></div>');
 
+    h.push('<div class="glass" style="padding:11px 13px;margin:10px 0 4px;font-size:12.5px;line-height:1.5;">' +
+             'Aşağıdakı ekran işçinin gördüyünün eynisidir. ' +
+             '<b>Basıb saxla</b> → menyu. <b>＋</b> → yeni kart. ' +
+             '<span style="opacity:.6;">' + c.cards.length + ' / ' + total + ' kart seçilib</span>' +
+           '</div>');
+
+    /* CANLI redaktə olunan iş masası */
+    h.push(renderUserDash(true));
+
+    h.push('<div style="margin:16px 0 4px;display:flex;gap:8px;flex-wrap:wrap;">' +
+             '<button class="btn" onclick="JollyUserMode.clearAll()">🗑 Hamısını sil</button>' +
+             '<button class="btn" onclick="JollyUserMode.addAll()">✚ Hamısını əlavə et</button>' +
+             '<button class="btn" onclick="JollyUserMode.reset()">↩ Standart</button>' +
+           '</div>');
+
     /* Salamlama */
-    h.push('<div class="section-title" style="margin-top:14px;">Salamlama</div>');
+    h.push('<div class="section-title" style="margin-top:18px;">Salamlama</div>');
     h.push('<div class="glass" style="padding:14px;margin-bottom:9px;">' +
              '<div class="muted" style="font-size:11.5px;margin-bottom:6px;">{ad} yerinə işçinin adı yazılır</div>' +
              '<input id="jumGreet" class="input" style="width:100%;margin-bottom:8px;" value="' + esc(c.greeting) + '">' +
@@ -366,21 +672,6 @@
            '</div>');
     h.push(sw('greetAdminToo', c.greetAdminToo, 'Admin də adı ilə salamlansın', 'Söndürsən, admin ekranında yenə "İş masası" yazılır'));
 
-    /* Kartlar */
-    h.push('<div class="section-title" style="margin-top:16px;">İşçinin iş masasındakı kartlar</div>');
-    h.push('<div class="muted" style="font-size:11.5px;margin-bottom:8px;">Seçilməyən hər şey işçidə bağlıdır. İcazəsi olmayan kart onsuz da görünmür.</div>');
-    for (var i = 0; i < CARDS.length; i++) {
-      var cd = CARDS[i];
-      var on = c.cards.indexOf(cd.id) !== -1;
-      h.push('<div class="glass" onclick="JollyUserMode.toggleCard(\'' + cd.id + '\')" ' +
-               'style="padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:11px;cursor:pointer;' +
-               'border:1px solid ' + (on ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.07)') + ';">' +
-               '<span style="font-size:20px;">' + cd.icon + '</span>' +
-               '<span style="flex:1;font-size:13.5px;">' + esc(cd.label) + '</span>' +
-               '<span style="font-size:16px;">' + (on ? '✅' : '⬜') + '</span>' +
-             '</div>');
-    }
-
     /* Açarlar */
     h.push('<div class="section-title" style="margin-top:16px;">Sadələşdirmə</div>');
     h.push(sw('simpleDash', c.simpleDash, 'İşçiyə ayrı sadə iş masası', 'Söndürsən, işçi də adi iş masasını görür'));
@@ -389,10 +680,7 @@
     h.push(sw('lockAdminRoutes', c.lockAdminRoutes, 'Admin ekranlarını bağla', 'Linki əl ilə yazsa belə girə bilməz'));
     h.push(sw('on', c.on, 'İşçi rejimi ümumiyyətlə işləsin', 'Söndürsən, hər şey əvvəlki halına qayıdır'));
 
-    h.push('<div style="margin:16px 0 30px;display:flex;gap:8px;flex-wrap:wrap;">' +
-             '<button class="btn" onclick="JollyUserMode.preview()">👁️ İşçinin gözü ilə bax</button>' +
-             '<button class="btn" onclick="JollyUserMode.reset()">↩ Standart</button>' +
-           '</div>');
+    h.push('<div style="height:30px;"></div>');
     h.push('</div>');
     return h.join('');
   }
@@ -401,25 +689,89 @@
     var A = global.JollyApp || peek('JollyApp');
     try { if (A && A.render) A.render(); } catch (e) {}
   }
+  function reRenderAdmin() {
+    closeSheet();
+    if (String(global.location.hash || '') === ROUTE) {
+      var el = document.getElementById('main');
+      if (el) { el.innerHTML = renderAdmin(); return; }
+    }
+    refresh();
+  }
 
+  /* ══════════════════════════════════════════════════════════
+     8) Açıq API
+     ══════════════════════════════════════════════════════════ */
   var API = {
     go: function (route) {
       var R = global.JollyRouter || peek('JollyRouter');
       if (R && R.go) R.go(route); else global.location.hash = route;
     },
+    closeSheet: closeSheet,
+
     toggle: function (key) {
       var c = cfg(), p = {};
       p[key] = !c[key];
       saveCfg(p);
       applyBodyFlags();
-      refresh();
+      reRenderAdmin();
     },
-    toggleCard: function (id) {
+
+    /* uzun basma menyusu */
+    flipPerm: function (id) {
+      var cd = cardById(id);
+      if (!cd || !cd.perm) return;
+      var now = permState(cd.perm);
+      if (setPerm(cd.perm, !now)) {
+        toast(!now ? '🔓 ' + cd.label + ' — icazə verildi' : '🔒 ' + cd.label + ' — icazə bağlandı', 'ok');
+      } else {
+        toast('İcazə mühərriki tapılmadı', 'error');
+      }
+      reRenderAdmin();
+    },
+    hideCard: function (id) {
       var c = cfg(), list = c.cards.slice(), i = list.indexOf(id);
-      if (i === -1) list.push(id); else list.splice(i, 1);
+      if (i !== -1) list.splice(i, 1);
       saveCfg({ cards: list });
-      refresh();
+      reRenderAdmin();
     },
+    addCard: function (id) {
+      var c = cfg(), list = c.cards.slice();
+      if (list.indexOf(id) === -1) list.push(id);
+      saveCfg({ cards: list });
+      reRenderAdmin();
+    },
+    move: function (id, dir) {
+      var c = cfg(), list = c.cards.slice(), i = list.indexOf(id);
+      if (i === -1) return;
+      var j = i + dir;
+      if (j < 0 || j >= list.length) return;
+      var tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+      saveCfg({ cards: list });
+      reRenderAdmin();
+    },
+    filterPick: function (q) {
+      q = String(q || '').toLowerCase().trim();
+      var box = document.getElementById('jumPickL');
+      if (!box) return;
+      var rows = box.getElementsByClassName('jum-pi');
+      for (var i = 0; i < rows.length; i++) {
+        var nm = rows[i].getAttribute('data-nm') || '';
+        rows[i].style.display = (!q || nm.indexOf(q) !== -1) ? '' : 'none';
+      }
+    },
+
+    clearAll: function () {
+      saveCfg({ cards: [] });
+      toast('İşçi ekranı boşaldıldı — indi bir-bir əlavə et', 'ok');
+      reRenderAdmin();
+    },
+    addAll: function () {
+      var ids = catalog().map(function (x) { return x.id; });
+      saveCfg({ cards: ids });
+      toast(ids.length + ' kart əlavə olundu', 'ok');
+      reRenderAdmin();
+    },
+
     saveGreeting: function () {
       var g = document.getElementById('jumGreet');
       var s = document.getElementById('jumSub');
@@ -428,39 +780,40 @@
         sub: s ? s.value : DEFAULTS.sub
       });
       toast('Salamlama yadda saxlanıldı', 'ok');
-      refresh();
+      reRenderAdmin();
     },
-    preview: function () {
-      var el = document.getElementById('main');
-      if (!el) return;
-      el.innerHTML = '<div style="padding:10px 0;">' +
-        '<div class="glass" style="padding:10px 13px;margin-bottom:12px;font-size:12.5px;">' +
-        '👁️ Önbaxış — işçi bunu görür. <span style="opacity:.6;">Geri: aşağıdakı düymə.</span></div>' +
-        renderUserDash(true) +
-        '<div style="margin-top:14px;"><button class="btn" onclick="JollyUserMode.go(\'' + ROUTE + '\');JollyUserMode._r();">← Geri</button></div>' +
-        '</div>';
-    },
-    _r: refresh,
     reset: function () {
       try { localStorage.removeItem(CFG_KEY); } catch (e) {}
       applyBodyFlags();
       toast('Standart hala qaytarıldı', 'ok');
-      refresh();
+      reRenderAdmin();
     },
+
+    /* köhnə adlar — uyğunluq üçün saxlanılır */
+    toggleCard: function (id) {
+      var c = cfg();
+      if (c.cards.indexOf(id) === -1) API.addCard(id); else API.hideCard(id);
+    },
+    preview: function () { API.go(ROUTE); },
+    _r: refresh,
+
     render: renderAdmin,
     can: can,
     cfg: cfg,
     isUser: isUser,
     isAdmin: isAdmin,
     greeting: greetingText,
-    cards: function () { return CARDS.slice(); },
+    cards: catalog,
+    catalog: catalog,
+    syncPerms: syncModulePerms,
+    permState: permState,
     _renderUserDash: renderUserDash,
     _applyGreeting: applyGreeting
   };
   global.JollyUserMode = API;
 
   /* ══════════════════════════════════════════════════════════
-     Qeydiyyat
+     9) Qeydiyyat
      ══════════════════════════════════════════════════════════ */
   function registerPerm() {
     var POS = global.POS || peek('POS');
@@ -468,7 +821,7 @@
     try {
       POS.register({
         id: 'usermode', name: 'İşçi Rejimi', icon: '👥',
-        permissions: [{ key: PERM_KEY, label: 'İşçi rejimini idarə et', tag: 'system', default: false }]
+        permissions: [{ key: PERM_KEY, label: 'İşçi rejimini idarə et', tag: 'system', 'default': false }]
       });
       return true;
     } catch (e) { return false; }
@@ -488,13 +841,13 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     Açılış
+     10) Açılış
      ══════════════════════════════════════════════════════════ */
   var tries = 0;
   function boot() {
     installAuth();
     installCss();
-    watchEdgePanel();
+    installGestures();
     applyBodyFlags();
 
     var ok1 = installAddGuard();
@@ -502,18 +855,18 @@
     var ok3 = registerPerm();
     var ok4 = registerModule();
 
-    var coreOk = ok1 && ok3 && ok4; // add guard + perm + module
+    var coreOk = ok1 && ok3 && ok4;
     ++tries;
     if (coreOk && ok2) {
-      console.log('[UserMode] hazırdır');
+      syncModulePerms();
+      console.log('[UserMode v2] hazırdır — kataloq:', catalog().length, 'kart');
       guardRoute();
+      schedulePermSync();
       return;
     }
     if (tries > 40) {
-      // Dashboard sarğısı olmasa da digərləri işləyir — bunu sonra yenidən cəhd edirik
       if (!ok2) {
         console.warn('[UserMode] dashboard sarğısı uğursuz — hər render-də cəhd ediləcək');
-        // hashchange-də yenidən cəhd
         global.addEventListener('jolly:rendered', function tryDash() {
           if (installDashboardWrap()) {
             console.log('[UserMode] dashboard sarğısı qoşuldu');
@@ -521,13 +874,24 @@
           }
         });
       }
-      if (coreOk) { guardRoute(); return; }
-      console.warn('[UserMode] tam qoşula bilmədi:', { add: ok1, dashboard: ok2, perm: ok3, module: ok4 });
+      syncModulePerms();
+      schedulePermSync();
+      if (!coreOk) console.warn('[UserMode] tam qoşula bilmədi:', { add: ok1, dashboard: ok2, perm: ok3, module: ok4 });
       guardRoute();
       return;
     }
     setTimeout(boot, 250);
   }
+
+  /* Modullar tənbəl yüklənir (jolly-lazy-loader.js) — sonradan gələn
+     modulların icazə açarları da qeydiyyata düşməlidir */
+  var syncT = null;
+  function schedulePermSync() {
+    if (syncT) clearTimeout(syncT);
+    syncT = setTimeout(function () { syncModulePerms(); }, 1200);
+  }
+  setTimeout(syncModulePerms, 4000);
+  setTimeout(syncModulePerms, 12000);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 60); });
@@ -544,9 +908,10 @@
   }, 2000);
 
   global.addEventListener('hashchange', function () {
+    closeSheet();
     applyBodyFlags();
     guardRoute();
-    setTimeout(watchEdgePanel, 100);
+    schedulePermSync();
   });
 
 })(typeof window !== 'undefined' ? window : this);
