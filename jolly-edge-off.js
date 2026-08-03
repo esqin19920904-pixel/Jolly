@@ -3,9 +3,19 @@
    (2026-08-03)
 
    NƏ EDİR:
-   Kənar panel (edge panel) həm admin, həm işçi üçün TAM söndürülür.
-   Səbəb: dartma dili (#edgeTab, qızılı "›") üzən lupanın (#qs-fab,
-   sol alt) düz üstünə düşürdü və panel özü də lazım deyil.
+   İki şey söndürülür — həm admin, həm işçi üçün:
+
+   1) KƏNAR PANEL (edge panel) — lazım deyil.
+
+   2) ⌃ ALT DOK DÜYMƏSİ (#jbdTab, bottom-dock.js:52)
+      ★ ƏSL TOQQUŞMA BUDUR (08-03-də cihazda görüldü):
+          #jbdTab   left:14px  bottom:90px   (bottom-dock.js)
+          #qs-fab   left:16px  bottom:88px   (üzən lupa)
+      İkisi tam eyni yerdə oturur — ekranda qızılı ⌃ görünür,
+      lupa isə altında itir. Esqin: "ancaq lupa qalsın".
+
+   Əlavə: lupa səhvən söndürülübsə (üstündə 900 ms basılı saxlamaq
+   `jolly_fab_off` açarını yazır) avtomatik geri qaytarılır.
 
    NİYƏ AYRICA FAYL:
    index.html-dən <div id="edgePanel"> və edge-panel.js SİLİNMİR,
@@ -56,7 +66,10 @@
       'body.jeo-off #edgePanel{',
       'display:none!important;visibility:hidden!important;opacity:0!important;',
       'pointer-events:none!important;transform:translateY(120%)!important;}',
-      /* lupa yenidən ən üstdə — panel getdiyi üçün rəqibi qalmadı */
+      /* ⌃ alt dok düyməsi — lupanın düz üstündə otururdu */
+      'body.jeo-off #jbdTab,',
+      'body.jeo-off #jbdRoot{display:none!important;pointer-events:none!important;}',
+      /* lupa yenidən ən üstdə və sərbəst */
       'body.jeo-off #qs-fab{z-index:9990!important;}'
     ].join('');
     (document.head || document.documentElement).appendChild(st);
@@ -94,6 +107,21 @@
     } catch (e) {}
   }
 
+  /* ── 2b) Lupanı geri qaytar (səhvən söndürülübsə) ───────── */
+  function restoreLupa() {
+    if (!enabled()) return;
+    try {
+      if (localStorage.getItem('jolly_fab_off') === '1') {
+        localStorage.setItem('jolly_fab_off', '0');
+        console.log('[EdgeOff] lupa söndürülmüşdü — geri qaytarıldı');
+      }
+    } catch (e) {}
+    try {
+      var QS = global.JollyQuickSearch || peek('JollyQuickSearch');
+      if (QS && QS.show) QS.show();
+    } catch (e) {}
+  }
+
   /* ── 3) API sarğısı ─────────────────────────────────────── */
   function wrapApi() {
     var EP = global.JollyEdgePanel || peek('JollyEdgePanel');
@@ -118,6 +146,7 @@
     installCss();
     applyFlag();
     watchAll();
+    restoreLupa();
     var ok = wrapApi();
     if (ok || ++tries > 40) {
       console.log('[EdgeOff] kənar panel söndürüldü' + (ok ? '' : ' (API tapılmadı — CSS + müşahidəçi işləyir)'));
@@ -137,6 +166,7 @@
       applyFlag();
       console.log('[EdgeOff] geri qaytarıldı — səhifəni yenilə');
     },
+    showLupa: restoreLupa,
     status: enabled
   };
 
@@ -147,7 +177,7 @@
   }
 
   global.addEventListener('hashchange', function () {
-    setTimeout(function () { applyFlag(); watchAll(); }, 80);
+    setTimeout(function () { applyFlag(); watchAll(); restoreLupa(); }, 80);
   });
 
 })(typeof window !== 'undefined' ? window : this);
