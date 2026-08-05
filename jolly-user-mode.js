@@ -92,7 +92,9 @@
     lockAdminRoutes: true,
     whitelist: true,        // işçi YALNIZ icazə verilənləri görür
     pressDebug: false,
-    cards: ['home', 'scan', 'share-inbox', 'fixmode', 'tasks']
+    /* 08-05 Esqin: işçiyə HEÇ NƏ verilməsin, sonra bir-bir açılsın.
+       Ona görə standart siyahı BOŞDUR — əvvəl 5 kart var idi. */
+    cards: []
   };
 
   function cfg() {
@@ -909,7 +911,7 @@
     h.push('<div class="storeos">');
     h.push('<div class="dash-head"><div>' +
              '<h2 style="font-family:var(--font-display);margin:0;font-size:22px;">👥 İşçi Rejimi</h2>' +
-             '<div class="muted" style="font-size:12.5px;">v3.0 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
+             '<div class="muted" style="font-size:12.5px;">v3.1 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
            '</div></div>');
 
     h.push('<div class="glass" style="padding:11px 13px;margin:10px 0 4px;font-size:12.5px;line-height:1.5;">' +
@@ -1163,7 +1165,7 @@
     ++tries;
     if (coreOk) {
       syncModulePerms();
-      console.log('[UserMode v3.0] hazırdır — kataloq:', catalog().length, 'kart');
+      console.log('[UserMode v3.1] hazırdır — kataloq:', catalog().length, 'kart');
       
       guardRoute();
       schedulePermSync();
@@ -1190,7 +1192,7 @@
       if (!ok1) miss.push('qadağa');
       if (!ok3) miss.push('icazə');
       if (!ok4) miss.push('modul');
-      if (miss.length) toast('👥 v3.0 — qurulmadı: ' + miss.join(', '), 'error');
+      if (miss.length) toast('👥 v3.1 — qurulmadı: ' + miss.join(', '), 'error');
       guardRoute();
       startDomFix();
       return;
