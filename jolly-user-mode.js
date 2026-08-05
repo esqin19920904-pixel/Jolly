@@ -91,6 +91,7 @@
     hideFabs: true,
     lockAdminRoutes: true,
     whitelist: true,        // işçi YALNIZ icazə verilənləri görür
+    permDriven: true,       // ekran icazədən qurulur (Modul Qovluğu ilə eyni mənbə)
     pressDebug: false,
     /* 08-05 Esqin: işçiyə HEÇ NƏ verilməsin, sonra bir-bir açılsın.
        Ona görə standart siyahı BOŞDUR — əvvəl 5 kart var idi. */
@@ -379,6 +380,40 @@
   }
 
   /* ══════════════════════════════════════════════════════════
+     3b) İCAZƏDƏN QURULAN SİYAHI
+     ──────────────────────────────────────────────────────────
+     📂 Modul Qovluğu (jolly-modul-qovlugu.js) icazəni HƏR İŞÇİ
+     ÜÇÜN AYRICA verir. Ekranın da eyni mənbədən qurulması üçün
+     işçinin kartları artıq əl ilə seçilmiş siyahıdan yox,
+     İCAZƏDƏN gəlir: hansı modula icazəsi varsa, o görünür.
+
+     Açarın adı Modul Qovluğu ilə EYNİ qaydadadır:
+        modulun öz `perm` açarı, yoxdursa 'ui.card.<id>'
+     ══════════════════════════════════════════════════════════ */
+  function permKeyOf(cd) { return cd.perm || ('ui.card.' + cd.id); }
+
+  /* İşçinin görəcəyi kartlar — sıra: əvvəlcə əl ilə düzülənlər,
+     sonra icazəsi olan qalanlar */
+  function permCards() {
+    var c = cfg(), out = [], seen = {}, i;
+    var list = catalog();
+    var order = c.cards || [];
+
+    for (i = 0; i < order.length; i++) {
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id !== order[i]) continue;
+        if (can(permKeyOf(list[j]))) { out.push(list[j]); seen[list[j].id] = 1; }
+        break;
+      }
+    }
+    for (i = 0; i < list.length; i++) {
+      if (seen[list[i].id]) continue;
+      if (can(permKeyOf(list[i]))) out.push(list[i]);
+    }
+    return out;
+  }
+
+  /* ══════════════════════════════════════════════════════════
      4) CSS
      ══════════════════════════════════════════════════════════ */
   function installCss() {
@@ -451,13 +486,23 @@
   /* edit=true → admin redaktə edir (uzun basma açıqdır, icazə süzgəci yoxdur) */
   function renderUserDash(edit) {
     var c = cfg();
-    var ids = c.cards || [];
-    var body = '', shown = 0;
+    var body = '', shown = 0, list;
 
-    for (var i = 0; i < ids.length; i++) {
-      var cd = cardById(ids[i]);
+    if (!edit && c.permDriven) {
+      list = permCards();                       // icazədən qurulur
+    } else {
+      list = [];
+      var ids = c.cards || [];
+      for (var q = 0; q < ids.length; q++) {
+        var cq = cardById(ids[q]);
+        if (cq) list.push(cq);
+      }
+    }
+
+    for (var i = 0; i < list.length; i++) {
+      var cd = list[i];
       if (!cd) continue;
-      if (!edit && cd.perm && !can(cd.perm)) continue;   // icazəsi yoxdursa kart da yoxdur
+      if (!edit && !c.permDriven && cd.perm && !can(cd.perm)) continue;
       shown++;
       var st = edit && cd.perm ? permState(cd.perm) : null;
       var badge = (edit && cd.perm) ? '<div class="jum-lock">' + (st ? '🔓' : '🔒') + '</div>' : '';
@@ -618,12 +663,17 @@
      əks halda icazə verilən ekranın içi də boşalardı.
      ══════════════════════════════════════════════════════════ */
   function allowedRouteSet() {
-    var c = cfg(), out = { '': 1, '#/': 1, '#/dashboard': 1 };
+    var c = cfg(), out = { '': 1, '#/': 1, '#/dashboard': 1 }, i;
+    if (c.permDriven) {
+      var pc = permCards();
+      for (i = 0; i < pc.length; i++) out[String(pc[i].route).split('?')[0]] = 1;
+      return out;
+    }
     var ids = c.cards || [];
-    for (var i = 0; i < ids.length; i++) {
+    for (i = 0; i < ids.length; i++) {
       var cd = cardById(ids[i]);
       if (!cd) continue;
-      if (cd.perm && !can(cd.perm)) continue;   // icazəsi yoxdursa açıq deyil
+      if (cd.perm && !can(cd.perm)) continue;
       out[String(cd.route).split('?')[0]] = 1;
     }
     return out;
@@ -911,9 +961,11 @@
     h.push('<div class="storeos">');
     h.push('<div class="dash-head"><div>' +
              '<h2 style="font-family:var(--font-display);margin:0;font-size:22px;">👥 İşçi Rejimi</h2>' +
-             '<div class="muted" style="font-size:12.5px;">v3.1 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
+             '<div class="muted" style="font-size:12.5px;">v3.2 · Karta basıb saxla — sil, gizlət, icazə ver</div>' +
            '</div></div>');
 
+    h.push('<div class="glass" style="padding:12px 14px;margin:10px 0;font-size:13px;text-align:center;cursor:pointer;" ' +
+             'onclick="JollyUserMode.go(\'#/modules\')">📂 <b>Modul Qovluğu</b> — hər işçiyə ayrıca icazə ver</div>');
     h.push('<div class="glass" style="padding:11px 13px;margin:10px 0 4px;font-size:12.5px;line-height:1.5;">' +
              'Aşağıdakı ekran işçinin gördüyünün eynisidir. Uzun basma <b>əsl iş masasında da</b> işləyir. ' +
              '<b>Basıb saxla</b> → menyu. <b>＋</b> → yeni kart. ' +
@@ -967,6 +1019,7 @@
     h.push(sw('simpleDash', c.simpleDash, 'İşçiyə ayrı sadə iş masası', 'Söndürsən, işçi də adi iş masasını görür'));
     h.push(sw('hideTop', c.hideTop, 'Yuxarı düymələri gizlət', 'Studio · AI Brain · ⌘ · backup'));
     h.push(sw('hideFabs', c.hideFabs, 'Üzən dairəvi menyuları gizlət', 'Radial menyu və sürətli düymələr'));
+    h.push(sw('permDriven', c.permDriven, '📂 Ekran icazədən qurulsun', 'Modul Qovluğunda verdiyin icazə dərhal işçinin ekranına düşür'));
     h.push(sw('whitelist', c.whitelist, '🔒 Yalnız icazə verilənlər görünsün', 'İşçi heç nə görmür — sən yuxarıdan bir-bir açırsan'));
     h.push(sw('lockAdminRoutes', c.lockAdminRoutes, 'Admin ekranlarını bağla', 'Ağ siyahı sönülüdürsə işə düşür'));
     h.push(sw('on', c.on, 'İşçi rejimi ümumiyyətlə işləsin', 'Söndürsən, hər şey əvvəlki halına qayıdır'));
@@ -1098,6 +1151,8 @@
     catalog: catalog,
     syncPerms: syncModulePerms,
     permState: permState,
+    permCards: permCards,
+    permKeyOf: permKeyOf,
     _findPressTarget: findPressTarget,
     _sweep: sweepUi,
     _guard: guardRoute,
@@ -1165,7 +1220,7 @@
     ++tries;
     if (coreOk) {
       syncModulePerms();
-      console.log('[UserMode v3.1] hazırdır — kataloq:', catalog().length, 'kart');
+      console.log('[UserMode v3.2] hazırdır — kataloq:', catalog().length, 'kart');
       
       guardRoute();
       schedulePermSync();
@@ -1192,7 +1247,7 @@
       if (!ok1) miss.push('qadağa');
       if (!ok3) miss.push('icazə');
       if (!ok4) miss.push('modul');
-      if (miss.length) toast('👥 v3.1 — qurulmadı: ' + miss.join(', '), 'error');
+      if (miss.length) toast('👥 v3.2 — qurulmadı: ' + miss.join(', '), 'error');
       guardRoute();
       startDomFix();
       return;
