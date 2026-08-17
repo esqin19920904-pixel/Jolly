@@ -124,6 +124,13 @@
     return q;
   }
 
+  /* Qovluğun üz şəkli — siyahıda və kartda görünür */
+  function setCover(id, ref) {
+    var l = all();
+    for (var i = 0; i < l.length; i++) if (l[i].id === id) { l[i].image = ref; save(l); return true; }
+    return false;
+  }
+
   function edit(id, name, code, price) {
     var l = all(), q = null;
     for (var i = 0; i < l.length; i++) if (l[i].id === id) q = l[i];
@@ -170,6 +177,56 @@
     save(all().filter(function (x) { return x.id !== id; }));
   }
 
+  /* Qovluğun öz üz şəkli */
+  function setCover(id, ref) {
+    var l = all();
+    for (var i = 0; i < l.length; i++) if (l[i].id === id) l[i].cover = ref;
+    save(l);
+  }
+
+  /* Mövcud (artıq yaradılmış) malı qovluğa salmaq —
+     barkod və qiymət ona da tətbiq olunur */
+  function attach(qid, pid) {
+    var q = get(qid), d = DB();
+    if (!q) return false;
+    try {
+      d.Products.update(pid, {
+        qovluqId: qid,
+        price: q.price,
+        barcodes: q.code ? [q.code] : []
+      });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function detach(pid) {
+    var d = DB();
+    try { d.Products.update(pid, { qovluqId: '' }); return true; }
+    catch (e) { return false; }
+  }
+
+  /* İş masasına kart kimi qoymaq — İdarə Mərkəzi varsa ondan keçir */
+  function onDash() {
+    var I = global.JollyIdare;
+    if (!I || !I.dashOf) return false;
+    try { return (I.dashOf('__me') || []).indexOf('qovluq') !== -1; }
+    catch (e) { return false; }
+  }
+  function toggleDash() {
+    var I = global.JollyIdare;
+    if (!I || !I.tgD) {
+      toast('İdarə Mərkəzi yüklənməyib — bir az sonra yenidən yoxla', 'error');
+      return;
+    }
+    try {
+      /* İdarə hədəf kimi "Mən"i seçsin, sonra açsın/bağlasın */
+      if (I.dashPick) I.dashPick('__me');
+      I.tgD('qovluq');
+      toast(onDash() ? '⌂ İş masasına əlavə olundu' : 'İş masasından götürüldü', 'ok');
+      repaint();
+    } catch (e) { toast('Alınmadı', 'error'); }
+  }
+
   /* Toplu mal əlavəsi — barkod və qiymət qovluqdan gəlir */
   function addItems(qid, rows) {
     var q = get(qid);
@@ -192,6 +249,38 @@
       } catch (e) {}
     }
     return n;
+  }
+
+  /* Kataloqda hazır olan malı qovluğa salmaq — barkod və qiymət
+     qovluqdan yazılır, yəni mal avtomatik qovluğun qaydasına düşür */
+  function attach(qid, productId) {
+    var q = get(qid), d = DB();
+    if (!q) return false;
+    try {
+      d.Products.update(productId, {
+        qovluqId: qid,
+        price: q.price,
+        barcodes: q.code ? [q.code] : []
+      });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function detachProduct(productId) {
+    try { DB().Products.update(productId, { qovluqId: '' }); return true; }
+    catch (e) { return false; }
+  }
+
+  /* Ad artıq qovluqdadırsa xəbərdarlıq — 100 mal yazarkən
+     təsadüfən eynisini iki dəfə yazmaq asandır */
+  function dupNames(qid, rows) {
+    var have = {}, out = [];
+    items(qid).forEach(function (p) { have[String(p.name || '').toLowerCase().trim()] = 1; });
+    rows.forEach(function (r) {
+      var k = String(r.name || '').toLowerCase().trim();
+      if (have[k]) out.push(r.name);
+    });
+    return out;
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -229,6 +318,7 @@
       '.qv-cell img,.qv-cell .ph{width:100%;height:110px;border-radius:10px;object-fit:cover;',
       'background:rgba(255,255,255,.06);display:block}',
       '.qv-cell .ph{display:flex;align-items:center;justify-content:center;font-size:30px}',
+      '.qv-cov{width:44px;height:44px;border-radius:11px;object-fit:cover;flex:none}',
       '.qv-cell .t{font-size:12.5px;font-weight:600;margin-top:7px;overflow:hidden;',
       'text-overflow:ellipsis;white-space:nowrap}'
     ].join('');
@@ -253,8 +343,14 @@
            'Məsələn <b>Açkı 545</b> — barkod 545, qiymət 10 ₼, içində 100 fərqli mal. ' +
            'Kassa barkodu oxuyanda qiymət düz gəlir.</div>');
 
-    h.push('<button class="btn btn-primary" style="width:100%" onclick="JollyQovluq.newQ()">' +
-           '＋ Yeni qovluq</button>');
+    h.push('<div class="row" style="display:flex;gap:8px">' +
+             '<button class="btn btn-primary" style="flex:1" onclick="JollyQovluq.newQ()">' +
+               '＋ Yeni qovluq</button>' +
+             '<button class="btn btn-ghost" style="flex:none;padding:0 14px" ' +
+               'onclick="JollyQovluq.dash()">' + (onDash() ? '⌂ ✓' : '⌂ +') + '</button>' +
+           '</div>');
+    h.push('<div class="muted" style="font-size:11.5px;margin-top:6px">' +
+           '⌂ düyməsi — Qovluqları iş masasına kart kimi qoyur</div>');
 
     h.push('<div class="mt" style="margin-top:12px">');
     if (!l.length) {
@@ -262,8 +358,13 @@
     } else {
       for (var i = 0; i < l.length; i++) {
         var q = l[i], n = items(q.id).length;
+        var I0 = IMG();
+        var cov = (q.cover && I0 && I0.imgAttr)
+          ? '<img class="ic" ' + I0.imgAttr(q.cover, true) +
+            ' style="width:44px;height:44px;border-radius:11px;object-fit:cover" alt="">'
+          : '<span class="ic">🗂</span>';
         h.push('<div class="qv-row" onclick="JollyQovluq.open(\'' + q.id + '\')">' +
-                 '<span class="ic">🗂</span>' +
+                 cov +
                  '<span class="b"><div class="nm">' + esc(q.name) + '</div>' +
                    '<div class="mt">' + (q.code ? '▣ ' + esc(q.code) : 'barkodsuz') +
                    (q.price != null ? ' · ' + q.price + ' ₼' : '') + '</div></span>' +
@@ -297,10 +398,21 @@
                  '<span style="font-size:14px;opacity:.6">₼</span></div>' : '') +
                '<div class="qv-code" style="flex:1">' + (q.code ? esc(q.code) : '—') + '</div>' +
              '</div>' +
-             '<div class="row" style="margin-top:12px;display:flex;gap:8px">' +
+             '<div class="row" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' +
                '<button class="btn btn-ghost btn-sm" onclick="JollyQovluq.editQ()">✎ Dəyiş</button>' +
+               '<button class="btn btn-ghost btn-sm" onclick="JollyQovluq.cover()">🖼 Üz şəkli</button>' +
                '<button class="btn btn-ghost btn-sm" onclick="JollyQovluq.delQ()">🗑 Sil</button>' +
              '</div>' +
+           '</div>');
+
+    /* Mövcud malı qovluğa salmaq */
+    h.push('<div class="card">' +
+             '<div style="font-weight:700;margin-bottom:4px">Mövcud malı qovluğa sal</div>' +
+             '<div class="muted" style="font-size:12px;margin-bottom:9px">' +
+               'Artıq yazılmış mal varsa adını axtar və seç — barkod və qiymət ona da tətbiq olunacaq.</div>' +
+             '<input id="qvFind" class="qv-in" placeholder="Mal adı ilə axtar…" ' +
+               'autocomplete="off" oninput="JollyQovluq.find(this.value)">' +
+             '<div id="qvHits"></div>' +
            '</div>');
 
     /* Toplu əlavə */
@@ -330,8 +442,15 @@
         var ref = (p.images || [])[0];
         var img = (ref && I && I.imgAttr) ? '<img ' + I.imgAttr(ref, true) + ' alt="">'
                                           : '<div class="ph">📦</div>';
-        h.push('<div class="qv-cell" onclick="JollyQovluq.openProduct(\'' + p.id + '\')">' +
-                 img + '<div class="t">' + esc(p.name || 'Adsız') + '</div></div>');
+        h.push('<div class="qv-cell">' +
+                 '<div onclick="JollyQovluq.openProduct(\'' + p.id + '\')">' + img +
+                   '<div class="t">' + esc(p.name || 'Adsız') + '</div></div>' +
+                 '<div style="display:flex;gap:6px;margin-top:7px">' +
+                   '<button class="btn btn-ghost btn-sm" style="flex:1;padding:5px" ' +
+                     'onclick="JollyQovluq.itemPhoto(\'' + p.id + '\')">📷</button>' +
+                   '<button class="btn btn-ghost btn-sm" style="flex:1;padding:5px" ' +
+                     'onclick="JollyQovluq.detach(\'' + p.id + '\')">✕</button>' +
+                 '</div></div>');
       }
       h.push('</div>');
     }
@@ -367,6 +486,35 @@
     }
     var A = global.JollyApp || peek('JollyApp');
     try { if (A && A.render) A.render(); } catch (e) {}
+  }
+
+  /* Kameradan/qalereyadan şəkil götürüb IndexedDB-yə yazır,
+     sonra ünvanını (ref) geri verir. Üç yerdə işlədilir:
+     qovluğun üz şəkli, qaralama sətri, mövcud mal. */
+  function pickPhoto(done) {
+    var inp = document.getElementById('qvPhoto');
+    if (!inp) {
+      inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+      inp.id = 'qvPhoto'; inp.style.display = 'none';
+      document.body.appendChild(inp);
+    }
+    inp.onchange = function () {
+      var f = (inp.files || [])[0];
+      inp.value = '';
+      if (!f) return;
+      var I = IMG();
+      if (!I || !I.saveImage) return toast('Şəkil saxlanıla bilmədi', 'error');
+      toast('☁️ şəkil yüklənir…');
+      var fr = new FileReader();
+      fr.onload = function () {
+        Promise.resolve(I.saveImage(fr.result)).then(function (ref) {
+          if (ref) done(ref);
+        }).catch(function (e) { toast('Alınmadı: ' + (e && e.message), 'error'); });
+      };
+      fr.readAsDataURL(f);
+    };
+    inp.click();
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -428,34 +576,89 @@
 
     drop: function (i) { draft.splice(i, 1); repaint(); },
 
-    photo: function (i) {
-      var inp = document.getElementById('qvPhoto');
-      if (!inp) {
-        inp = document.createElement('input');
-        inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
-        inp.id = 'qvPhoto'; inp.style.display = 'none';
-        document.body.appendChild(inp);
-      }
-      inp.onchange = function () {
-        var f = (inp.files || [])[0];
-        inp.value = '';
-        if (!f || !draft[i]) return;
-        var I = IMG();
-        if (!I || !I.saveImage) return toast('Şəkil saxlanıla bilmədi', 'error');
-        toast('☁️ şəkil yüklənir…');
-        var fr = new FileReader();
-        fr.onload = function () {
-          Promise.resolve(I.saveImage(fr.result)).then(function (ref) {
-            if (ref && draft[i]) { draft[i].images.push(ref); repaint(); toast('✅ şəkil əlavə olundu', 'ok'); }
-          }).catch(function (e) { toast('Alınmadı: ' + (e && e.message), 'error'); });
-        };
-        fr.readAsDataURL(f);
+    dash: function () { toggleDash(); },
+
+    cover: function () {
+      pickPhoto(function (ref) {
+        setCover(openId, ref);
+        toast('🖼 Üz şəkli qoyuldu', 'ok');
+        repaint();
+      });
+    },
+
+    itemPhoto: function (pid) {
+      pickPhoto(function (ref) {
+        var d = DB();
+        try {
+          var p = d.Products.get ? d.Products.get(pid) : null;
+          var imgs = (p && p.images) ? p.images.slice() : [];
+          imgs.push(ref);
+          d.Products.update(pid, { images: imgs });
+          toast('📷 Şəkil əlavə olundu', 'ok');
+          repaint();
+        } catch (e) { toast('Alınmadı', 'error'); }
+      });
+    },
+
+    detach: function (pid) {
+      if (!confirm('Bu mal qovluqdan çıxarılsın?\n\nMal SİLİNMİR.')) return;
+      detachProduct(pid);
+      toast('Qovluqdan çıxarıldı', 'ok');
+      repaint();
+    },
+
+    /* Mövcud malı axtarıb qovluğa salmaq */
+    find: function (q) {
+      var box = document.getElementById('qvHits');
+      if (!box) return;
+      q = String(q || '').trim().toLowerCase();
+      if (q.length < 2) { box.innerHTML = ''; return; }
+      var d = DB(), list = [];
+      try { list = (d && d.Products && d.Products.all) ? (d.Products.all() || []) : []; } catch (e) {}
+      var fold = function (x) {
+        return String(x || '').toLowerCase()
+          .replace(/ə/g, 'e').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ğ/g, 'g')
+          .replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ı/g, 'i');
       };
-      inp.click();
+      var qq = fold(q);
+      var hits = list.filter(function (p) {
+        return p && p.qovluqId !== openId && fold(p.name).indexOf(qq) !== -1;
+      }).slice(0, 8);
+
+      box.innerHTML = hits.length
+        ? hits.map(function (p) {
+            return '<div class="qv-line"><span style="flex:1">' + esc(p.name || 'Adsız') + '</span>' +
+              '<button class="btn btn-primary btn-sm" onclick="JollyQovluq.take(\'' + p.id + '\')">' +
+              '＋ Sal</button></div>';
+          }).join('')
+        : '<div class="muted" style="font-size:12px;padding:6px 0">Tapılmadı</div>';
+    },
+
+    take: function (pid) {
+      if (attach(openId, pid)) {
+        toast('✅ Qovluğa salındı', 'ok');
+        var el = document.getElementById('qvFind');
+        if (el) el.value = '';
+        repaint();
+      }
+    },
+
+    photo: function (i) {
+      pickPhoto(function (ref) {
+        if (!draft[i]) return;
+        draft[i].images.push(ref);
+        repaint();
+        toast('✅ şəkil əlavə olundu', 'ok');
+      });
     },
 
     commit: function () {
       if (!draft.length) return;
+      /* 100 mal yazarkən eyni adı iki dəfə yazmaq asandır */
+      var dup = dupNames(openId, draft);
+      if (dup.length && !confirm('Bu adlar qovluqda artıq var:\n\n' +
+          dup.slice(0, 6).join(', ') + (dup.length > 6 ? '…' : '') +
+          '\n\nYenə də yazılsın?')) return;
       var n = addItems(openId, draft);
       draft = [];
       toast('✅ ' + n + ' mal qovluğa yazıldı', 'ok');
@@ -465,7 +668,8 @@
     openProduct: function (pid) { go('#/product/' + pid); },
 
     /* Kənardan istifadə üçün */
-    all: all, get: get, items: items, create: create, edit: edit, addItems: addItems
+    all: all, get: get, items: items, create: create, edit: edit, addItems: addItems,
+    attach: attach, setCover: setCover, onDash: onDash
   };
 
   /* ══════════════════════════════════════════════════════════
