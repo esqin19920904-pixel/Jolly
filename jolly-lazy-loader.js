@@ -46,6 +46,7 @@
        index.html-ə TOXUNULMUR. */
     { key: 'jolly-idare.js',       src: 'jolly-idare.js',       label: 'İdarə Mərkəzi',     icon: '🛠', lock: true },
     { key: 'jolly-qovluq.js',      src: 'jolly-qovluq.js',      label: 'Qovluqlar',        icon: '🗂', lock: true },
+    { key: 'jolly-ai-bridge.js',   src: 'jolly-ai-bridge.js',   label: 'AI körpüsü',       icon: '🔗', lock: true },
     { key: 'jolly-image-guard.js', src: 'jolly-image-guard.js', label: 'Şəkil Qoruyucusu',  icon: '🖼', lock: true },
 
     { key: 'jolly-archive.js',          src: 'jolly-archive.js',               label: 'Arxiv',                 icon: '🗄️', mod: 'Arxiv' },
