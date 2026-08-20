@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06070d">
+<title>JOLLY Kassa</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+
+<!--
+  ═══════════════════════════════════════════════════════════════
+  JOLLY KASSA — ayrıca səhifə
+  v1.0 (2026-08-19)
+
+  NİYƏ AYRICA SƏHİFƏ
+
+  Esqin haqlı olaraq soruşdu: "niyə yamaq işlər görürsən?"
+
+  Cavab: `index.html`-ə toxunmaq qadağan idi, ona görə köhnə
+  icazə sistemlərini (jolly-user-mode.js, jolly-idare.js) ayrı
+  fayllardan susdurmağa çalışırdım. Onlar isə yüklənməkdə davam
+  edirdi — nəticədə hər dəfə bir yerdən sızırdı.
+
+  Bu səhifə həmin problemi KÖKÜNDƏN həll edir: burada köhnə
+  sistemlər YÜKLƏNMİR. Gizlətməyə ehtiyac yoxdur, çünki yoxdur.
+
+  YÜKLƏNƏNLƏR — cəmi dörd fayl:
+      db.js          məhsul bazası (localStorage)
+      storage.js     şəkillər (IndexedDB / server)
+      jolly-space.js yaddaş qoruyucusu
+      jolly-cc.js    ekranın özü
+
+  YÜKLƏNMƏYƏNLƏR: app.js, dashboard.js, studios.js, products.js,
+  jolly-user-mode.js, jolly-idare.js, radial-fab.js və qalan
+  ~145 fayl. Yəni kassirin gedə biləcəyi başqa yer YOXDUR.
+
+  MƏLUMAT EYNİDİR: eyni brauzerdə eyni localStorage oxunur.
+  ═══════════════════════════════════════════════════════════════
+-->
+
+<style>
+  :root{
+    --bg:#06070d; --panel:rgba(255,255,255,.045);
+    --line:rgba(255,255,255,.1); --ink:#e8ecf5; --muted:#9aa4bd;
+    --accent-1:#2ee6a8; --font-display:'Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 700px at 20% -10%,rgba(46,230,168,.09),transparent 60%),
+      radial-gradient(900px 600px at 90% 10%,rgba(59,130,246,.08),transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    font-size:15px;line-height:1.5;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .kbar{
+    display:flex;align-items:center;gap:11px;padding:12px 16px;
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;
+    background:rgba(6,7,13,.92);backdrop-filter:blur(12px);
+  }
+  .kbar .logo{font-weight:800;font-size:17px;letter-spacing:.04em;color:var(--accent-1)}
+  .kbar .who{
+    margin-left:auto;font-size:12.5px;color:var(--muted);
+    padding:6px 12px;border-radius:12px;background:var(--panel);
+    border:1px solid var(--line);
+  }
+  #main{padding:16px;max-width:1400px;margin:0 auto}
+  .storeos{max-width:100%}
+  .dash-head{margin-bottom:14px}
+  .muted{color:var(--muted)}
+  .card{
+    border-radius:16px;padding:15px;margin-bottom:10px;
+    background:var(--panel);border:1px solid var(--line);
+  }
+  .card.sm{padding:12px}
+  .btn{
+    padding:12px;border-radius:13px;font-size:13.5px;font-weight:600;
+    cursor:pointer;color:inherit;background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.14);
+  }
+  .btn-primary{background:linear-gradient(135deg,#2ee6a8,#3b82f6);color:#04240f;border:none}
+  .btn-ghost{background:transparent}
+  .input{
+    padding:11px 13px;border-radius:12px;color:inherit;
+    background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.14);
+  }
+  .empty-state{text-align:center;padding:34px 10px;opacity:.55}
+  .empty-state .big-icon{font-size:40px}
+  .section-title{
+    font-size:11px;letter-spacing:.07em;opacity:.45;
+    margin:16px 0 8px;text-transform:uppercase;
+  }
+  .mt{margin-top:10px}
+  /* Yükləmə anı */
+  #boot{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;background:var(--bg);z-index:999;
+  }
+  #boot .sp{
+    width:30px;height:30px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.15);border-top-color:var(--accent-1);
+    animation:sp .7s linear infinite;
+  }
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #boot .t{font-size:13px;opacity:.6}
+  .kerr{
+    margin:16px;padding:16px;border-radius:14px;font-size:13px;line-height:1.6;
+    background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);
+  }
+</style>
+</head>
+<body>
+
+<div class="kbar">
+  <span class="logo">JOLLY</span>
+  <span class="muted" style="font-size:12px">Kassa</span>
+  <span class="who" id="kWho">—</span>
+</div>
+
+<div id="main"></div>
+
+<div id="boot"><div class="sp"></div><div class="t">JOLLY Kassa açılır…</div></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Minimal Toast — db.js və storage.js onu `typeof` ilə axtarır.
+   Tam proqramdakı bildiriş sistemi burada lazım deyil.
+   ═══════════════════════════════════════════════════════════ */
+window.Toast = (function () {
+  function show(msg, color) {
+    try {
+      var d = document.createElement('div');
+      d.textContent = String(msg);
+      d.style.cssText =
+        'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);' +
+        'max-width:88%;padding:12px 18px;border-radius:14px;z-index:9999;' +
+        'font-size:13.5px;background:rgba(12,16,28,.96);color:#e8ecf5;' +
+        'border:1px solid ' + color + ';box-shadow:0 8px 30px rgba(0,0,0,.5)';
+      document.body.appendChild(d);
+      setTimeout(function () { try { d.remove(); } catch (e) {} }, 3200);
+    } catch (e) {}
+  }
+  return {
+    info:    function (m) { show(m, 'rgba(255,255,255,.16)'); },
+    success: function (m) { show(m, 'rgba(46,230,168,.5)'); },
+    error:   function (m) { show(m, 'rgba(248,113,113,.5)'); }
+  };
+})();
+
+/* Kassir rejimini məcburi edirik — bu səhifə yalnız onun üçündür.
+   Sessiyada rol yoxdursa da CC işçi kimi davranmalıdır. */
+try {
+  var s = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+  if (!s || !s.role || String(s.role).toLowerCase() === 'admin') {
+    sessionStorage.setItem('jolly_sec_session', JSON.stringify({
+      role: 'kassa', userName: (s && s.userName) || 'Kassa', ts: Date.now()
+    }));
+  }
+  var s2 = JSON.parse(sessionStorage.getItem('jolly_sec_session') || 'null');
+  document.getElementById('kWho').textContent = (s2 && s2.userName) || 'Kassa';
+} catch (e) {}
+
+/* Bu səhifədə marşrut həmişə #/cc-dir */
+if (location.hash.indexOf('#/cc') !== 0) {
+  try { history.replaceState(null, '', location.pathname + '#/cc'); }
+  catch (e) { location.hash = '#/cc'; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Faylları ardıcıl yükləyirik — sıra vacibdir:
+   db.js → storage.js → space → cc
+   ═══════════════════════════════════════════════════════════ */
+(function () {
+  var FILES = ['db.js', 'storage.js', 'jolly-space.js', 'jolly-cc.js'];
+  var i = 0;
+
+  function fail(f, e) {
+    var b = document.getElementById('boot');
+    if (b) b.remove();
+    var d = document.createElement('div');
+    d.className = 'kerr';
+    d.innerHTML = '<b>Açıla bilmədi</b><br>' +
+      'Yüklənməyən fayl: <b>' + f + '</b><br><br>' +
+      'Bu fayl repoda yoxdur və ya adı fərqlidir. ' +
+      'Tam proqram <b>index.html</b>-dən açılır.';
+    document.body.appendChild(d);
+  }
+
+  function next() {
+    if (i >= FILES.length) {
+      setTimeout(function () {
+        var b = document.getElementById('boot');
+        if (b) b.remove();
+        /* CC özü #main-ə yazır; bir də təkan veririk */
+        try { if (window.JollyCC && window.JollyCC.ensure) window.JollyCC.ensure(); } catch (e) {}
+      }, 350);
+      return;
+    }
+    var f = FILES[i++];
+    var sc = document.createElement('script');
+    sc.src = f + '?v=kassa1';
+    sc.onload = next;
+    sc.onerror = function () { fail(f); };
+    document.head.appendChild(sc);
+  }
+  next();
+})();
+
+/* Service Worker — oflayn işləmək üçün (varsa) */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+
+</body>
+</html>
