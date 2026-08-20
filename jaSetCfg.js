@@ -21,4 +21,4 @@
     // Kart ölçüsü sabit qalsın (User olub-olmamasından asılı olmasın)
     const card = document.getElementById('ja-card');
     if (card) card.style.maxWidth = '400px';
-  };1
+  };
